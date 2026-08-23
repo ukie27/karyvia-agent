@@ -122,9 +122,11 @@ def to_load_request(
     if keep is not None:
         declarations = tuple(decl for decl in declarations if keep(manifest, decl))
     return LoadRequest(
+        plugin_id=manifest.id,
         provider=provider,
         setup=manifest.setup,
         declarations=tuple(to_declaration(decl) for decl in declarations),
+        dependencies=manifest.dependencies,
         critical=manifest.critical,
     )
 

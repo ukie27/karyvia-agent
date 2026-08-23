@@ -154,11 +154,14 @@ Lifecycle activate → ready → reverse-order stop
 
 加载顺序只保证依赖先 setup，不决定覆盖胜负。覆盖语义只在 Registry resolution 中解释。
 `RegistrationBatch` 回滚能力表；`StartupResources` 同时接管 `setup()` 已产生的任务与订阅。
+某个非关键插件在 setup 阶段失败时，其传递依赖者不再执行 setup；无关插件仍继续加载。
 任一步失败时先逆序清理这些运行资源，再释放实例锁；成功后所有权一次性交给
 `AgentInstance`。CLI 回落等二次装配也必须先撤销前一次尝试。
 
 安装链路与启动链路分开：`nm plugins install/update/uninstall` 在 Runtime 管理全局代码目录，
-实例只通过 `enabled/disable` 选择已安装候选。全局变更持有管理锁并确认所有实例已停止。
+实例只通过 `enabled/disable` 选择已安装候选。全局变更持有管理锁并确认所有实例已停止；默认
+Python 安装还会拒绝同名发行包的多版本集合。卸载不允许破坏仍被依赖的插件，跨实例配置与
+全局目录通过补偿事务一起提交或恢复。
 
 ## 5. 配置与 Secret 链路
 

@@ -1,6 +1,6 @@
 """注册意图的 kernel 侧投影：`CapabilityDeclaration` 与 `LoadRequest`（技术方案 §7.2）。
 
-职责：以契约层认识的类型描述「一个提供方声明了哪些能力、从哪导入 `setup`、是否关键」，
+职责：以契约层认识的类型描述「一个插件声明了哪些能力、从哪导入 `setup`、依赖谁、是否关键」，
 作为 Host 与 loader 的输入。
 不负责：解析或校验 manifest（那是 `sdk/manifest.py`，且 `R2` 禁止 `kernel/` import
 `sdk/`）、导入实现、判定谁生效。本模块是纯数据，无 IO。
@@ -88,16 +88,22 @@ class CapabilityDeclaration:
 
 @dataclass(frozen=True, slots=True)
 class LoadRequest:
-    """一个提供方的一次加载请求：谁、从哪导入 `setup`、声明了什么、是否关键。
+    """一个插件的一次加载请求：逻辑身份、提供方、入口、依赖、声明与关键性。
+
+    `plugin_id` 与 `dependencies` 是阶段 B 必须保留的最小拓扑信息。阶段 A 的排序只能保证
+    依赖先执行；若依赖的 ``setup()`` 随后失败，loader 仍需据此跳过依赖者。不能从
+    ``provider`` 反推逻辑身份，因为全部内建插件共享一个 :class:`Builtin` 提供方身份。
 
     `critical` 是**提供方级**的（`PluginManifest.critical`，不是每项能力各有一个），
     Host 把它原样灌进 `RegisteredHook` 与 `RegisteredContextProvider`——`CTX-005` 与
     `PLG-004` 的分叉必须在 kernel 里判，而 kernel 不认识 manifest。
     """
 
+    plugin_id: str
     provider: ProviderId
     setup: str
     declarations: tuple[CapabilityDeclaration, ...]
+    dependencies: tuple[str, ...] = ()
     critical: bool = False
 
     def __post_init__(self) -> None:

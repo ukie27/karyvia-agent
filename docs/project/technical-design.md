@@ -1020,7 +1020,7 @@ asyncio 抢占不了同步回调，因此「超时隔离」的形态是**测量 
 
 | 来源 | 用途 | 形式 |
 | --- | --- | --- |
-| `~/.nucleamind/plugins.json` | 全局已安装插件目录 | id、版本、安装后端、来源与运行入口；当前 Python 入口为 `name = "pkg.module:MANIFEST"` |
+| `~/.nucleamind/plugins.json` | 全局已安装插件目录 | id、版本、逻辑依赖、安装后端、来源、运行入口和已解析发行包版本；当前 Python 入口为 `name = "pkg.module:MANIFEST"` |
 
 不采用的方案及理由：
 
@@ -1114,13 +1114,15 @@ class PluginManifest(BaseModel):
   B3 开启 RegistrationBatch
   B4 await setup(api)
   B5 成功 -> batch.commit()   失败 -> batch.rollback() 并记录失败阶段
+  B6 失败 id 进入集合；依赖它的后续插件跳过 setup，无关插件继续
 阶段 C  解析覆盖 -> ResolutionReport -> 校验必需能力
 阶段 D  按拓扑序 start() 长生命周期服务
 ```
 
 `RegistrationBatch` 是 `EDG-103` 的落地手段：`setup` 期间的所有注册先进入批次暂存区，
 只在 `setup` 正常返回后一次性并入 registry。中途抛异常 → 批次整体丢弃，registry
-不会留下半注册状态。
+不会留下半注册状态。阶段 A 的拓扑排序并不能预知 setup 是否成功，因此阶段 B 继续携带
+`plugin_id/dependencies`：依赖失败会沿图级联，但不会把无关的非关键插件一起停掉。
 
 阶段 A 失败的插件根据 `critical` 决定后果：`critical=true` → 启动失败；否则记入
 `ResolutionReport.failures`，实例继续启动（`PLG-004`、`EDG-106`）。
@@ -1628,10 +1630,12 @@ nm capabilities                                 # 报告中可见 provider 与 s
 `nm plugins install/update/uninstall` 是全局操作，并要求所有已知实例停止。卸载删除
 `~/.nucleamind/plugin-packages/<id>/`，同时清除全部已知实例中的配置引用，因此覆盖插件被
 卸载后，内建实现会在实例下次启动时恢复。`<instance_dir>/plugins/<id>/` 默认保留；清理需
-显式 `nm plugins purge <id> --confirm --instance ...`，执行前打印路径与体积。
+显式 `nm plugins purge <id> --confirm --instance ...`，执行前打印路径与体积。仍被其他全局
+插件依赖的插件不得卸载；多实例配置写入与全局代码删除使用补偿事务，任一步失败就恢复此前
+已写的配置。
 
-升级时 `state_version` 变化必须由插件提供迁移函数，迁移失败保留旧状态并返回可恢复错误
-（`EDG-503`、`CFG-004`）。
+当前没有热状态迁移协议；升级后 `state_version` 不一致会拒绝实例启动并保留原状态。只有
+出现不停机升级的真实需求时，才集中设计迁移函数、任务排空、原子切换与回滚。
 
 ## 11. 目录布局与多实例
 
@@ -1640,7 +1644,7 @@ nm capabilities                                 # 报告中可见 provider 与 s
 ```text
 ~/.nucleamind/
   plugins.json                    # 全局安装目录
-  plugin-packages/<plugin_id>/    # 管理器拥有的插件代码
+  plugin-packages/<plugin_id>/    # 管理器拥有的插件代码；默认依赖版本必须与其他根兼容
   plugin-cache/                   # 安装器缓存；不参与发现
   instances.json                  # 已知实例目录（含自定义路径）
   plugin-manager.lock             # 全局插件变更协调锁

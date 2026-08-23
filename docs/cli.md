@@ -144,9 +144,9 @@ nm plugins purge     <插件 id> --confirm
 
 | 子命令 | 做什么 |
 | --- | --- |
-| `install` | 把插件全局安装到 `~/.nucleamind/plugin-packages/<id>/`，不自动为任何实例启用 |
-| `update` | 从安装记录里的来源更新全局插件 |
-| `uninstall` | 删除全局代码，并清除所有已知实例中的启用、禁用和配置引用；实例状态目录默认保留 |
+| `install` | 把插件全局安装到 `~/.nucleamind/plugin-packages/<id>/`，验证逻辑依赖和 Python 发行包版本集合，不自动为任何实例启用 |
+| `update` | 从安装记录里的来源更新全局插件；依赖集合不兼容时保持旧版本 |
+| `uninstall` | 无其他插件依赖它时删除全局代码，并事务性清除所有已知实例中的配置引用；实例状态目录默认保留 |
 | `list` | 列出已发现的插件、状态、版本与能力（内建不在这张表里，看 `nm capabilities`） |
 | `enable` | 外部插件写入 `plugins.enabled` 并从 `plugins.disable` 移除；内建插件本来就存在，因此只撤销 `disable`，不会伪造成外部安装引用 |
 | `disable` | 写入 `plugins.disable`，**不动 `enabled`**（这样 `enable` 才是它的逆操作）。对内建同样有效 |
@@ -155,6 +155,12 @@ nm plugins purge     <插件 id> --confirm
 - `install` / `update` / `uninstall` 是**全局操作**，不接受 `--instance`、
   `--instance-dir` 或 `--set`。执行时必须先停止所有实例；这样运行中的实例不会突然失去
   已导入代码。全局文件直接位于 `~/.nucleamind/`，没有额外的 `global/` 目录。
+- 默认安装会记录插件目录中实际解析出的 Python 发行包版本；两个插件需要同一发行包的不同
+  版本时，安装或更新会拒绝发布。`install --no-deps` 表示只安装插件自身，其余 Python 依赖
+  由启动 `nm` 的环境负责，而不是由插件管理器检查。
+- 外部插件 id 不能冒用内建插件 id；替换内建能力应在 manifest 中声明 `overrides`。
+- 卸载仍被其他已安装插件依赖的插件会被拒绝。卸载写多个实例配置时，任何一步失败都会恢复
+  已经修改的配置，并保留全局插件。
 - `enable` / `disable` **只改配置，不在当前进程生效**（首版不热更新）。每次改动的输出
   都带这句话。
 - 禁用一个**覆盖过别的能力**的插件时，输出会提前告诉你还得在

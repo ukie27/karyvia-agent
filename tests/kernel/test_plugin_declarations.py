@@ -70,6 +70,7 @@ def test_a_load_request_rejects_duplicate_declarations() -> None:
     duplicate = CapabilityDeclaration(kind=CapabilityKind.TOOL, name="fs.read")
     with pytest.raises(NucleaError) as excinfo:
         LoadRequest(
+            plugin_id="probe",
             provider=Builtin(),
             setup="pkg:setup",
             declarations=(duplicate, duplicate),
@@ -80,6 +81,7 @@ def test_a_load_request_rejects_duplicate_declarations() -> None:
 def test_the_same_name_under_two_kinds_is_not_a_duplicate() -> None:
     """唯一性键是 `(kind, name)`：一个叫 `status` 的命令与一个叫 `status` 的工具不冲突。"""
     request = LoadRequest(
+        plugin_id="probe",
         provider=Builtin(),
         setup="pkg:setup",
         declarations=(

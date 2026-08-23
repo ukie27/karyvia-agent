@@ -154,7 +154,13 @@ my-plugin = "nucleamind_plugin_my_plugin:MANIFEST"
 
 Runtime 只读取由 `nm` 写入全局安装目录的 entry point 记录，不扫描整个 Python 环境，也不从
 实例配置读取代码路径。开发中的本地包同样交给 `nm plugins install <本地路径>`；修改后用
-`nm plugins update <id>` 重新构建。实例的 `plugins/` 目录只保存状态，不保存代码。
+`nm plugins update <id>` 重新构建。实例的 `plugins/` 目录只保存状态，不保存代码。默认安装
+会记录解析出的全部 Python 发行包版本，并拒绝与其他已安装插件形成同名包多版本；如果使用
+`--no-deps`，则明确表示依赖由运行 `nm` 的 Python 环境统一提供。
+
+manifest 的 `dependencies` 表示其他插件的逻辑依赖。依赖必须先全局安装；被其他插件依赖的
+插件不能直接卸载。外部插件也不能使用内建插件 id，替换内建能力应通过能力声明中的
+`overrides` 表达。
 
 ## 5. 安装 ≠ 启用
 

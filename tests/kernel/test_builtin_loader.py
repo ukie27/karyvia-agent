@@ -49,15 +49,21 @@ def host_for(batch: RegistrationBatch, request: LoadRequest) -> RegistrationHost
 
 
 def request_for(
-    setup: str = "fake:setup", *, critical: bool = False, plugin: str | None = None
+    setup: str = "fake:setup",
+    *,
+    critical: bool = False,
+    plugin: str | None = None,
+    dependencies: tuple[str, ...] = (),
 ) -> LoadRequest:
     return LoadRequest(
+        plugin_id=plugin or "builtin-probe",
         provider=Plugin(PluginId(plugin)) if plugin else Builtin(),
         setup=setup,
         declarations=(
             CapabilityDeclaration(kind=CapabilityKind.TOOL, name=ECHO_SPEC.name),
             CapabilityDeclaration(kind=CapabilityKind.MODEL, name="model"),
         ),
+        dependencies=dependencies,
         critical=critical,
     )
 
@@ -223,6 +229,74 @@ async def test_a_non_critical_failure_does_not_stop_the_remaining_providers() ->
     assert outcomes[0].error is not None
     assert outcomes[1].ok
     assert len(registry.registrations) == 2
+
+
+async def test_a_failed_dependency_skips_only_its_transitive_dependents() -> None:
+    """阶段 A 排好顺序后，阶段 B 的失败仍必须沿依赖图级联，但不能波及无关插件。"""
+    calls: list[str] = []
+
+    def resolve(target: str) -> SetupFn:
+        def setup(api: object) -> None:
+            calls.append(target)
+            if target == "fail:setup":
+                raise RuntimeError("boom")
+            good_setup(api)
+
+        return setup
+
+    registry = CapabilityRegistry()
+    outcomes = await load_into(
+        registry,
+        [
+            request_for("fail:setup", plugin="a"),
+            request_for("b:setup", plugin="b", dependencies=("a",)),
+            request_for("c:setup", plugin="c", dependencies=("b",)),
+            request_for("free:setup", plugin="free"),
+        ],
+        host_for=host_for,
+        resolve_setup=resolve,
+    )
+
+    assert calls == ["fail:setup", "free:setup"]
+    assert [outcome.ok for outcome in outcomes] == [False, False, False, True]
+    assert outcomes[1].error is not None
+    assert outcomes[1].error.detail["failed_dependencies"] == ["a"]
+    assert outcomes[2].error is not None
+    assert outcomes[2].error.detail["failed_dependencies"] == ["b"]
+    assert len(registry.registrations) == 2
+
+
+async def test_a_critical_dependent_fails_startup_without_running_setup() -> None:
+    calls: list[str] = []
+
+    def resolve(target: str) -> SetupFn:
+        def setup(api: object) -> None:
+            calls.append(target)
+            if target == "fail:setup":
+                raise RuntimeError("boom")
+            good_setup(api)
+
+        return setup
+
+    with pytest.raises(NucleaError) as caught:
+        await load_into(
+            CapabilityRegistry(),
+            [
+                request_for("fail:setup", plugin="a"),
+                request_for(
+                    "must-not-run:setup",
+                    plugin="b",
+                    dependencies=("a",),
+                    critical=True,
+                ),
+            ],
+            host_for=host_for,
+            resolve_setup=resolve,
+        )
+
+    assert calls == ["fail:setup"]
+    assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
+    assert caught.value.detail["plugin_id"] == "b"
 
 
 # -------------------------------------------------------------------------------- import_setup

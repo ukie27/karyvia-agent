@@ -14,11 +14,13 @@ from __future__ import annotations
 
 import json
 import tomllib
+from collections.abc import Mapping
 from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import CapabilityKind, ToolSpec
+from nucleamind.contracts import CapabilityKind, ErrorCode, JsonValue, NucleaError, ToolSpec
+from nucleamind.runtime.cli.commands import plugins as plugins_subject
 from nucleamind.runtime.cli.main import app
 from nucleamind.runtime.plugin_home import GlobalPluginHome, InstalledPlugin
 from nucleamind.sdk import NucleaAPI, parse_manifest
@@ -93,7 +95,17 @@ def _register_manifest(path: Path) -> None:
     home.package_dir(manifest.id).mkdir(parents=True, exist_ok=True)
     rows = [item for item in home.catalog() if item.plugin_id != manifest.id]
     home.write_catalog(
-        (*rows, InstalledPlugin(manifest.id, manifest.version, "test", f"{__name__}:{attribute}", str(path)))
+        (
+            *rows,
+            InstalledPlugin(
+                manifest.id,
+                manifest.version,
+                "test",
+                f"{__name__}:{attribute}",
+                str(path),
+                dependencies=manifest.dependencies,
+            ),
+        )
     )
 
 
@@ -272,6 +284,39 @@ def test_global_uninstall_clears_every_known_instance(tmp_path: Path) -> None:
         plugins = _config(root)["plugins"]
         assert plugins["enabled"] == [] and plugins["disable"] == []  # type: ignore[index]
         assert "alpha" not in plugins  # type: ignore[operator]
+
+
+def test_global_uninstall_rolls_back_configs_when_a_later_write_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    for root in (first, second):
+        write_config(root, plugins={"enabled": ["alpha"]})
+        GlobalPluginHome.resolve().register_instance(root)
+    _install_test_plugin(first, "alpha")
+
+    real_write = plugins_subject.write_document
+    failed = False
+
+    def fail_second_once(path: Path, document: Mapping[str, JsonValue]) -> None:
+        nonlocal failed
+        if path == second / "config.json" and not failed:
+            failed = True
+            raise NucleaError(
+                ErrorCode.PERSISTENCE_WRITE_FAILED,
+                "simulated",
+            )
+        real_write(path, document)
+
+    monkeypatch.setattr(plugins_subject, "write_document", fail_second_once)
+
+    assert app(["plugins", "uninstall", "alpha"]) == 2
+    assert _config(first)["plugins"]["enabled"] == ["alpha"]  # type: ignore[index]
+    assert _config(second)["plugins"]["enabled"] == ["alpha"]  # type: ignore[index]
+    home = GlobalPluginHome.resolve()
+    assert {item.plugin_id for item in home.catalog()} == {"alpha"}
+    assert home.package_dir("alpha").is_dir()
 
 
 # ---------------------------------------------------------------------------- purge

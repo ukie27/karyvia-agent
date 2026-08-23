@@ -153,3 +153,114 @@ def test_failed_install_does_not_publish_a_catalog_record(
         subject.install_plugin(home, "broken-source")
 
     assert home.catalog() == ()
+
+
+def test_install_set_rejects_missing_logical_dependencies() -> None:
+    alpha = subject.InstalledPlugin(
+        "alpha",
+        "1.0.0",
+        "alpha-dist",
+        "alpha:MANIFEST",
+        "alpha-source",
+        dependencies=("missing",),
+    )
+
+    with pytest.raises(NucleaError) as caught:
+        subject._validate_install_set((alpha,))
+
+    assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
+    assert caught.value.detail["plugin_id"] == "alpha"
+
+
+def test_install_set_rejects_two_versions_of_one_python_distribution() -> None:
+    alpha = subject.InstalledPlugin(
+        "alpha",
+        "1.0.0",
+        "alpha-dist",
+        "alpha:MANIFEST",
+        "alpha-source",
+        resolved_distributions=("shared-lib==1.0",),
+    )
+    beta = subject.InstalledPlugin(
+        "beta",
+        "1.0.0",
+        "beta-dist",
+        "beta:MANIFEST",
+        "beta-source",
+        resolved_distributions=("shared_lib==2.0",),
+    )
+
+    with pytest.raises(NucleaError) as caught:
+        subject._validate_install_set((alpha, beta))
+
+    assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
+    assert caught.value.detail["distribution"] == "shared-lib"
+    assert caught.value.detail["plugins"] == ["alpha", "beta"]
+
+
+def test_install_set_accepts_the_same_resolved_version_across_plugin_roots() -> None:
+    rows = tuple(
+        subject.InstalledPlugin(
+            plugin_id,
+            "1.0.0",
+            f"{plugin_id}-dist",
+            f"{plugin_id}:MANIFEST",
+            f"{plugin_id}-source",
+            resolved_distributions=("shared-lib==1.0",),
+        )
+        for plugin_id in ("alpha", "beta")
+    )
+
+    subject._validate_install_set(rows)
+
+
+def test_uninstall_refuses_to_break_an_installed_dependent(tmp_path: Path) -> None:
+    home = subject.GlobalPluginHome.resolve(home=tmp_path, env={})
+    home.write_catalog(
+        (
+            subject.InstalledPlugin(
+                "alpha", "1.0.0", "alpha-dist", "alpha:MANIFEST", "alpha-source"
+            ),
+            subject.InstalledPlugin(
+                "beta",
+                "1.0.0",
+                "beta-dist",
+                "beta:MANIFEST",
+                "beta-source",
+                dependencies=("alpha",),
+            ),
+        )
+    )
+    home.package_dir("alpha").mkdir(parents=True)
+
+    with pytest.raises(NucleaError) as caught:
+        subject.uninstall_plugin(home, "alpha")
+
+    assert caught.value.detail["dependents"] == ["beta"]
+    assert home.package_dir("alpha").is_dir()
+    assert {item.plugin_id for item in home.catalog()} == {"alpha", "beta"}
+
+
+def test_install_rejects_an_external_plugin_using_a_builtin_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    home = subject.GlobalPluginHome.resolve(home=tmp_path, env={})
+    home.ensure()
+    monkeypatch.setattr(subject, "_run_pip", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        subject,
+        "_inspect_stage",
+        lambda *args, **kwargs: subject.InstalledPlugin(
+            "model-openai",
+            "1.0.0",
+            "external-model",
+            "external:MANIFEST",
+            "source",
+        ),
+    )
+
+    with pytest.raises(NucleaError) as caught:
+        subject.install_plugin(home, "source")
+
+    assert caught.value.code is ErrorCode.PLUGIN_REGISTRATION_CONFLICT
+    assert home.catalog() == ()

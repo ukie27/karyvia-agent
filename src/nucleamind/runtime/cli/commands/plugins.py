@@ -35,6 +35,7 @@ from ...plugin_home import (
     install_plugin,
     uninstall_plugin,
     update_plugin,
+    validate_uninstall,
 )
 from ..main import Options
 
@@ -225,7 +226,11 @@ def _uninstall(home: GlobalPluginHome, args: Sequence[str]) -> int:
         sys.stdout.write(f"{plugin_id}: 尚未全局安装。\n")
         return 3
     with home.mutation():
-        updates: list[tuple[Path, dict[str, JsonValue]]] = []
+        # 依赖阻塞属于纯 preflight；必须在第一份实例配置写盘之前发现。
+        validate_uninstall(home, plugin_id)
+        updates: list[
+            tuple[Path, dict[str, JsonValue], dict[str, JsonValue]]
+        ] = []
         state_dirs: list[Path] = []
         for root in home.instances():
             config_path = root / "config.json"
@@ -236,13 +241,11 @@ def _uninstall(home: GlobalPluginHome, args: Sequence[str]) -> int:
             disabled = remove_from_list(enabled.document, _PLUGINS, _DISABLE, plugin_id)
             entry = remove_plugin_entry(disabled.document, plugin_id)
             if enabled.changed or disabled.changed or entry.changed:
-                updates.append((config_path, entry.document))
+                updates.append((config_path, document, entry.document))
             state = root / "plugins" / plugin_id
             if state.is_dir():
                 state_dirs.append(state)
-        for path, document in updates:
-            write_document(path, document)
-        uninstall_plugin(home, plugin_id)
+        _commit_uninstall(home, plugin_id, updates)
     sys.stdout.write(
         f"{plugin_id}: 已从全局插件目录卸载，并清理 {len(updates)} 个实例的配置引用。\n"
         "被覆盖的内建能力会在实例下次启动时恢复。\n"
@@ -254,6 +257,42 @@ def _uninstall(home: GlobalPluginHome, args: Sequence[str]) -> int:
             f"--instance-dir {state.parent.parent}\n"
         )
     return 0
+
+
+def _commit_uninstall(
+    home: GlobalPluginHome,
+    plugin_id: str,
+    updates: Sequence[
+        tuple[Path, dict[str, JsonValue], dict[str, JsonValue]]
+    ],
+) -> None:
+    """把多实例配置修改与全局代码删除提交成一个可回滚操作。
+
+    单个 ``config.json`` 和全局目录各自已经原子替换，但跨文件系统路径不存在通用的原子
+    rename。这里用补偿事务连接两者：任何配置写入或全局卸载失败，已写配置都按逆序恢复。
+    ``uninstall_plugin()`` 自身在目录与 catalog 之间也有回滚，因此成功返回后没有后续的
+    可失败步骤。
+    """
+    applied: list[tuple[Path, dict[str, JsonValue]]] = []
+    try:
+        for path, before, after in updates:
+            write_document(path, after)
+            applied.append((path, before))
+        uninstall_plugin(home, plugin_id)
+    except BaseException as error:
+        rollback_failures: list[str] = []
+        for path, before in reversed(applied):
+            try:
+                write_document(path, before)
+            except Exception:
+                rollback_failures.append(str(path))
+        if rollback_failures:
+            raise NucleaError(
+                ErrorCode.PERSISTENCE_WRITE_FAILED,
+                "插件卸载失败，且部分实例配置无法自动恢复。",
+                detail={"plugin_id": plugin_id, "paths": rollback_failures},
+            ) from error
+        raise
 
 
 # --------------------------------------------------------------- enable / disable

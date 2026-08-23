@@ -1,7 +1,7 @@
 """静态清单 bootstrap：把一批 `LoadRequest` 跑成注册（技术方案 §7.3 阶段 B）。
 
-职责：按顺序对每个请求开批次、调用方给的 Host 跑 `setup`、核对声明、提交或回滚，
-并如实报告每个提供方的结果。
+职责：按顺序对每个请求开批次、调用方给的 Host 跑 `setup`、核对声明、提交或回滚；
+依赖在 setup 阶段失败时跳过其依赖者，并如实报告每个提供方的结果。
 不负责：决定加载哪些提供方、依赖拓扑排序、解析覆盖、构造 Host 与 `PluginContext`；
 这些由发现/规划机制和 Runtime 组装根负责。
 
@@ -16,7 +16,8 @@
 并让 registry 保持可写可空，它有自己的测试，不是一条退化分支。
 
 **`critical` 决定失败的后果**（`PLG-004`、`EDG-106`）：关键提供方失败直接抛，非关键的
-记进 `LoadOutcome.error` 由调用方折进 `ResolutionReport.failures`，实例继续启动。
+记进 `LoadOutcome.error` 由调用方折进 `ResolutionReport.failures`，实例继续启动。依赖失败
+同样是一种加载失败：只跳过它的传递依赖者，不妨碍无关插件启动。
 两种情况下批次都已回滚，registry 不留半注册状态（`EDG-103`）。
 """
 
@@ -160,13 +161,30 @@ async def load_into(
     而不是一个只为证明而存在的函数里。
 
     **异常约定**：`critical=True` 的提供方失败时原样抛出（启动失败）；非关键提供方的失败
-    记进对应的 `LoadOutcome.error` 并继续加载其余项。两种情况批次都已回滚。
+    记进对应的 `LoadOutcome.error`。依赖已失败的请求不构造 Host、不执行 setup，并以
+    `PLUGIN_LOAD_FAILED` 记录依赖链；无关请求继续。实际执行失败的批次均已回滚。
     """
     outcomes: list[LoadOutcome] = []
+    failed: set[str] = set()
     for request in requests:
-        batch = registry.batch(request.provider)
-        outcome = await _run_one(batch, request, host_for(batch, request), resolve_setup)
+        blocked_by = tuple(
+            dependency for dependency in request.dependencies if dependency in failed
+        )
+        if blocked_by:
+            outcome = LoadOutcome(
+                provider=request.provider,
+                error=NucleaError(
+                    ErrorCode.PLUGIN_LOAD_FAILED,
+                    "插件依赖未能完成加载，因此未执行 setup。",
+                    detail={"plugin_id": request.plugin_id, "failed_dependencies": blocked_by},
+                ),
+            )
+        else:
+            batch = registry.batch(request.provider)
+            outcome = await _run_one(batch, request, host_for(batch, request), resolve_setup)
         if outcome.error is not None and request.critical:
             raise outcome.error
+        if outcome.error is not None:
+            failed.add(request.plugin_id)
         outcomes.append(outcome)
     return tuple(outcomes)
