@@ -198,7 +198,7 @@ compare  --before <path> --after <path>
 `nanobot/channels/...` 归一后相撞。路径分隔符统一为 `/`，消除 Windows 与 Linux 差异。
 
 **新层不写长期兼容垫片**（技术方案 §4.5）：不保留 `nanobot` 命令别名；后续新 Kernel
-只读 `NUCLEAMIND_*`、`~/.nucleamind/<instance>/` 和 snake_case 配置，不双读旧格式。
+只读 `NUCLEAMIND_*`、`~/.nucleamind/instances/<instance>/` 和 snake_case 配置，不双读旧格式。
 但 `legacy/` 在被删除前继续读取 `NANOBOT_*`、`~/.nanobot/` 和原 camelCase 配置，
 以便 D00 能验证遗留功能没有被结构迁移破坏。
 

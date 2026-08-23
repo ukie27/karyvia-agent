@@ -147,6 +147,8 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 
 ### Config
 
+- 命名实例统一位于 `~/.nucleamind/instances/<name>/`；`--instance-dir` 才能使用任意外部
+  路径。不要把实例重新平铺到 NucleaMind home 顶层。
 - 配置优先级只在 `sources.collect_layers()` 定义：default < `config.json` < env < CLI。
 - 字段只在 `schema.SECTION_SPECS` 声明；字段形状积木只在 `fields.py`。
 - 默认值常量放 `defaults.py`；`json_schema.py` 是派生物，不是第二份真相。

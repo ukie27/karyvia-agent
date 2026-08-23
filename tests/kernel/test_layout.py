@@ -25,6 +25,7 @@ from nucleamind.kernel.config import (
     DEFAULT_INSTANCE_NAME,
     INSTANCE_DIR_ENV,
     INSTANCE_NAME_ENV,
+    INSTANCES_DIRNAME,
     LOCK_FILENAME,
     LOGS_DIRNAME,
     NUCLEAMIND_HOME_ENV,
@@ -46,6 +47,7 @@ def test_layout_names_are_frozen() -> None:
     assert DEFAULT_INSTANCE_NAME == "default"
     assert INSTANCE_DIR_ENV == "NUCLEAMIND_INSTANCE_DIR"
     assert INSTANCE_NAME_ENV == "NUCLEAMIND_INSTANCE"
+    assert INSTANCES_DIRNAME == "instances"
     assert NUCLEAMIND_HOME_ENV == "NUCLEAMIND_HOME"
 
 
@@ -67,7 +69,7 @@ class TestResolution:
             env={INSTANCE_DIR_ENV: str(tmp_path / "env-dir"), INSTANCE_NAME_ENV: "env-name"},
             home=tmp_path,
         )
-        assert layout.root == (tmp_path / ".nucleamind" / "work").resolve()
+        assert layout.root == (tmp_path / ".nucleamind" / "instances" / "work").resolve()
 
     def test_env_dir_beats_env_name(self, tmp_path: Path) -> None:
         layout = InstanceLayout.resolve(
@@ -78,17 +80,19 @@ class TestResolution:
 
     def test_env_name_used_when_no_dir(self, tmp_path: Path) -> None:
         layout = InstanceLayout.resolve(env={INSTANCE_NAME_ENV: "staging"}, home=tmp_path)
-        assert layout.root == (tmp_path / ".nucleamind" / "staging").resolve()
+        assert layout.root == (tmp_path / ".nucleamind" / "instances" / "staging").resolve()
 
     def test_falls_back_to_default_instance(self, tmp_path: Path) -> None:
         layout = InstanceLayout.resolve(env={}, home=tmp_path)
-        assert layout.root == (tmp_path / ".nucleamind" / DEFAULT_INSTANCE_NAME).resolve()
+        assert layout.root == (
+            tmp_path / ".nucleamind" / "instances" / DEFAULT_INSTANCE_NAME
+        ).resolve()
 
     def test_nucleamind_home_is_the_data_root_itself(self, tmp_path: Path) -> None:
         """环境变量直接指向数据根，不能再偷偷追加 `.nucleamind` 或 `global`。"""
         data_root = tmp_path / "nm-data"
         layout = InstanceLayout.resolve(env={NUCLEAMIND_HOME_ENV: str(data_root)})
-        assert layout.root == data_root.resolve() / DEFAULT_INSTANCE_NAME
+        assert layout.root == data_root.resolve() / "instances" / DEFAULT_INSTANCE_NAME
 
     def test_named_instance_uses_nucleamind_home_directly(self, tmp_path: Path) -> None:
         data_root = tmp_path / "nm-data"
@@ -96,7 +100,7 @@ class TestResolution:
             instance="work",
             env={NUCLEAMIND_HOME_ENV: str(data_root)},
         )
-        assert layout.root == data_root.resolve() / "work"
+        assert layout.root == data_root.resolve() / "instances" / "work"
 
     def test_relative_explicit_dir_becomes_absolute(self, tmp_path: Path) -> None:
         """相对路径必须变成绝对路径，否则后续 cwd 变化会改变实例位置。"""
@@ -109,7 +113,9 @@ class TestResolution:
             env={"NANOBOT_INSTANCE_DIR": str(tmp_path / "legacy"), "NANOBOT_INSTANCE": "legacy"},
             home=tmp_path,
         )
-        assert layout.root == (tmp_path / ".nucleamind" / DEFAULT_INSTANCE_NAME).resolve()
+        assert layout.root == (
+            tmp_path / ".nucleamind" / "instances" / DEFAULT_INSTANCE_NAME
+        ).resolve()
 
 
 class TestInstanceNameValidation:
@@ -134,16 +140,12 @@ class TestInstanceNameValidation:
             InstanceLayout.resolve(instance="x" * 200, env={}, home=tmp_path)
         assert caught.value.code is ErrorCode.INPUT_TOO_LARGE
 
-    @pytest.mark.parametrize(
-        "name",
-        ["plugin-packages", "plugin-cache", "plugins.json", "instances.json", "plugin-manager.lock"],
-    )
-    def test_rejects_names_owned_by_global_plugin_management(
+    @pytest.mark.parametrize("name", ["plugin-packages", "plugins.json", "plugin-manager.lock"])
+    def test_global_names_are_valid_inside_the_instance_namespace(
         self, name: str, tmp_path: Path
     ) -> None:
-        with pytest.raises(NucleaError) as caught:
-            InstanceLayout.resolve(instance=name, env={}, home=tmp_path)
-        assert caught.value.code is ErrorCode.CONFIG_INVALID
+        layout = InstanceLayout.resolve(instance=name, env={}, home=tmp_path)
+        assert layout.root == (tmp_path / ".nucleamind" / "instances" / name).resolve()
 
     @pytest.mark.parametrize("name", ["default", "work", "my-instance", "inst_2", "a1"])
     def test_accepts_reasonable_names(self, name: str, tmp_path: Path) -> None:

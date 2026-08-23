@@ -39,7 +39,7 @@ nm init
 它在实例目录里建两个文件，**已经存在的 `config.json` 一个字节都不会动**：
 
 ```text
-~/.nucleamind/default/
+~/.nucleamind/instances/default/
 ├── config.json          # 你的配置，只有 nm init 建它、只有 nm plugins enable 改它
 └── config.schema.json   # 派生的 JSON Schema，供编辑器补全，运行期忽略
 ```

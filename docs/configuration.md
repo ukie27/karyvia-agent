@@ -11,10 +11,11 @@
 
 ## 1. 实例布局
 
-一个**实例**是一份配置 + 一份数据。默认落在 `~/.nucleamind/<实例名>/`：
+一个**实例**是一份配置 + 一份数据。命名实例统一落在
+`~/.nucleamind/instances/<实例名>/`：
 
 ```text
-~/.nucleamind/default/
+~/.nucleamind/instances/default/
 ├── config.json            # 你的配置（nm init 建，nm plugins enable 改，加载路径只读）
 ├── config.schema.json     # 派生 JSON Schema，供编辑器补全，运行期忽略
 ├── instance.lock          # 实例锁，同一实例目录同时只跑一个进程
@@ -24,13 +25,16 @@
 └── workspace/             # 工作区：文件工具与 ctx.fs 的根
 ```
 
+`NUCLEAMIND_HOME` 可以改变数据根本身；它直接指向原本的 `~/.nucleamind/` 这一层，命名
+实例仍统一放在其 `instances/` 子目录。
+
 选实例的三种方式，优先级从高到低：
 
 | 方式 | 例子 |
 | --- | --- |
-| `--instance-dir <目录>` / `NUCLEAMIND_INSTANCE_DIR` | 直接指定目录，跳过 `~/.nucleamind/` 的推导 |
-| `--instance <名字>` / `NUCLEAMIND_INSTANCE` | 目录仍落在 `~/.nucleamind/` 下 |
-| 都不给 | `~/.nucleamind/default/` |
+| `--instance-dir <目录>` / `NUCLEAMIND_INSTANCE_DIR` | 直接指定目录，跳过命名实例目录的推导 |
+| `--instance <名字>` / `NUCLEAMIND_INSTANCE` | 目录落在 `~/.nucleamind/instances/` 下 |
+| 都不给 | `~/.nucleamind/instances/default/` |
 
 **布局在配置之前解析**：要先知道 `config.json` 在哪才能读它。因此 `workspace.root`
 只能改 workspace，永远改不了实例目录本身。实例名会成为一段路径分量，长度上限 64。

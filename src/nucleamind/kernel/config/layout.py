@@ -31,6 +31,7 @@ __all__ = [
     "DEFAULT_INSTANCE_NAME",
     "INSTANCE_DIR_ENV",
     "INSTANCE_NAME_ENV",
+    "INSTANCES_DIRNAME",
     "NUCLEAMIND_HOME_ENV",
     "LOCK_FILENAME",
     "LOGS_DIRNAME",
@@ -43,10 +44,10 @@ __all__ = [
 #: 未指定实例名时的默认值（§11）。
 DEFAULT_INSTANCE_NAME = "default"
 
-#: 直接指定实例目录。优先级最高，跳过 `~/.nucleamind/<name>` 的推导。
+#: 直接指定实例目录。优先级最高，跳过 `~/.nucleamind/instances/<name>` 的推导。
 INSTANCE_DIR_ENV = "NUCLEAMIND_INSTANCE_DIR"
 
-#: 只指定实例名，目录仍落在 `~/.nucleamind/` 下。
+#: 只指定实例名，目录仍落在 `~/.nucleamind/instances/` 下。
 INSTANCE_NAME_ENV = "NUCLEAMIND_INSTANCE"
 
 #: NucleaMind 的数据根。与 ``HOME`` 不同，它直接指向 ``.nucleamind`` 这一层。
@@ -63,6 +64,7 @@ MAX_INSTANCE_NAME_LENGTH = 64
 CONFIG_FILENAME = "config.json"
 LOCK_FILENAME = "instance.lock"
 
+INSTANCES_DIRNAME = "instances"
 SESSIONS_DIRNAME = "sessions"
 PLUGINS_DIRNAME = "plugins"
 LOGS_DIRNAME = "logs"
@@ -77,26 +79,13 @@ _OWNED_DIRNAMES: tuple[str, ...] = (
     WORKSPACE_DIRNAME,
 )
 
-# 这些名字由 Runtime 的全局插件管理器直接放在 ``~/.nucleamind/`` 下。实例仍与它们共享
-# 一个父目录，因此必须在路径拼接前拒绝同名实例，而不能等 ``mkdir`` 以模糊的 IO 错误失败。
-_GLOBAL_PLUGIN_NAMES = frozenset(
-    {"plugin-packages", "plugin-cache", "plugins.json", "instances.json", "plugin-manager.lock"}
-)
-
-
 def _validate_instance_name(name: str) -> str:
     """校验实例名可安全地拼成一个目录名。
 
     先走 `validate_identifier`（非空、不超长、无控制字符），再挡住路径分量特有的三种形状。
-    `..` 能逃出 `~/.nucleamind/`，这是本模块唯一的安全问题——不能只靠通用标识校验。
+    `..` 能逃出 ``instances/``，这是本模块唯一的安全问题——不能只靠通用标识校验。
     """
     validate_identifier("instance", name, max_length=MAX_INSTANCE_NAME_LENGTH)
-    if name in _GLOBAL_PLUGIN_NAMES:
-        raise NucleaError(
-            ErrorCode.CONFIG_INVALID,
-            "实例名与 NucleaMind 的全局目录名冲突。",
-            detail={"instance": name},
-        )
     if name in {".", ".."} or name.strip() != name:
         raise NucleaError(
             ErrorCode.CONFIG_INVALID,
@@ -152,13 +141,13 @@ class InstanceLayout:
             else (base / HOME_DIRNAME).expanduser().resolve()
         )
         if instance is not None:
-            return cls(root=data_root / name)
+            return cls(root=data_root / INSTANCES_DIRNAME / name)
 
         env_dir = environ.get(INSTANCE_DIR_ENV) or None
         if env_dir is not None:
             return cls(root=Path(env_dir).expanduser().resolve())
 
-        return cls(root=data_root / name)
+        return cls(root=data_root / INSTANCES_DIRNAME / name)
 
     @property
     def config_path(self) -> Path:

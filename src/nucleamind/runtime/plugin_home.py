@@ -5,7 +5,8 @@
 不负责：解析插件 manifest、决定实例启用哪些插件、执行插件代码。
 
 全局数据直接放在 NucleaMind home 下，不增加一层 ``global/``。插件代码与实例状态分开：
-前者在 ``plugin-packages/``，后者仍在各实例的 ``plugins/`` 目录。
+前者在 ``plugin-packages/``，命名实例统一在 ``instances/<name>/``，插件业务状态仍在各
+实例的 ``plugins/`` 目录。显式外部实例通过 ``instances.json`` 纳入全局停机检查。
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ from pathlib import Path
 from typing import Final, cast
 
 from nucleamind.contracts import ErrorCode, JsonValue, NucleaError, validate_identifier
-from nucleamind.kernel.config import NUCLEAMIND_HOME_ENV, InstanceLock
+from nucleamind.kernel.config import INSTANCES_DIRNAME, NUCLEAMIND_HOME_ENV, InstanceLock
 from nucleamind.kernel.plugins import ENTRY_POINT_GROUP, PluginCandidate, read_candidate
 from nucleamind.sdk import PluginManifest, parse_manifest
 
@@ -126,6 +127,11 @@ class GlobalPluginHome:
     @property
     def instances_path(self) -> Path:
         return self.root / "instances.json"
+
+    @property
+    def named_instances_dir(self) -> Path:
+        """由实例名定位的实例容器；显式 ``--instance-dir`` 不受它约束。"""
+        return self.root / INSTANCES_DIRNAME
 
     @property
     def manager_lock_path(self) -> Path:
@@ -244,8 +250,8 @@ class GlobalPluginHome:
             if not isinstance(rows, list) or not all(isinstance(item, str) for item in rows):
                 raise _catalog_error("实例目录索引格式错误。", path=self.instances_path)
             registered.update(Path(item).resolve() for item in cast("list[str]", rows))
-        if self.root.is_dir():
-            for child in self.root.iterdir():
+        if self.named_instances_dir.is_dir():
+            for child in self.named_instances_dir.iterdir():
                 if child.is_dir() and (child / "config.json").is_file():
                     registered.add(child.resolve())
         return tuple(sorted(registered))

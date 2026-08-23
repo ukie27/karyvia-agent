@@ -354,7 +354,7 @@ NucleaMind 是改造，不是 nanobot 的兼容发行版。新架构的命名冲
 | 发行名 | `nanobot-ai` | `nucleamind` | 删除 |
 | CLI 命令 | `nanobot` | `nm` | 删除，不留别名 |
 | 环境变量前缀 | `NANOBOT_` | 只用 `NUCLEAMIND_` | 删除（`D35`） |
-| 实例目录 | `~/.nanobot/` | `~/.nucleamind/<instance>/` | 删除（`D35`） |
+| 实例目录 | `~/.nanobot/` | `~/.nucleamind/instances/<instance>/` | 删除（`D35`） |
 | 配置键风格 | camelCase 别名 | 只用 snake_case | 删除（`D35`） |
 | 插件 entry point 组 | 无 | `nucleamind.plugins` | — |
 
@@ -1644,16 +1644,19 @@ nm capabilities                                 # 报告中可见 provider 与 s
   plugin-cache/                   # 安装器缓存；不参与发现
   instances.json                  # 已知实例目录（含自定义路径）
   plugin-manager.lock             # 全局插件变更协调锁
-
-<instance_dir>/                 # 默认 ~/.nucleamind/default/，可用 --instance 或环境变量指定
-  config.json                   # 实例配置
-  instance.lock                 # 排他锁（含 PID 与启动时间）
-  sessions/<storage_id>.jsonl   # 内建 session 存储
-  sessions/<storage_id>.meta.json
-  plugins/<plugin_id>/          # 插件私有状态目录，插件拥有所有权
-  logs/events-<date>.jsonl
-  workspace/                    # 默认 workspace 根（可配置指向项目目录）
+  instances/
+    <instance>/                   # 默认 default/；命名实例统一收在这里
+      config.json                 # 实例配置
+      instance.lock               # 排他锁（含 PID 与启动时间）
+      sessions/<storage_id>.jsonl # 内建 session 存储
+      sessions/<storage_id>.meta.json
+      plugins/<plugin_id>/        # 插件私有状态目录，插件拥有所有权
+      logs/events-<date>.jsonl
+      workspace/                  # 默认 workspace 根（可配置指向项目目录）
 ```
+
+`--instance-dir` / `NUCLEAMIND_INSTANCE_DIR` 仍可把实例放在任意显式路径；这些外部实例同样
+登记进 `instances.json`，但不复制到 `instances/`。
 
 多实例规则（`DST-005`、`EDG-507`）：
 

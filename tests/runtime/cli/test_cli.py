@@ -73,6 +73,14 @@ def test_init_generates_a_config_and_returns_zero(
     assert "OPENAI_API_KEY" in out
 
 
+def test_init_puts_a_named_instance_under_the_instances_container(tmp_path: Path) -> None:
+    assert app(["init", "--instance", "work"]) == 0
+
+    root = tmp_path / ".nucleamind" / "instances" / "work"
+    assert (root / "config.json").is_file()
+    assert not (tmp_path / ".nucleamind" / "work").exists()
+
+
 def test_init_refuses_to_overwrite_and_returns_three(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

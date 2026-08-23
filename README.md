@@ -17,7 +17,7 @@ channels, web/MCP tools, long-term memory, and cron automation.
 
 - The Python package is `nucleamind`, the distribution is `nucleamind`, and the
   only CLI command is `nm`. No `nanobot` alias is kept.
-- Instance data lives in `~/.nucleamind/<instance>/`; configuration is
+- Named instance data lives in `~/.nucleamind/instances/<instance>/`; configuration is
   snake_case and validated against a generated JSON Schema.
 - The project is developed independently and does not submit changes back to the
   upstream nanobot repository.

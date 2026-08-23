@@ -47,6 +47,7 @@ def test_layout_lives_directly_under_nucleamind_home(tmp_path: Path) -> None:
     assert home.root == tmp_path / ".nucleamind"
     assert home.catalog_path == home.root / "plugins.json"
     assert home.packages_dir == home.root / "plugin-packages"
+    assert home.named_instances_dir == home.root / "instances"
     assert "global" not in home.catalog_path.parts
 
 
@@ -120,6 +121,19 @@ def test_mutation_rejects_a_running_registered_instance(tmp_path: Path) -> None:
 
     assert caught.value.code is ErrorCode.CONFIG_INSTANCE_LOCKED
     assert str(instance) in caught.value.detail["instances"]
+
+
+def test_named_instances_are_scanned_only_inside_their_container(tmp_path: Path) -> None:
+    home = subject.GlobalPluginHome.resolve(home=tmp_path, env={})
+    named = home.named_instances_dir / "work"
+    named.mkdir(parents=True)
+    (named / "config.json").write_text("{}", encoding="utf-8")
+    unrelated = home.root / "looks-like-an-instance"
+    unrelated.mkdir(parents=True)
+    (unrelated / "config.json").write_text("{}", encoding="utf-8")
+
+    assert named.resolve() in home.instances()
+    assert unrelated.resolve() not in home.instances()
 
 
 def test_failed_install_does_not_publish_a_catalog_record(
