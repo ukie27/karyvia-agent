@@ -8,7 +8,7 @@
 理由：模型供应商、注册路径、`ToolExecutor`、`runtime/access/net.py` 的守卫全是生产实现。
 因此本文件要求 web 插件已经装进当前环境：
 
-    pip install -e plugins/nucleamind-plugin-web
+    nm plugins install --no-deps plugins/nucleamind-plugin-web
 
 **`web.fetch` 打不到公网，这是刻意的。** `conftest.py` 的网络闸门只放行回环，而
 `GuardedHttpAccess` 恰恰**拒绝**回环——两条规则合起来意味着这套用例里没有任何地址是
@@ -25,11 +25,11 @@ from pathlib import Path
 import httpx
 import pytest
 
-from nucleamind.kernel.plugins import installed_entry_points
 from nucleamind.kernel.turn import CancelToken
 from nucleamind.runtime.bootstrap import bootstrap
 from nucleamind.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
 from nucleamind.runtime.inspect import inspect_capabilities
+from nucleamind.runtime.plugin_home import GlobalPluginHome
 
 from ._support import say, use_tool
 from .conftest import Recorder
@@ -113,9 +113,9 @@ def _last_tool_message(request: httpx.Request) -> str:
 
 def test_the_web_plugin_is_installed_as_an_entry_point() -> None:
     """整套用例的前提。**单独成一条**：装漏了要看到一句能照做的话。"""
-    names = {name for name, _ in installed_entry_points()}
+    names = {item.plugin_id for item in GlobalPluginHome.resolve().catalog()}
     assert WEB_PLUGIN in names, (
-        "web 插件没装。请先跑 `pip install -e plugins/nucleamind-plugin-web`"
+        "web 插件没装。请先跑 `nm plugins install --no-deps plugins/nucleamind-plugin-web`"
     )
 
 

@@ -39,14 +39,13 @@ def test_an_unconfigured_plugin_gets_an_empty_entry() -> None:
 
 
 def test_reserved_keys_are_not_plugin_ids() -> None:
-    config = validate_config(_plugins(enabled=["acme"], disable=["a"], search_paths=["b"]))
+    config = validate_config(_plugins(enabled=["acme"], disable=["a"]))
     assert config.plugins.enabled == ("acme",)
     assert config.plugins.disable == ("a",)
     assert config.plugins.entries == {}
     assert set(RESERVED_PLUGIN_KEYS) == {
         "enabled",
         "disable",
-        "search_paths",
         "stop_timeout_ms",
     }
     # 保留键与插件 id 共用一个命名空间，但撞不上：插件 id 不允许下划线，而带下划线的

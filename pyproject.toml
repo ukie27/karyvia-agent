@@ -110,6 +110,8 @@ max-complexity = 12
 # 只有类型检查看得见——`D39` 的 `handle(invocation, cancel)` 与 `D41` 的
 # `EventHandler` 同步/协程都是测试全绿而实际会炸。两条 include 由
 # `tests/architecture/test_type_check_scope.py` 钉住。
+venvPath = "."
+venv = ".venv"
 include = ["src/nucleamind", "plugins/**/src", "examples/plugins/**/src"]
 # 三个模块排除在外，因为 CI 用 `--no-deps` 装插件、`lark-oapi` / `mcp`
 # 在那里根本不存在（见 test_ci_plugin_list.py）。它们在本地报「SDK 类型未知」、在 CI 报

@@ -121,13 +121,13 @@ nm run -p "用一句话介绍你自己"
 
 ## 5. 装一个官方插件
 
-官方插件是**独立发行包**，靠 entry point 被发现，所以**必须真的装进环境**：
+官方插件是**独立发行包**，由 NucleaMind 的全局插件管理器安装：
 
 ```bash
-.venv/bin/python -m pip install -e plugins/nucleamind-plugin-web
+nm plugins install plugins/nucleamind-plugin-web
 ```
 
-装进环境**不等于启用**（`DST-002`：安装 ≠ 启用）。没有写进 `plugins.enabled` 的候选
+全局安装**不等于实例启用**（`DST-002`：安装 ≠ 启用）。没有写进 `plugins.enabled` 的候选
 连 manifest 都不会被读——这既是安全边界，也是启动开销的边界：
 
 ```bash
@@ -144,13 +144,13 @@ nm capabilities          # 生效 / 被覆盖 / 已禁用 / 冲突，四段都�
 七个官方插件（`--no-deps` 是刻意的，平台 SDK 由你按需另装）：
 
 ```bash
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-openai-api
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-anthropic
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-feishu
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-web
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-mcp
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-memory
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-cron
+nm plugins install --no-deps plugins/nucleamind-plugin-openai-api
+nm plugins install --no-deps plugins/nucleamind-plugin-anthropic
+nm plugins install --no-deps plugins/nucleamind-plugin-feishu
+nm plugins install --no-deps plugins/nucleamind-plugin-web
+nm plugins install --no-deps plugins/nucleamind-plugin-mcp
+nm plugins install --no-deps plugins/nucleamind-plugin-memory
+nm plugins install --no-deps plugins/nucleamind-plugin-cron
 ```
 
 每个插件自己带一份 README（配置表 + 已知边界 + 刻意不做的事），清单见
@@ -167,7 +167,7 @@ nm capabilities          # 生效 / 被覆盖 / 已禁用 / 冲突，四段都�
 `nm run` 把进程交给 CLI 入口，在 `nohup` / systemd 下没有意义。要常驻的是 `nm serve`：
 
 ```bash
-.venv/bin/python -m pip install -e plugins/nucleamind-plugin-openai-api
+nm plugins install plugins/nucleamind-plugin-openai-api
 nm plugins enable openai-api
 nm serve                      # 默认监听 127.0.0.1:8760
 ```

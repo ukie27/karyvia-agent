@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import tomllib
@@ -78,9 +79,23 @@ def test_the_doc_lists_exactly_the_ten_registration_methods() -> None:
 
 def test_the_override_example_matches_the_shipped_plugin() -> None:
     """文档里那个 `overrides` 串与示例插件用的是同一个。"""
-    from nucleamind_plugin_session_memory import OVERRIDE_TARGET
+    source = (
+        DOC.parent.parent
+        / "examples/plugins/nucleamind-plugin-session-memory/src"
+        / "nucleamind_plugin_session_memory/__init__.py"
+    )
+    tree = ast.parse(source.read_text(encoding="utf-8"))
+    target = next(
+        node.value.value
+        for node in tree.body
+        if isinstance(node, ast.AnnAssign)
+        and isinstance(node.target, ast.Name)
+        and node.target.id == "OVERRIDE_TARGET"
+        and isinstance(node.value, ast.Constant)
+        and isinstance(node.value.value, str)
+    )
 
-    assert f'overrides="{OVERRIDE_TARGET}"' in DOC.read_text(encoding="utf-8")
+    assert f'overrides="{target}"' in DOC.read_text(encoding="utf-8")
 
 
 def test_the_doc_points_at_both_example_plugins() -> None:

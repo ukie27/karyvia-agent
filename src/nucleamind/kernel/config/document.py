@@ -65,7 +65,6 @@ def config_to_json(config: NucleaConfig) -> dict[str, JsonValue]:
         "plugins": {
             "enabled": list(config.plugins.enabled),
             "disable": list(config.plugins.disable),
-            "search_paths": list(config.plugins.search_paths),
             "stop_timeout_ms": config.plugins.stop_timeout_ms,
             **blocks.entries_to_json(config.plugins.entries),
         },

@@ -47,6 +47,7 @@ from .plugin_bootstrap import (
 )
 from .plugin_context import PluginRuntime
 from .plugin_disable import suppressed_capabilities
+from .plugin_home import GlobalPluginHome
 from .plugin_plan import discover_plugins
 from .selection import require_sessions
 from .startup import StartupResources
@@ -126,7 +127,13 @@ def inspect_plugins(
         manifests=manifests,
     )
     _, inventory = plan_external(
-        discover_plugins(loaded.config, layout, bus),
+        discover_plugins(
+            loaded.config,
+            layout,
+            bus,
+            strict_missing=False,
+            entry_points=GlobalPluginHome.resolve(env=env, home=home).entry_points,
+        ),
         loaded.config,
         layout,
         loaded.workspace_root,
@@ -169,7 +176,13 @@ async def inspect_capabilities(
         manifests=manifests,
     )
     plan, inventory = plan_external(
-        discover_plugins(loaded.config, layout, bus),
+        discover_plugins(
+            loaded.config,
+            layout,
+            bus,
+            strict_missing=False,
+            entry_points=GlobalPluginHome.resolve(env=env, home=home).entry_points,
+        ),
         loaded.config,
         layout,
         loaded.workspace_root,
@@ -235,7 +248,12 @@ async def open_session_store(
     # 外部插件走同一条路：覆盖了会话存储的插件，`nm session` 看到的就是它那一份。
     # 同样只取声明了 `SESSION_STORE` 的那些——一条只读命令不该因为「模型还没配」而失败。
     plan, _ = plan_external(
-        discover_plugins(loaded.config, layout, bus),
+        discover_plugins(
+            loaded.config,
+            layout,
+            bus,
+            entry_points=GlobalPluginHome.resolve(env=env, home=home).entry_points,
+        ),
         loaded.config,
         layout,
         loaded.workspace_root,

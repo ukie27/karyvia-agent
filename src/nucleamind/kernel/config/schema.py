@@ -145,7 +145,6 @@ SECTION_SPECS: Final[Mapping[str, Mapping[str, FieldSpec]]] = {
     "plugins": {
         "enabled": FieldSpec(FieldKind.STR_LIST, ()),
         "disable": FieldSpec(FieldKind.STR_LIST, ()),
-        "search_paths": FieldSpec(FieldKind.STR_LIST, ()),
         "stop_timeout_ms": FieldSpec(FieldKind.POSITIVE_INT, DEFAULT_PLUGIN_STOP_TIMEOUT_MS),
     },
     "hooks": {
@@ -384,7 +383,6 @@ def validate_config(data: Mapping[str, JsonValue]) -> NucleaConfig:
         plugins=PluginsSection(
             enabled=str_tuple_at(plugins, "enabled"),
             disable=str_tuple_at(plugins, "disable"),
-            search_paths=str_tuple_at(plugins, "search_paths"),
             stop_timeout_ms=int_at(plugins, "stop_timeout_ms", DEFAULT_PLUGIN_STOP_TIMEOUT_MS),
             entries=plugin_entries,
         ),

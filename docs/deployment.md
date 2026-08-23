@@ -167,7 +167,7 @@ journalctl -u nucleamind -f
 ## 升级
 
 1. 停掉服务（`docker compose down` / `systemctl stop`）。
-2. 更新代码并重装（`pip install -e .`，插件同理）。
+2. 更新 Kernel 代码并重装；插件通过 `nm plugins update <id>` 全局更新。
 3. 起来。
 
 **配置不会被自动改写**：加载路径只读 `config.json`，新增字段一律有默认值，

@@ -153,7 +153,7 @@ mkdir -p .pytest-tmp
 .venv/bin/python -m basedpyright
 ```
 
-完整 E2E 需要七个官方插件以 editable 方式装入同一个虚拟环境，确保 entry point 可发现。
+完整 E2E 需要七个官方插件登记到隔离的 NucleaMind 全局插件目录，确保安装目录发现链路可用。
 架构测试、类型检查和插件清单守卫不能因为开发环境缺依赖而跳过。
 
 ## 阅读顺序

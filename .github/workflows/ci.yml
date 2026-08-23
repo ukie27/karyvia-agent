@@ -30,6 +30,8 @@ jobs:
   python:
     name: Lint / Type / Test
     runs-on: ubuntu-latest
+    env:
+      NUCLEAMIND_HOME: ${{ runner.temp }}/.nucleamind
     steps:
       - uses: actions/checkout@v4
 
@@ -61,6 +63,15 @@ jobs:
           pip install --no-deps -e plugins/nucleamind-plugin-mcp
           pip install --no-deps -e plugins/nucleamind-plugin-memory
           pip install --no-deps -e plugins/nucleamind-plugin-cron
+          nm plugins install --no-deps examples/plugins/nucleamind-plugin-echo-tool
+          nm plugins install --no-deps examples/plugins/nucleamind-plugin-session-memory
+          nm plugins install --no-deps plugins/nucleamind-plugin-openai-api
+          nm plugins install --no-deps plugins/nucleamind-plugin-anthropic
+          nm plugins install --no-deps plugins/nucleamind-plugin-feishu
+          nm plugins install --no-deps plugins/nucleamind-plugin-web
+          nm plugins install --no-deps plugins/nucleamind-plugin-mcp
+          nm plugins install --no-deps plugins/nucleamind-plugin-memory
+          nm plugins install --no-deps plugins/nucleamind-plugin-cron
 
       - name: Lint
         run: ruff check src/ plugins/ examples/ scripts/ tests/

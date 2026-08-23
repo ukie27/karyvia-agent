@@ -27,17 +27,24 @@ import pytest
 
 from nucleamind.contracts import ErrorCode, NucleaError, Plugin, PluginId, ToolSpec
 from nucleamind.kernel.observability import PluginState
-from nucleamind.kernel.plugins import MANIFEST_FILENAME, STATE_FILE
+from nucleamind.kernel.plugins import STATE_FILE
 from nucleamind.runtime.bootstrap import bootstrap
 from nucleamind.runtime.instance import AgentInstance
 from nucleamind.sdk import NucleaAPI
 from nucleamind.sdk.testing import EchoTool
 
-from ._support import SCRIPT, TEST_MANIFESTS, text_response, write_config
+from ._support import (
+    SCRIPT,
+    TEST_MANIFESTS,
+    register_test_manifest,
+    text_response,
+    write_config,
+)
 
 #: 每个 `setup` 被调用时把自己的 id 追加进来。拓扑序的断言读它——顺序是**执行**顺序，
 #: 不是清单顺序，两者只有在真的排过序时才一致。
 SETUP_ORDER: list[str] = []
+MANIFEST_FILENAME = "plugin.toml"
 
 
 @pytest.fixture(autouse=True)
@@ -109,7 +116,8 @@ def write_plugin(
     """在搜索路径下放一个目录形态的插件。"""
     package = root / plugin_id
     package.mkdir(parents=True, exist_ok=True)
-    (package / MANIFEST_FILENAME).write_text(
+    manifest_path = package / MANIFEST_FILENAME
+    manifest_path.write_text(
         _MANIFEST.format(
             plugin_id=plugin_id,
             setup=setup or plugin_id,
@@ -119,12 +127,13 @@ def write_plugin(
         ),
         encoding="utf-8",
     )
+    register_test_manifest(manifest_path)
     return package
 
 
 async def boot(root: Path, plugins: dict[str, object]) -> AgentInstance:
     """写一份带 `plugins` 小节的配置并装配。搜索路径固定为实例目录下的 `ext/`。"""
-    write_config(root, plugins={"search_paths": ["ext"], **plugins})
+    write_config(root, plugins=plugins)
     return await bootstrap(instance_dir=root, manifests=TEST_MANIFESTS)
 
 
@@ -292,7 +301,7 @@ async def test_a_state_version_change_drops_the_plugin_and_keeps_the_state(
 async def test_a_critical_plugin_failing_phase_a_stops_the_instance(tmp_path: Path) -> None:
     """`EDG-106`：关键插件失败即启动失败，不「降级运行」。"""
     write_plugin(tmp_path / "ext", "alpha", dependencies=("nope",), critical=True)
-    write_config(tmp_path, plugins={"search_paths": ["ext"], "enabled": ["alpha"]})
+    write_config(tmp_path, plugins={"enabled": ["alpha"]})
     with pytest.raises(NucleaError) as caught:
         await bootstrap(instance_dir=tmp_path, manifests=TEST_MANIFESTS)
     assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
@@ -302,7 +311,7 @@ async def test_a_critical_plugin_failing_phase_a_stops_the_instance(tmp_path: Pa
 async def test_a_critical_plugin_failing_setup_stops_the_instance(tmp_path: Path) -> None:
     """阶段 B 同理：`load_into` 对 `critical` 的处置是原样抛（`D16` 的既有语义）。"""
     write_plugin(tmp_path / "ext", "boom", setup="explodes", critical=True)
-    write_config(tmp_path, plugins={"search_paths": ["ext"], "enabled": ["boom"]})
+    write_config(tmp_path, plugins={"enabled": ["boom"]})
     with pytest.raises(NucleaError) as caught:
         await bootstrap(instance_dir=tmp_path, manifests=TEST_MANIFESTS)
     assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
@@ -352,7 +361,8 @@ async def test_an_override_target_that_does_not_exist_fails_the_start(tmp_path: 
     manifest.write_text(
         manifest.read_text(encoding="utf-8") + 'overrides = "builtin:nope"\n', encoding="utf-8"
     )
-    write_config(tmp_path, plugins={"search_paths": ["ext"], "enabled": ["alpha"]})
+    register_test_manifest(manifest)
+    write_config(tmp_path, plugins={"enabled": ["alpha"]})
     with pytest.raises(NucleaError) as caught:
         await bootstrap(instance_dir=tmp_path, manifests=TEST_MANIFESTS)
     assert caught.value.code is ErrorCode.CAPABILITY_OVERRIDE_TARGET_MISSING

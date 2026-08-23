@@ -25,7 +25,6 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from nucleamind.contracts import ErrorCode, NucleaError, PluginId
@@ -34,7 +33,6 @@ from nucleamind.kernel.plugins import (
     EntryPointLister,
     PluginCandidate,
     discover,
-    installed_entry_points,
     read_candidate,
 )
 from nucleamind.sdk import PluginManifest, parse_manifest
@@ -91,7 +89,7 @@ class SkippedPlugin:
 
 @dataclass(frozen=True, slots=True)
 class PluginFailure:
-    """一条失败。`plugin_id` 为空串表示它不归属任何单个插件（搜索路径、id 撞车）。"""
+    """一条失败。`plugin_id` 为空串表示全局候选目录本身的冲突。"""
 
     error: NucleaError
     plugin_id: str = ""
@@ -172,8 +170,8 @@ class PluginInventory:
 def _as_manifest(candidate: PluginCandidate, raw: object) -> PluginManifest:
     """把候选交回来的东西变成 manifest。
 
-    两种形态都接受：`plugin.toml` 给的是 `Mapping`，entry point 与单文件给的通常是插件
-    自己构造好的 `PluginManifest`。后者已经过 pydantic 校验，原样采纳；前者一律走
+    两种形态都接受：entry point 可以交出 `Mapping`，也可以交出插件自己构造好的
+    `PluginManifest`。后者已经过 pydantic 校验，原样采纳；前者一律走
     `parse_manifest()`——那是不可信输入的**唯一**入口（`CMP-001`：失败带字段路径）。
     """
     if isinstance(raw, PluginManifest):
@@ -211,7 +209,7 @@ def _validate(candidate: PluginCandidate, manifest: PluginManifest) -> None:
                 "plugin_id": candidate.plugin_id,
                 "origin": candidate.origin,
                 "manifest_id": manifest.id,
-                "source": candidate.kind.value,
+                "source": "global_entry_point",
             },
         )
     if not manifest.sdk_compatible:
@@ -262,13 +260,12 @@ def build_inventory(
     *,
     enabled: Sequence[str] = (),
     disabled: Sequence[str] = (),
-    search_paths: Sequence[Path] = (),
-    entry_points: EntryPointLister = installed_entry_points,
+    entry_points: EntryPointLister = lambda: (),
     platform: str | None = None,
 ) -> PluginInventory:
     """发现 → 按启用清单筛 → 读 manifest → 校验，产出清单。
 
-    `enabled` / `disabled` / `search_paths` 直接来自 `config.plugins` 的三个字段。
+    生产路径把全局安装目录作为 ``entry_points`` 传入。
     `platform` 交给 `matches_platform()`，默认 `sys.platform`——平台矩阵测试需要在一个
     平台上断言另一个平台的插件会被跳过。
 
@@ -276,13 +273,25 @@ def build_inventory(
     而那是 `D27` 在加载阶段的判断）；本函数把每一条问题如实记进 `failures`，
     与 `validate_config()` 的「一次报全」同构。
     """
-    scan = discover(search_paths=search_paths, entry_points=entry_points)
+    scan = discover(entry_points=entry_points)
     failures = [PluginFailure(error=error) for error in scan.failures]
     discovered: list[DiscoveredPlugin] = []
     skipped: list[SkippedPlugin] = []
 
     enabled_ids = set(enabled)
     disabled_ids = set(disabled)
+    candidate_ids = {candidate.plugin_id for candidate in scan.candidates}
+    for plugin_id in sorted(enabled_ids - candidate_ids):
+        failures.append(
+            PluginFailure(
+                error=NucleaError(
+                    ErrorCode.PLUGIN_LOAD_FAILED,
+                    "实例启用了尚未安装的插件。",
+                    detail={"plugin_id": plugin_id},
+                ),
+                plugin_id=plugin_id,
+            )
+        )
     for candidate in scan.candidates:
         # 顺序是「先筛后读」，这正是「未启用即零导入开销」的实现方式。`disable` 压过
         # `enabled`：两张表都写了它时，禁用是那个更晚、更明确的意图。

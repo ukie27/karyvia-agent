@@ -51,9 +51,11 @@ _SECTION_HEADING = re.compile(r"^###\s+`(?P<section>[a-z_]+)`")
 #: 子命令标题：`## \`nm init\``。取 `nm ` 后的第一个词。
 _COMMAND_HEADING = re.compile(r"^##\s+`nm\s+(?P<command>[a-z]+)")
 
-#: `pip install [--no-deps] -e <路径>` 里的插件路径。判据与
-#: `tests/architecture/test_ci_plugin_list.py` 逐字相同——同一件事不该有两种写法。
-_EDITABLE = re.compile(r"pip\s+install\b[^\n]*?-e\s+(?P<path>(?:examples/)?plugins/[A-Za-z0-9._-]+)")
+#: 用户文档中的全局安装命令。CI 还会额外用 pip 把包放进类型检查环境，那不是用户侧
+#: 插件管理语义，因此这里仅认 ``nm``。
+_INSTALL_COMMAND = re.compile(
+    r"nm\s+plugins\s+install\b[^\n]*?\s(?P<path>(?:examples/)?plugins/[A-Za-z0-9._-]+)"
+)
 
 
 def _documented_fields() -> dict[tuple[str, str], str]:
@@ -132,7 +134,10 @@ def _official_plugins() -> set[str]:
 
 
 def _mentioned_plugins(doc: Path) -> set[str]:
-    return {match.group("path") for match in _EDITABLE.finditer(doc.read_text(encoding="utf-8"))}
+    return {
+        match.group("path")
+        for match in _INSTALL_COMMAND.finditer(doc.read_text(encoding="utf-8"))
+    }
 
 
 def test_the_docs_have_something_to_check() -> None:

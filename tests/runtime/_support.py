@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import tomllib
 from collections.abc import AsyncIterator, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
@@ -36,7 +37,8 @@ from nucleamind.contracts import (
     Sender,
     TrustLevel,
 )
-from nucleamind.sdk import CapabilityDecl, NucleaAPI, PluginManifest
+from nucleamind.runtime.plugin_home import GlobalPluginHome, InstalledPlugin
+from nucleamind.sdk import CapabilityDecl, NucleaAPI, PluginManifest, parse_manifest
 from nucleamind.sdk.testing import (
     FAKE_MODEL_ID,
     FakeModelProvider,
@@ -59,6 +61,7 @@ __all__ = [
     "manifests_with_multi_channel",
     "manifests_without",
     "memory_fragment",
+    "register_test_manifest",
     "setup_fake_memory",
     "setup_fake_model",
     "setup_multi_channel",
@@ -108,6 +111,28 @@ def write_config(root: Path, **sections: JsonValue) -> Path:
     path = root / "config.json"
     path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
     return path
+
+
+def register_test_manifest(path: Path) -> None:
+    """把测试 TOML 转成全局安装目录中的 entry point 候选。"""
+    manifest = parse_manifest(tomllib.loads(path.read_text(encoding="utf-8")), origin=str(path))
+    attribute = f"_MANIFEST_{manifest.id.replace('-', '_').upper()}"
+    globals()[attribute] = manifest
+    home = GlobalPluginHome.resolve()
+    home.package_dir(manifest.id).mkdir(parents=True, exist_ok=True)
+    rows = [item for item in home.catalog() if item.plugin_id != manifest.id]
+    home.write_catalog(
+        (
+            *rows,
+            InstalledPlugin(
+                manifest.id,
+                manifest.version,
+                "runtime-test",
+                f"{__name__}:{attribute}",
+                str(path),
+            ),
+        )
+    )
 
 
 # --------------------------------------------------------------- 多会话 Channel（`D33`）

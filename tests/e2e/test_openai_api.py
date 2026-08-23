@@ -8,9 +8,9 @@
 装配根、Channel 泵与 HTTP 服务全是生产实现，请求真的走 TCP 打到 `127.0.0.1`
 （`conftest.no_real_network` 放行回环、拦其余目标）。
 
-这套用例**要求 `openai-api` 插件已经装进当前环境**：
+这套用例**要求 `openai-api` 插件已经由全局插件管理器安装**：
 
-    pip install --no-deps -e plugins/nucleamind-plugin-openai-api
+    nm plugins install --no-deps plugins/nucleamind-plugin-openai-api
 
 没装时第一条用例会以一句能照做的话失败。
 """
@@ -25,10 +25,10 @@ from pathlib import Path
 import pytest
 
 from nucleamind.contracts import Channel
-from nucleamind.kernel.plugins import installed_entry_points
 from nucleamind.runtime.bootstrap import bootstrap
 from nucleamind.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
 from nucleamind.runtime.instance import AgentInstance
+from nucleamind.runtime.plugin_home import GlobalPluginHome
 
 from ._support import say
 from .conftest import Recorder
@@ -88,10 +88,10 @@ async def serving(instance_dir: Path) -> AsyncIterator[tuple[AgentInstance, str]
 
 def test_the_plugin_is_installed() -> None:
     """先证明它真的装着——否则后面每一条都在验一台不存在的机器。"""
-    names = {name for name, _ in installed_entry_points()}
+    names = {item.plugin_id for item in GlobalPluginHome.resolve().catalog()}
     assert PLUGIN_ID in names, (
-        "openai-api 插件没有装进当前环境，请先跑："
-        "pip install --no-deps -e plugins/nucleamind-plugin-openai-api"
+        "openai-api 插件没有全局安装，请先跑："
+        "nm plugins install --no-deps plugins/nucleamind-plugin-openai-api"
     )
 
 

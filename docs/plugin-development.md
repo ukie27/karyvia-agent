@@ -107,17 +107,29 @@ Kernel 负责。
 `setup()` 只登记，不应在这里建立长连接或让后台任务抢跑。使用 `PluginContext` 的三个入口：
 
 ```python
-async def connect() -> None:
-    await service.connect()
+from nucleamind.sdk import NucleaAPI
 
 
-async def close() -> None:
-    await service.close()
+class Service:
+    async def connect(self) -> None: ...
+
+    async def close(self) -> None: ...
+
+    async def run(self) -> None: ...
 
 
-api.ctx.on_start(connect)
-api.ctx.add_cleanup(close)
-api.ctx.spawn_task(service.run(), name="service-loop")
+def setup(api: NucleaAPI) -> None:
+    service = Service()
+
+    async def connect() -> None:
+        await service.connect()
+
+    async def close() -> None:
+        await service.close()
+
+    api.ctx.on_start(connect)
+    api.ctx.add_cleanup(close)
+    api.ctx.spawn_task(service.run(), name="service-loop")
 ```
 
 - `on_start()` 按插件依赖顺序执行，此时 Registry 已冻结，`ctx.instance` 与 `ctx.turns` 已可用。
@@ -140,14 +152,14 @@ my-plugin = "nucleamind_plugin_my_plugin:MANIFEST"
 **读 manifest 之前**就知道候选叫什么，才能把没启用的候选直接筛掉——那是「未启用的插件
 不产生任何导入开销」的实现方式，不是一条要人遵守的纪律。
 
-除 entry point 外还有两条来源，都需要用户在 `plugins.search_paths` 里显式指出目录：
-目录形态（目录里放 `plugin.toml`）与单文件形态（一个 `.py`，里面有 `MANIFEST`）。
-**没有 site-packages 全量扫描，也没有目录自动加载。**
+Runtime 只读取由 `nm` 写入全局安装目录的 entry point 记录，不扫描整个 Python 环境，也不从
+实例配置读取代码路径。开发中的本地包同样交给 `nm plugins install <本地路径>`；修改后用
+`nm plugins update <id>` 重新构建。实例的 `plugins/` 目录只保存状态，不保存代码。
 
 ## 5. 安装 ≠ 启用
 
 ```bash
-pip install nucleamind-plugin-my-plugin      # 装上，不生效
+nm plugins install nucleamind-plugin-my-plugin  # 全局装上，不生效
 nm plugins enable my-plugin                  # 写进 plugins.enabled
 nm run                                       # 下次启动生效（首版不热更新）
 ```

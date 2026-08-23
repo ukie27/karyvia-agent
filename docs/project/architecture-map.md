@@ -125,7 +125,7 @@ OutboundMessage → Channel.deliver / CLI
 ## 4. 插件启动链路
 
 ```text
-entry points / plugin roots
+~/.nucleamind/plugins.json
        │ 先得到不导入代码也可知的 candidate id
        ▼
 plugins.enabled / plugins.disable 过滤
@@ -156,6 +156,9 @@ Lifecycle activate → ready → reverse-order stop
 `RegistrationBatch` 回滚能力表；`StartupResources` 同时接管 `setup()` 已产生的任务与订阅。
 任一步失败时先逆序清理这些运行资源，再释放实例锁；成功后所有权一次性交给
 `AgentInstance`。CLI 回落等二次装配也必须先撤销前一次尝试。
+
+安装链路与启动链路分开：`nm plugins install/update/uninstall` 在 Runtime 管理全局代码目录，
+实例只通过 `enabled/disable` 选择已安装候选。全局变更持有管理锁并确认所有实例已停止。
 
 ## 5. 配置与 Secret 链路
 

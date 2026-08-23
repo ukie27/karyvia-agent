@@ -947,7 +947,7 @@ Pi 在 `AgentLoopConfig` 中反复强调的约定，本方案照搬。
   > - **逐字段校验留给 `D25` 阶段 A**（manifest 自带的 `config_schema`）。`D23` 只保证
   >   条目的**形状**（是个对象、只有 `config` / `secrets` 两个键），具体字段由各内建的
   >   `resolve_settings()` 在 `setup()` 里校验并抛 `CONFIG_INVALID`。
-  > - 保留键 `disable` / `search_paths` 与插件 id 共用一个命名空间，因此叫这两个名字的
+  > - 保留键 `disable` / `stop_timeout_ms` 与插件 id 共用一个命名空间，因此叫这些名字的
   >   插件无法配置——那被显式拒绝而不是静默当成保留键。
 - Secret 只以引用形式出现：`{"api_key": "${OPENAI_API_KEY}"}`。解析结果包装为
   `SecretStr`，`__repr__` 与序列化输出恒为 `***`。写回配置时保留原始 `${VAR}` 字面量
@@ -1016,36 +1016,36 @@ asyncio 抢占不了同步回调，因此「超时隔离」的形态是**测量 
 
 ### 7.1 发现机制
 
-回答 §17.2 第 1 项。采用**两条来源，都要求显式**：
+回答 §17.2 第 1 项。生产发现只有一条来源：全局安装目录中由 `nm` 管理的 entry point 记录。
 
 | 来源 | 用途 | 形式 |
 | --- | --- | --- |
-| Python entry point 组 `nucleamind.plugins` | 已安装的正式插件包 | `name = "pkg.module:MANIFEST"` |
-| 配置中的显式路径 `plugins.search_paths` | 本地开发、单文件插件 | 目录含 `plugin.toml`，或单个 `.py` 暴露 `MANIFEST` |
+| `~/.nucleamind/plugins.json` | 全局已安装插件目录 | id、版本、安装后端、来源与运行入口；当前 Python 入口为 `name = "pkg.module:MANIFEST"` |
 
 不采用的方案及理由：
 
-- **不做 site-packages 全量扫描**：启动开销不可控，违反 `NFR-401`、`NFR-405`。
+- **不扫描 site-packages**：手工 `pip install` 不等于 NucleaMind 已安装，且环境扫描的所有权
+  与卸载边界不清楚。
 - **不做目录自动加载**（Pi 的做法）：Pi 是单用户 coding agent，目录即意图；NucleaMind 需要
   「安装 ≠ 启用」的解耦（`DST-002`）。
 - nanobot 现有的 `pkgutil` 扫描只保留在旧路径中，新体系内建能力用静态清单，
   行为确定且可读（「显式优于魔法」）。
-- **不扫描 `InstanceLayout.plugins_dir`**（`D25` 补）：那是插件的**状态**目录
+- **不扫描 `InstanceLayout.plugins_dir`**：那是插件的**状态**目录
   （`<instance>/plugins/<id>/`），把它同时当成代码来源会让一个只写了状态的子目录看起来
   像一个装错了的插件。
 
 **发现与启用分离**：发现产出候选列表；只有 `plugins.enabled` 中显式列出的插件才会进入
 加载阶段。未列出的插件不导入其模块，因此不产生启动开销。
 
-`D25` 落地时的两处细化：
+当前实现的两处细化：
 
-- 配置键名沿用 `D23` 已发布的 `plugins.search_paths`（原文写的是 `plugins.paths`），
-  新增的只有 `plugins.enabled`。
-- **候选 id 在读 manifest 之前就已知**（entry point 的 name / 目录名 / `.py` 文件名），
+- 安装目录、插件代码目录、实例索引和管理锁都直接位于 `~/.nucleamind/`，不增加
+  `global/` 中间层。实例配置不保存安装路径。
+- **候选 id 在读 manifest 之前就已知**（来自安装目录中的 entry point name），
   「未启用即不导入」因此是没有路径而不是一条纪律。代价是 entry point 的 name 必须等于
   manifest 里的 `id`，对不上即失败——静默以 manifest 为准会让 `plugins.enabled`
   指不到任何东西。
-- 实现分两层：机制（枚举、扫描、取回原始数据）在 `kernel/plugins/discovery.py`，
+- 实现分两层：候选枚举与原始对象读取机制在 `kernel/plugins/discovery.py`，
   manifest 的解析与判定在 `runtime/inventory.py`。**开发方案点名的
   `kernel/plugins/manifest.py` 不交付**：manifest 的类型与校验自 `D05` 起在 `sdk/`，
   而 `R2` 禁止 `kernel/` import 它，在 kernel 侧再写一份就是第二套校验（`D06` 的约定）。
@@ -1595,7 +1595,7 @@ Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中
 ### 10.4 插件启用与覆盖
 
 ```text
-pip install nucleamind-plugin-memory-sqlite     # 安装，不生效
+nm plugins install nucleamind-plugin-memory-sqlite  # 全局安装，不为任何实例自动启用
 nm plugins enable memory-sqlite                 # 写入 plugins.enabled
 nm restart                                      # 下次启动生效（首版不热更新）
 nm capabilities                                 # 报告中可见 provider 与 shadowed 关系
@@ -1625,9 +1625,10 @@ nm capabilities                                 # 报告中可见 provider 与 s
 
 ### 10.5 卸载与数据
 
-`nm plugins uninstall <id>` 只移除启用状态与代码引用，**默认保留**
-`<instance_dir>/plugins/<id>/`（`EDG-505`）。清理需显式 `nm plugins purge <id> --confirm`，
-执行前打印将删除的路径与体积。
+`nm plugins install/update/uninstall` 是全局操作，并要求所有已知实例停止。卸载删除
+`~/.nucleamind/plugin-packages/<id>/`，同时清除全部已知实例中的配置引用，因此覆盖插件被
+卸载后，内建实现会在实例下次启动时恢复。`<instance_dir>/plugins/<id>/` 默认保留；清理需
+显式 `nm plugins purge <id> --confirm --instance ...`，执行前打印路径与体积。
 
 升级时 `state_version` 变化必须由插件提供迁移函数，迁移失败保留旧状态并返回可恢复错误
 （`EDG-503`、`CFG-004`）。
@@ -1637,6 +1638,13 @@ nm capabilities                                 # 报告中可见 provider 与 s
 回答 §17.2 第 8、9 项。
 
 ```text
+~/.nucleamind/
+  plugins.json                    # 全局安装目录
+  plugin-packages/<plugin_id>/    # 管理器拥有的插件代码
+  plugin-cache/                   # 安装器缓存；不参与发现
+  instances.json                  # 已知实例目录（含自定义路径）
+  plugin-manager.lock             # 全局插件变更协调锁
+
 <instance_dir>/                 # 默认 ~/.nucleamind/default/，可用 --instance 或环境变量指定
   config.json                   # 实例配置
   instance.lock                 # 排他锁（含 PID 与启动时间）
@@ -1649,7 +1657,8 @@ nm capabilities                                 # 报告中可见 provider 与 s
 
 多实例规则（`DST-005`、`EDG-507`）：
 
-- 实例目录是唯一的状态边界，不存在跨实例共享的可写目录。
+- 实例目录是业务状态的唯一边界；会话、插件状态和日志不跨实例共享。全局目录只共享插件
+  代码与安装目录，并且只能在所有实例停止时修改。
 - `instance.lock` 用 `O_EXCL` 创建 + PID 存活检测；陈旧锁（PID 不存在）自动清理并记录。
 - 端口类资源在配置中显式声明，启动时先 bind 再继续；冲突报明确错误而非退避重试。
 - 插件状态目录归插件所有，Kernel 只创建和删除目录本身，不解读其内容。

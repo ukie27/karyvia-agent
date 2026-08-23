@@ -34,7 +34,7 @@ _USAGE: Final = """用法：nm <命令> [参数...]
   config show        打印生效配置与每个值的来源
   session list       列出本实例的会话
   session show <id>  打印一个会话的摘要
-  plugins ...        列出插件、启用 / 禁用 / 移除 / 清理状态目录
+  plugins ...        全局安装 / 更新 / 卸载，以及实例启用与状态管理
   capabilities       打印覆盖解析报告（生效 / 被覆盖 / 已禁用 / 冲突）
 
 选项：

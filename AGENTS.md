@@ -82,7 +82,10 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 - manifest 的 `capabilities` 是有约束力的全集：未声明却注册、声明却未注册都必须失败。
 - `overrides` 以原始字符串跨层传递，统一由 `contracts.parse_capability_target()` 解析。
 - manifest 通常不要显式写默认 `priority=100`；内建基准为 0，只有确有排序意图时才写。
-- 发现只识别候选来源；manifest 解析和项目规则在 `runtime/inventory.py`。
+- 生产发现只读取 `~/.nucleamind/plugins.json` 中由 `nm` 管理的全局候选；不扫描环境，
+  不从实例配置读取代码路径。manifest 解析和项目规则在 `runtime/inventory.py`。
+- 安装、更新、卸载是全局操作，要求所有实例停止；实例只管理启用、配置和业务状态。
+  全局数据直接位于 `~/.nucleamind/`，不要增加 `global/` 中间目录。
 - 未启用插件不得被导入。entry point 名、候选名和 manifest `id` 必须一致。
 - `kernel/plugins/loader.py` 只负责依赖、排序和 schema 等机制；项目级判定在
   `runtime/plugin_plan.py`。
@@ -98,8 +101,8 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 调用 Python/OS API。
 
 插件应继承 `sdk.testing` 的契约测试基类，并同时加入 `inspect.signature` 守卫；Protocol 的
-运行时检查只验证属性存在，不能证明签名一致。官方插件还必须进入 basedpyright 和 CI 安装
-清单。
+运行时检查只验证属性存在，不能证明签名一致。官方插件还必须进入 basedpyright 和 CI 的
+全局安装清单。
 
 ## 5. Turn 与编排不变量
 

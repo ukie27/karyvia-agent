@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import sys
 import time
+import tomllib
 from pathlib import Path
+from types import ModuleType
 
 from nucleamind.contracts import CapabilityKind, ErrorCode
 from nucleamind.kernel.observability import PluginState
-from nucleamind.kernel.plugins import MANIFEST_FILENAME
 from nucleamind.runtime.inventory import SkipReason, build_inventory
 from nucleamind.sdk import SDK_VERSION, CapabilityDecl, PluginManifest
 
@@ -35,6 +36,8 @@ kind = "tool"
 name = "acme.ping"
 """
 
+_POINTS: dict[Path, list[tuple[str, str]]] = {}
+
 
 def _manifest_text(plugin_id: str, *, platforms: str = "") -> str:
     return _VALID.format(plugin_id=plugin_id, platforms=platforms)
@@ -44,8 +47,20 @@ def _plugin(root: Path, plugin_id: str, body: str | None = None) -> Path:
     package = root / plugin_id
     package.mkdir(parents=True, exist_ok=True)
     text = _manifest_text(plugin_id) if body is None else body
-    (package / MANIFEST_FILENAME).write_text(text, encoding="utf-8")
+    try:
+        raw: object = tomllib.loads(text)
+    except tomllib.TOMLDecodeError:
+        raw = text
+    _candidate(root, plugin_id, raw)
     return package
+
+
+def _candidate(root: Path, plugin_id: str, raw: object) -> None:
+    module_name = f"_inventory_{abs(hash(root))}_{plugin_id.replace('-', '_')}"
+    module = ModuleType(module_name)
+    module.MANIFEST = raw  # type: ignore[attr-defined]
+    sys.modules[module_name] = module
+    _POINTS.setdefault(root, []).append((plugin_id, f"{module_name}:MANIFEST"))
 
 
 def _none() -> tuple[tuple[str, str], ...]:
@@ -53,8 +68,7 @@ def _none() -> tuple[tuple[str, str], ...]:
 
 
 def _inventory(tmp_path: Path, **kwargs: object):  # type: ignore[no-untyped-def]
-    kwargs.setdefault("entry_points", _none)
-    kwargs.setdefault("search_paths", [tmp_path])
+    kwargs.setdefault("entry_points", lambda: tuple(_POINTS.get(tmp_path, ())))
     return build_inventory(**kwargs)  # pyright: ignore[reportArgumentType]
 
 
@@ -150,7 +164,7 @@ def test_a_missing_required_field_reports_the_field_path(tmp_path: Path) -> None
     assert failure.error.code is ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED
     fields = {item["field"] for item in failure.error.detail["errors"]}
     assert {"sdk_range", "setup", "capabilities"} <= fields
-    assert failure.plugin_id == "acme" and failure.origin.endswith(MANIFEST_FILENAME)
+    assert failure.plugin_id == "acme" and "nucleamind.plugins:acme" in failure.origin
 
 
 def test_an_illegal_id_reports_the_field_path(tmp_path: Path) -> None:
@@ -205,7 +219,7 @@ def test_the_platform_can_be_supplied_for_matrix_tests(tmp_path: Path) -> None:
 
 
 def test_a_manifest_object_of_the_wrong_type_is_rejected(tmp_path: Path) -> None:
-    (tmp_path / "solo.py").write_text("MANIFEST = 42", encoding="utf-8")
+    _candidate(tmp_path, "solo", 42)
     (failure,) = _inventory(tmp_path, enabled=["solo"]).failures
     assert failure.error.code is ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED
     assert failure.error.detail["type"] == "int"
@@ -213,13 +227,16 @@ def test_a_manifest_object_of_the_wrong_type_is_rejected(tmp_path: Path) -> None
 
 def test_a_real_manifest_object_is_taken_as_is(tmp_path: Path) -> None:
     """插件作者在自己的模块里就该直接构造 `PluginManifest`——它已经过 pydantic 校验。"""
-    (tmp_path / "solo.py").write_text(
-        "from nucleamind.sdk import CapabilityDecl, PluginManifest\n"
-        "MANIFEST = PluginManifest(\n"
-        '    id="solo", version="0.1.0", sdk_range=">=0.1", setup="solo:setup",\n'
-        '    capabilities=(CapabilityDecl(kind="tool", name="solo.ping"),),\n'
-        ")\n",
-        encoding="utf-8",
+    _candidate(
+        tmp_path,
+        "solo",
+        PluginManifest(
+            id="solo",
+            version="0.1.0",
+            sdk_range=">=0.1",
+            setup="solo:setup",
+            capabilities=(CapabilityDecl(kind="tool", name="solo.ping"),),
+        ),
     )
     (item,) = _inventory(tmp_path, enabled=["solo"]).discovered
     assert isinstance(item.manifest, PluginManifest)
@@ -228,12 +245,11 @@ def test_a_real_manifest_object_is_taken_as_is(tmp_path: Path) -> None:
     )
 
 
-def test_a_discovery_level_failure_is_unattributed(tmp_path: Path) -> None:
-    inventory = build_inventory(search_paths=[tmp_path / "nope"], entry_points=_none)
+def test_an_enabled_but_uninstalled_plugin_is_a_failure() -> None:
+    inventory = build_inventory(enabled=["missing"], entry_points=_none)
     (failure,) = inventory.failures
-    assert failure.plugin_id == "" and failure.error.code is ErrorCode.CONFIG_INVALID
-    # 不归属任何插件的失败不会伪造出一条 PluginStatus。
-    assert inventory.statuses() == ()
+    assert failure.plugin_id == "missing" and failure.error.code is ErrorCode.PLUGIN_LOAD_FAILED
+    assert inventory.statuses()[0].state is PluginState.FAILED
 
 
 # --------------------------------------------------------------------------- 诊断投影
@@ -274,7 +290,7 @@ def test_the_inventory_serialises(tmp_path: Path) -> None:
 
 
 def test_nothing_configured_yields_an_empty_inventory() -> None:
-    """默认形态：没启用任何插件、没配搜索路径。"""
+    """默认形态：全局安装目录为空，实例也没启用任何插件。"""
     inventory = build_inventory(entry_points=_none)
     assert inventory == build_inventory(entry_points=_none, enabled=[])
     assert inventory.statuses() == ()

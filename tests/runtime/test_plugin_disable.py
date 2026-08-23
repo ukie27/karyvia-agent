@@ -17,7 +17,7 @@ import pytest
 
 from nucleamind.contracts import Builtin, CapabilityKind, ErrorCode, NucleaError
 from nucleamind.kernel.config import NucleaConfig, validate_config
-from nucleamind.kernel.plugins import PluginCandidate, SourceKind
+from nucleamind.kernel.plugins import PluginCandidate
 from nucleamind.runtime.inventory import (
     DiscoveredPlugin,
     PluginInventory,
@@ -51,7 +51,7 @@ def _manifest(*, overrides: str | None = "builtin:jsonl", plugin_id: str = PLUGI
 
 def _candidate(plugin_id: str = PLUGIN_ID) -> PluginCandidate:
     return PluginCandidate(
-        plugin_id=plugin_id, kind=SourceKind.ENTRY_POINT, location="acme.plugin:MANIFEST"
+        plugin_id=plugin_id, location="acme.plugin:MANIFEST"
     )
 
 

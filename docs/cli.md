@@ -133,21 +133,28 @@ nm session show <会话 id>
 ## `nm plugins`
 
 ```text
+nm plugins install   <包名、路径或 URL>
+nm plugins update    <插件 id>
+nm plugins uninstall <插件 id>
 nm plugins list [--json]
 nm plugins enable    <插件 id>
 nm plugins disable   <插件 id>
-nm plugins uninstall <插件 id>
 nm plugins purge     <插件 id> --confirm
 ```
 
 | 子命令 | 做什么 |
 | --- | --- |
+| `install` | 把插件全局安装到 `~/.nucleamind/plugin-packages/<id>/`，不自动为任何实例启用 |
+| `update` | 从安装记录里的来源更新全局插件 |
+| `uninstall` | 删除全局代码，并清除所有已知实例中的启用、禁用和配置引用；实例状态目录默认保留 |
 | `list` | 列出已发现的插件、状态、版本与能力（内建不在这张表里，看 `nm capabilities`） |
-| `enable` | 写入 `plugins.enabled`，**并把它从 `plugins.disable` 里摘掉**——不摘就等于让一条明确的「启用」静默失效，摘掉了什么会印出来 |
+| `enable` | 外部插件写入 `plugins.enabled` 并从 `plugins.disable` 移除；内建插件本来就存在，因此只撤销 `disable`，不会伪造成外部安装引用 |
 | `disable` | 写入 `plugins.disable`，**不动 `enabled`**（这样 `enable` 才是它的逆操作）。对内建同样有效 |
-| `uninstall` | 从两张表里移除引用，**保留状态目录**，**不碰已安装的发行包**（卸包是 pip 的事） |
 | `purge` | 删除插件的状态目录 |
 
+- `install` / `update` / `uninstall` 是**全局操作**，不接受 `--instance`、
+  `--instance-dir` 或 `--set`。执行时必须先停止所有实例；这样运行中的实例不会突然失去
+  已导入代码。全局文件直接位于 `~/.nucleamind/`，没有额外的 `global/` 目录。
 - `enable` / `disable` **只改配置，不在当前进程生效**（首版不热更新）。每次改动的输出
   都带这句话。
 - 禁用一个**覆盖过别的能力**的插件时，输出会提前告诉你还得在
@@ -156,7 +163,7 @@ nm plugins purge     <插件 id> --confirm
 - **`purge` 是唯一会删用户数据的地方**：没带 `--confirm` 就只打印路径与体积、
   一个字节都不删（退出码 `3`）。路径与体积在确认**之前**打印——一句「确定吗」
   不足以让你知道自己将要失去什么。
-- 这些命令都**不取实例锁**，代价是改动要等对方重启才生效；反正首版本来就不热更新。
+- `list` / `enable` / `disable` / `purge` 是实例操作；前三者的改动要等实例重启后生效。
 
 **`nm plugins enable|disable|uninstall` 是 `config.json` 唯一的修改点**
 （`nm init` 是唯一的创建点，加载路径只读）。

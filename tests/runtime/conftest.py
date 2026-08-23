@@ -15,11 +15,12 @@ from __future__ import annotations
 
 import socket
 from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from nucleamind.kernel.plugins import ENTRY_POINT_GROUP
+from nucleamind.runtime.plugin_home import NUCLEAMIND_HOME_ENV
 
 #: 允许的目标。事件循环的 self-pipe 只连这几个。
 _LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost", "", None})
@@ -62,27 +63,9 @@ def no_real_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 
 
 @pytest.fixture(autouse=True)
-def no_ambient_plugins(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """本层用例看到的 entry point 恒为空（`D30` 加）。
-
-    `examples/plugins/` 的两个示例插件在开发环境里是**真的装着的**（`tests/e2e/` 那套
-    里程碑用例要求如此），于是「没装任何插件」这个前提在这一层就不再成立——`nm plugins
-    list` 会印出两条，`diagnostics.plugins()` 也不再是空元组。那不是回归，是这些用例
-    一直依赖着一个它们没有声明的环境事实。
-
-    **patch 的是 `importlib.metadata.entry_points`**：`installed_entry_points()` 在函数
-    体内 import 它，因此换掉它就够了；而 `build_inventory` 的 `entry_points` 形参默认值
-    在函数定义时就绑好了，改模块属性影响不到那条路。要在这一层验真实 entry point 的用例
-    自己传 `entry_points=`，本夹具挡不住那条显式路径——那正是它可注入的理由。
-    """
-    import importlib.metadata
-
-    real = importlib.metadata.entry_points
-
-    def entry_points(**kwargs: Any) -> Any:  # boundary: stdlib 的重载签名
-        if kwargs.get("group") == ENTRY_POINT_GROUP:
-            return ()
-        return real(**kwargs)
-
-    monkeypatch.setattr(importlib.metadata, "entry_points", entry_points)
+def isolated_plugin_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[None]:
+    """全局插件目录属于用户数据；Runtime 测试不得读写开发者真实的 home。"""
+    monkeypatch.setenv(NUCLEAMIND_HOME_ENV, str(tmp_path / ".nucleamind"))
     yield

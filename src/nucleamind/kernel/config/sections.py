@@ -197,9 +197,9 @@ class WorkspaceSection:
 
 @dataclass(frozen=True, slots=True)
 class PluginsSection:
-    """插件发现与加载的开关，以及逐插件的配置块。
+    """实例级插件启用状态、停止预算与逐插件配置块。
 
-    `enabled` / `disable` / `search_paths` / `stop_timeout_ms` 是**保留键**，`plugins` 小节里
+    `enabled` / `disable` / `stop_timeout_ms` 是**保留键**，`plugins` 小节里
     其余的键都是插件 id（技术方案 §6.7 的 `plugins.<plugin_id>.config`），形状校验与那条
     「保留键为什么撞不上插件 id」的理由都在 `plugin_blocks.py`。
     """
@@ -209,10 +209,6 @@ class PluginsSection:
     enabled: tuple[str, ...] = ()
     #: 显式禁用的提供方 id。它压过 `enabled`，也对内建生效（`resolve(disabled=...)`）。
     disable: tuple[str, ...] = ()
-    #: 插件搜索路径（技术方案 §7.1 的 `plugins.paths`）。
-    #: 每条路径下的直接子项：含 `plugin.toml` 的目录，或单个 `.py`。**不含
-    #: `InstanceLayout.plugins_dir`**——那是插件的状态目录，不是代码来源。
-    search_paths: tuple[str, ...] = ()
     #: 单个插件的停止预算（`EDG-104`）：超时即放弃等待、记事件、继续停其余插件。
     stop_timeout_ms: int = DEFAULT_PLUGIN_STOP_TIMEOUT_MS
     #: 插件 id -> 它的 `{config, secrets}`。装配根按 id 取，取不到就给空块。

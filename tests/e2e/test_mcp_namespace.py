@@ -11,7 +11,7 @@
 
 因此本文件要求 mcp 插件已经装进当前环境：
 
-    pip install -e plugins/nucleamind-plugin-mcp
+    nm plugins install --no-deps plugins/nucleamind-plugin-mcp
 """
 
 from __future__ import annotations
@@ -29,9 +29,9 @@ from nucleamind.contracts import (
     ToolInvocation,
     ToolSpec,
 )
-from nucleamind.kernel.plugins import installed_entry_points
 from nucleamind.kernel.registry import CapabilityRegistry
 from nucleamind.kernel.turn import tools_from
+from nucleamind.runtime.plugin_home import GlobalPluginHome
 from nucleamind.runtime.wiring import wire_capabilities
 from nucleamind.sdk.testing import FakePluginContext, ManualCancel, make_correlation
 
@@ -126,9 +126,9 @@ def _specs(registry: CapabilityRegistry) -> dict[str, ToolSpec]:
 
 def test_the_mcp_plugin_is_installed_as_an_entry_point() -> None:
     """整套用例的前提。**单独成一条**：装漏了要看到一句能照做的话。"""
-    names = {name for name, _ in installed_entry_points()}
+    names = {item.plugin_id for item in GlobalPluginHome.resolve().catalog()}
     assert MCP_PLUGIN in names, (
-        "mcp 插件没装。请先跑 `pip install -e plugins/nucleamind-plugin-mcp`"
+        "mcp 插件没装。请先跑 `nm plugins install --no-deps plugins/nucleamind-plugin-mcp`"
     )
 
 

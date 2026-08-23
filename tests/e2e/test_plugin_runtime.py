@@ -7,13 +7,13 @@
 
 **这里唯一的替身是传输层**（`conftest.recorder`），与 `test_out_of_box.py` 同一条理由：
 里程碑说的是「装上一个插件之后」，用 Fake 能力验它等于验了一台不存在的机器。因此这套
-用例**要求两个示例插件已经装进当前环境**：
+用例**要求两个示例插件已经由全局管理器安装**：
 
-    pip install -e examples/plugins/nucleamind-plugin-echo-tool
-    pip install -e examples/plugins/nucleamind-plugin-session-memory
+    nm plugins install --no-deps examples/plugins/nucleamind-plugin-echo-tool
+    nm plugins install --no-deps examples/plugins/nucleamind-plugin-session-memory
 
-没装时第一条用例会以一句明确的话失败，而不是安静地少验几件事——`installed_entry_points()`
-读的是真实包元数据，没有第二条路能让它们出现在候选里。
+没装时第一条用例会以一句明确的话失败，而不是安静地少验几件事。启动只读全局安装目录，
+不会把环境里恰好存在的 Python 包误当成已安装插件。
 """
 
 from __future__ import annotations
@@ -25,12 +25,13 @@ from pathlib import Path
 import pytest
 
 from nucleamind.contracts import UNTRUSTED_DATA_PREFIX, ErrorCode, NucleaError
-from nucleamind.kernel.plugins import installed_entry_points
 from nucleamind.kernel.turn import CancelToken
 from nucleamind.runtime.bootstrap import bootstrap
 from nucleamind.runtime.cli.main import app
 from nucleamind.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
 from nucleamind.runtime.inspect import inspect_capabilities, inspect_plugins
+from nucleamind.runtime.plugin_home import GlobalPluginHome
+from tests.runtime._support import register_test_manifest
 
 from ._support import say, use_tool
 from .conftest import Recorder
@@ -94,12 +95,12 @@ def render(error: NucleaError) -> str:
 def test_both_example_plugins_are_installed_as_entry_points() -> None:
     """整套用例的前提。**放在最前面单独成一条**：装漏了要看到一句能照做的话，
     而不是后面十几条各失败一次。"""
-    names = {name for name, _ in installed_entry_points()}
+    names = {item.plugin_id for item in GlobalPluginHome.resolve().catalog()}
     missing = {ECHO_PLUGIN, MEMORY_PLUGIN} - names
     assert not missing, (
         f"示例插件没装：{sorted(missing)}。请先跑 "
-        "`pip install -e examples/plugins/nucleamind-plugin-echo-tool "
-        "-e examples/plugins/nucleamind-plugin-session-memory`"
+        "`nm plugins install --no-deps examples/plugins/nucleamind-plugin-echo-tool` 和 "
+        "`nm plugins install --no-deps examples/plugins/nucleamind-plugin-session-memory`"
     )
 
 
@@ -382,7 +383,7 @@ def _toml_value(value: object) -> str:
 
 
 def _directory_plugin(root: Path, plugin_id: str, manifest: dict[str, object]) -> Path:
-    """在搜索路径下造一个目录形态的插件。返回搜索路径。
+    """把测试声明登记成一个全局候选。返回写下的 manifest 路径。
 
     用目录形态而不是再发一个包：这两条用例要的是**坏掉的** manifest，而一个装得上的坏插件
     没法同时留在 `examples/` 里当范例。目录形态的 manifest 是 `plugin.toml`，读它连一次
@@ -391,8 +392,10 @@ def _directory_plugin(root: Path, plugin_id: str, manifest: dict[str, object]) -
     directory = root / plugin_id
     directory.mkdir(parents=True, exist_ok=True)
     lines = [f"{key} = {_toml_value(value)}" for key, value in manifest.items()]
-    (directory / "plugin.toml").write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return root
+    path = directory / "plugin.toml"
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    register_test_manifest(path)
+    return path
 
 
 def test_an_incompatible_sdk_range_is_refused_with_its_own_code(
@@ -400,7 +403,7 @@ def test_an_incompatible_sdk_range_is_refused_with_its_own_code(
 ) -> None:
     """第二类：**SDK 不兼容**（`SDK-005`）。不带病加载，错误码与配置错误分得开。"""
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
-    search = _directory_plugin(
+    _directory_plugin(
         instance_dir / "external",
         "from-the-future",
         {
@@ -411,10 +414,7 @@ def test_an_incompatible_sdk_range_is_refused_with_its_own_code(
             "capabilities": [{"kind": "tool", "name": "future.thing"}],
         },
     )
-    write_config(
-        instance_dir,
-        {"enabled": ["from-the-future"], "search_paths": [str(search)]},
-    )
+    write_config(instance_dir, {"enabled": ["from-the-future"]})
     recorder.script(say("好。"))
 
     assert asyncio.run(run_prompt(instance_dir, "在吗")) == 0
@@ -433,7 +433,7 @@ def test_a_setup_that_cannot_be_loaded_is_reported_per_provider(
     而不是在阶段 A 的清单里——`nm capabilities` 把这一段单独印成「加载失败的提供方」。
     """
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
-    search = _directory_plugin(
+    _directory_plugin(
         instance_dir / "external",
         "broken-setup",
         {
@@ -444,9 +444,7 @@ def test_a_setup_that_cannot_be_loaded_is_reported_per_provider(
             "capabilities": [{"kind": "tool", "name": "broken.thing"}],
         },
     )
-    write_config(
-        instance_dir, {"enabled": ["broken-setup"], "search_paths": [str(search)]}
-    )
+    write_config(instance_dir, {"enabled": ["broken-setup"]})
     recorder.script(say("好。"))
 
     assert asyncio.run(run_prompt(instance_dir, "在吗")) == 0

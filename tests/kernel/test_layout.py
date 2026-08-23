@@ -27,6 +27,7 @@ from nucleamind.kernel.config import (
     INSTANCE_NAME_ENV,
     LOCK_FILENAME,
     LOGS_DIRNAME,
+    NUCLEAMIND_HOME_ENV,
     PLUGINS_DIRNAME,
     SESSIONS_DIRNAME,
     WORKSPACE_DIRNAME,
@@ -45,6 +46,7 @@ def test_layout_names_are_frozen() -> None:
     assert DEFAULT_INSTANCE_NAME == "default"
     assert INSTANCE_DIR_ENV == "NUCLEAMIND_INSTANCE_DIR"
     assert INSTANCE_NAME_ENV == "NUCLEAMIND_INSTANCE"
+    assert NUCLEAMIND_HOME_ENV == "NUCLEAMIND_HOME"
 
 
 class TestResolution:
@@ -82,6 +84,20 @@ class TestResolution:
         layout = InstanceLayout.resolve(env={}, home=tmp_path)
         assert layout.root == (tmp_path / ".nucleamind" / DEFAULT_INSTANCE_NAME).resolve()
 
+    def test_nucleamind_home_is_the_data_root_itself(self, tmp_path: Path) -> None:
+        """环境变量直接指向数据根，不能再偷偷追加 `.nucleamind` 或 `global`。"""
+        data_root = tmp_path / "nm-data"
+        layout = InstanceLayout.resolve(env={NUCLEAMIND_HOME_ENV: str(data_root)})
+        assert layout.root == data_root.resolve() / DEFAULT_INSTANCE_NAME
+
+    def test_named_instance_uses_nucleamind_home_directly(self, tmp_path: Path) -> None:
+        data_root = tmp_path / "nm-data"
+        layout = InstanceLayout.resolve(
+            instance="work",
+            env={NUCLEAMIND_HOME_ENV: str(data_root)},
+        )
+        assert layout.root == data_root.resolve() / "work"
+
     def test_relative_explicit_dir_becomes_absolute(self, tmp_path: Path) -> None:
         """相对路径必须变成绝对路径，否则后续 cwd 变化会改变实例位置。"""
         layout = InstanceLayout.resolve(instance_dir="rel-instance", env={}, home=tmp_path)
@@ -117,6 +133,17 @@ class TestInstanceNameValidation:
         with pytest.raises(NucleaError) as caught:
             InstanceLayout.resolve(instance="x" * 200, env={}, home=tmp_path)
         assert caught.value.code is ErrorCode.INPUT_TOO_LARGE
+
+    @pytest.mark.parametrize(
+        "name",
+        ["plugin-packages", "plugin-cache", "plugins.json", "instances.json", "plugin-manager.lock"],
+    )
+    def test_rejects_names_owned_by_global_plugin_management(
+        self, name: str, tmp_path: Path
+    ) -> None:
+        with pytest.raises(NucleaError) as caught:
+            InstanceLayout.resolve(instance=name, env={}, home=tmp_path)
+        assert caught.value.code is ErrorCode.CONFIG_INVALID
 
     @pytest.mark.parametrize("name", ["default", "work", "my-instance", "inst_2", "a1"])
     def test_accepts_reasonable_names(self, name: str, tmp_path: Path) -> None:

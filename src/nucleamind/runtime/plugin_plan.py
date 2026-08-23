@@ -26,10 +26,11 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from nucleamind.contracts import EventName, JsonValue
+from nucleamind.contracts import ErrorCode, EventName, JsonValue, NucleaError
 from nucleamind.kernel.config import InstanceLayout, NucleaConfig
 from nucleamind.kernel.observability import EventBus
 from nucleamind.kernel.plugins import (
+    EntryPointLister,
     PlanNode,
     check_state_version,
     plan_load_order,
@@ -64,24 +65,38 @@ class ExternalPlan:
 
 
 def discover_plugins(
-    config: NucleaConfig, layout: InstanceLayout, bus: EventBus
+    config: NucleaConfig,
+    layout: InstanceLayout,
+    bus: EventBus,
+    *,
+    strict_missing: bool = True,
+    entry_points: EntryPointLister = lambda: (),
 ) -> PluginInventory:
     """§10.1 步骤 3b：发现外部插件并把结果发成事件（`D25`）。
 
     **发现不导入未启用的插件**：`plugins.enabled` 之外的候选连 manifest 都不会被读，
     因此未启用的插件不产生任何导入开销（`NFR-401`、`DST-002`）。
 
-    搜索路径按实例目录解析相对路径——用户在 `config.json` 里写 `"./my-plugins"` 时，
-    「相对谁」的唯一合理答案是那份配置所在的目录，而不是 `nm` 的当前工作目录。
+    候选只来自全局安装目录。实例配置只决定是否启用，不再承担代码发现与安装职责。
     """
     inventory = build_inventory(
         enabled=config.plugins.enabled,
         disabled=config.plugins.disable,
-        search_paths=[
-            path if (path := Path(raw)).is_absolute() else layout.root / raw
-            for raw in config.plugins.search_paths
-        ],
+        entry_points=entry_points,
     )
+    missing = sorted(
+        failure.plugin_id
+        for failure in inventory.failures
+        if failure.error.code is ErrorCode.PLUGIN_LOAD_FAILED
+        and not failure.origin
+        and failure.plugin_id in config.plugins.enabled
+    )
+    if missing and strict_missing:
+        raise NucleaError(
+            ErrorCode.PLUGIN_LOAD_FAILED,
+            "实例启用了尚未全局安装的插件。",
+            detail={"plugins": missing, "suggestion": "nm plugins install <来源>"},
+        )
     for item in inventory.discovered:
         bus.publish(
             EventName.PLUGIN_DISCOVERED,
@@ -90,7 +105,7 @@ def discover_plugins(
             payload={
                 "plugin": item.manifest.id,
                 "version": item.manifest.version,
-                "source": item.candidate.kind.value,
+                "source": "global_entry_point",
             },
         )
     for failure in inventory.failures:

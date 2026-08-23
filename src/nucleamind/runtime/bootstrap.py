@@ -26,6 +26,7 @@ from nucleamind.builtins.registry import BUILTIN_MANIFESTS
 from nucleamind.contracts import (
     CapabilityKind,
     CliEntry,
+    ErrorCode,
     EventName,
     InstanceId,
     JsonValue,
@@ -82,6 +83,7 @@ from .plugin_bootstrap import (
 )
 from .plugin_context import PluginRuntime, RuntimePluginContext
 from .plugin_disable import suppressed_capabilities
+from .plugin_home import GlobalPluginHome
 from .plugin_plan import discover_plugins
 from .selection import (
     missing_capability,
@@ -153,6 +155,9 @@ async def bootstrap(
     layout.ensure()
     lock = InstanceLock(layout.lock_path).acquire() if acquire_lock else None
     try:
+        plugin_home = GlobalPluginHome.resolve(env=env, home=home)
+        with plugin_home.registration():
+            plugin_home.register_instance(layout.root)
         return await _bootstrap_with_lock(
             layout, lock, env=env, overrides=overrides, home=home, manifests=manifests
         )
@@ -185,6 +190,7 @@ async def _bootstrap_with_lock(
             lock,
             loaded=loaded,
             env=env,
+            home=home,
             manifests=manifests,
             resources=resources,
         )
@@ -199,6 +205,7 @@ async def _build_instance(
     *,
     loaded: LoadedConfig,
     env: Mapping[str, str] | None,
+    home: Path | None,
     manifests: Sequence[PluginManifest],
     resources: StartupResources,
 ) -> AgentInstance:
@@ -220,13 +227,26 @@ async def _build_instance(
     selected = select_manifests(manifests, config)
 
     # 发现外部插件：未列入 `plugins.enabled` 的候选连 manifest 都不读。
-    inventory = discover_plugins(config, layout, bus)
+    inventory = discover_plugins(
+        config,
+        layout,
+        bus,
+        entry_points=GlobalPluginHome.resolve(env=env, home=home).entry_points,
+    )
     # 阶段 A 校验与拓扑排序。产出接到诊断上，`/plugins` 因此列得出
     # 候选、跳过原因与两个阶段的失败。
     plan, inventory = plan_external(
         inventory, config, layout, loaded.workspace_root, bus, selected
     )
     external_ids = [manifest.id for manifest in plan.manifests]
+    builtin_ids = {manifest.id for manifest in selected}
+    collisions = sorted(builtin_ids.intersection(external_ids))
+    if collisions:
+        raise NucleaError(
+            ErrorCode.PLUGIN_REGISTRATION_CONFLICT,
+            "外部插件 id 不能与内建插件 id 相同；覆盖能力应使用 manifest.overrides。",
+            detail={"plugins": collisions},
+        )
     # 被禁用的覆盖者留下的空缺：`BAS-004` 不允许内建在这里**隐式**复活，因此用户必须
     # 对每一条 `on_disable` 表态。判定在配置层与注册之间——它是配置错误，不该等到
     # 一次白跑的 `setup()` 之后才报出来。

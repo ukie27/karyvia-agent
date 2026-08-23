@@ -29,7 +29,7 @@ def _script() -> None:
 
 
 def _instance(root: Path, **plugins: object) -> None:
-    write_config(root, plugins={"search_paths": ["ext"], **plugins})
+    write_config(root, plugins=plugins)
 
 
 def _states(root: Path) -> dict[str, PluginState]:

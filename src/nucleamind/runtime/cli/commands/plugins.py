@@ -1,20 +1,12 @@
-"""`nm plugins list|enable|disable|uninstall|purge`（`D29`，技术方案 §10.4、§10.5）。
+"""全局插件安装与实例级启用管理。
 
-职责：列出插件与它们的状态，把启用 / 禁用写进 `config.json`，移除配置里的引用，
-并在显式确认后删除插件的状态目录。
+职责：在 NucleaMind home 中安装、更新和卸载插件；列出当前实例状态；把启用 / 禁用写进
+实例 ``config.json``；在显式确认后删除实例插件状态。
 不负责：发现与阶段 A 判定（`runtime/inspect.py` → `inventory.py` / `plugin_plan.py`）、
 改配置的文件操作（`runtime/config_edit.py`）。
 
-**`enable` / `disable` 只改配置，不在当前进程生效**（首版不热更新，需求 §4.2、§10.4）。
-这句印在每一次改动的输出里。
-
-**不取实例锁**，与 `nm config show` 同一条理由：看一眼装了什么、
-或者改一行配置，不该与正在跑的实例互斥。代价是改动要等对方重启才生效——反正首版本来
-就不热更新，这里没有多付出什么。
-
-**`purge` 是本文件唯一会删用户数据的地方**（`EDG-505`）：默认**不删**，`uninstall` 更是
-一个字节都不碰状态目录。要删就得先看见将要删掉什么——路径与体积在 `--confirm` 之前
-就已经印出来了，那不是确认之后的回执。
+安装、更新、卸载是全局操作，不接受实例参数，并要求全部实例停止。启用、禁用和状态清理
+仍是实例操作。卸载删除全局代码和所有已知实例中的配置引用，但保留各实例业务状态。
 """
 
 from __future__ import annotations
@@ -25,12 +17,25 @@ import sys
 from collections.abc import Sequence
 from pathlib import Path
 
+from nucleamind.builtins.registry import BUILTIN_MANIFESTS
 from nucleamind.contracts import ErrorCode, JsonValue, NucleaError
 from nucleamind.kernel.config import InstanceLayout
 from nucleamind.kernel.observability import PluginStatus
 
-from ...config_edit import add_to_list, read_document, remove_from_list, write_document
+from ...config_edit import (
+    add_to_list,
+    read_document,
+    remove_from_list,
+    remove_plugin_entry,
+    write_document,
+)
 from ...inspect import inspect_plugins
+from ...plugin_home import (
+    GlobalPluginHome,
+    install_plugin,
+    uninstall_plugin,
+    update_plugin,
+)
 from ..main import Options
 
 __all__ = ["plugins_command"]
@@ -38,11 +43,16 @@ __all__ = ["plugins_command"]
 _USAGE = """用法：nm plugins <子命令>
 
 子命令：
+  install <来源> [--no-deps] 全局安装一个 Python 插件
+  update <插件 id>          从原安装来源全局更新插件
+  uninstall <插件 id>       全局卸载，并清除所有已知实例的配置引用
   list [--json]              列出已发现的插件、状态、版本与能力
-  enable <插件 id>           写入 plugins.enabled（下次启动生效）
+  enable <插件 id>           启用外部插件，或恢复被禁用的内建插件
   disable <插件 id>          写入 plugins.disable（对内建同样有效）
-  uninstall <插件 id>        从配置里移除引用，保留插件的状态目录
   purge <插件 id> --confirm  删除插件的状态目录（先打印路径与体积）
+
+install / update / uninstall 是全局操作，不能与 --instance / --instance-dir 一起使用，
+并且执行时所有实例都必须已经停止。
 """
 
 #: 改完配置后统一的那句话。首版不热更新，说清楚比让用户困惑地敲 `/plugins` 强。
@@ -58,8 +68,18 @@ def plugins_command(options: Options) -> int:
     if action in ("", "-h", "--help"):
         sys.stdout.write(_USAGE)
         return 0
-    layout = InstanceLayout.resolve(instance_dir=options.instance_dir, instance=options.instance)
     args = options.rest[1:]
+    if action in {"install", "update", "uninstall"}:
+        _require_global(options, action)
+        home = GlobalPluginHome.resolve()
+        match action:
+            case "install":
+                return _install(home, args)
+            case "update":
+                return _update(home, args)
+            case _:
+                return _uninstall(home, args)
+    layout = InstanceLayout.resolve(instance_dir=options.instance_dir, instance=options.instance)
     match action:
         case "list":
             return _list(options, args)
@@ -67,16 +87,34 @@ def plugins_command(options: Options) -> int:
             return _enable(layout, args)
         case "disable":
             return _disable(layout, args)
-        case "uninstall":
-            return _uninstall(layout, args)
         case "purge":
             return _purge(layout, args)
         case _:
             raise NucleaError(
                 ErrorCode.INPUT_MALFORMED,
                 f"未知的 plugins 子命令 {action!r}。",
-                detail={"known": ["list", "enable", "disable", "uninstall", "purge"]},
+                detail={
+                    "known": [
+                        "install",
+                        "update",
+                        "uninstall",
+                        "list",
+                        "enable",
+                        "disable",
+                        "purge",
+                    ]
+                },
             )
+
+
+def _require_global(options: Options, action: str) -> None:
+    if options.instance is None and options.instance_dir is None and not options.overrides:
+        return
+    raise NucleaError(
+        ErrorCode.INPUT_MALFORMED,
+        f"nm plugins {action} 是全局操作，不接受实例参数或 --set。",
+        detail={"scope": "global"},
+    )
 
 
 def _plugin_id(args: Sequence[str], usage: str, *, flags: Sequence[str] = ()) -> str:
@@ -146,17 +184,108 @@ def _render(status: PluginStatus) -> str:
     return "".join(lines)
 
 
-# ------------------------------------------------------- enable / disable / uninstall
+# --------------------------------------------------------- install / update / uninstall
+
+
+def _source(args: Sequence[str]) -> tuple[str, bool]:
+    positional = [item for item in args if not item.startswith("-")]
+    unknown = [item for item in args if item.startswith("-") and item != "--no-deps"]
+    if len(positional) != 1 or unknown or args.count("--no-deps") > 1:
+        raise NucleaError(
+            ErrorCode.INPUT_MALFORMED,
+            "要给出且只给出一个插件安装来源。",
+            detail={"usage": "nm plugins install <包名、路径或 URL>"},
+        )
+    return positional[0], "--no-deps" not in args
+
+
+def _install(home: GlobalPluginHome, args: Sequence[str]) -> int:
+    source, with_dependencies = _source(args)
+    with home.mutation():
+        record = install_plugin(home, source, with_dependencies=with_dependencies)
+    sys.stdout.write(
+        f"{record.plugin_id} {record.version}: 已全局安装到 {home.package_dir(record.plugin_id)}。\n"
+        "它尚未在任何实例启用；使用 nm plugins enable <插件 id>。\n"
+    )
+    return 0
+
+
+def _update(home: GlobalPluginHome, args: Sequence[str]) -> int:
+    plugin_id = _plugin_id(args, "nm plugins update <插件 id>")
+    with home.mutation():
+        record = update_plugin(home, plugin_id)
+    sys.stdout.write(f"{record.plugin_id}: 已全局更新到 {record.version}。\n")
+    return 0
+
+
+def _uninstall(home: GlobalPluginHome, args: Sequence[str]) -> int:
+    """删除全局代码与实例配置引用；实例业务状态由 ``purge`` 单独管理。"""
+    plugin_id = _plugin_id(args, "nm plugins uninstall <插件 id>")
+    if plugin_id not in {item.plugin_id for item in home.catalog()}:
+        sys.stdout.write(f"{plugin_id}: 尚未全局安装。\n")
+        return 3
+    with home.mutation():
+        updates: list[tuple[Path, dict[str, JsonValue]]] = []
+        state_dirs: list[Path] = []
+        for root in home.instances():
+            config_path = root / "config.json"
+            if not config_path.is_file():
+                continue
+            document = read_document(config_path)
+            enabled = remove_from_list(document, _PLUGINS, _ENABLED, plugin_id)
+            disabled = remove_from_list(enabled.document, _PLUGINS, _DISABLE, plugin_id)
+            entry = remove_plugin_entry(disabled.document, plugin_id)
+            if enabled.changed or disabled.changed or entry.changed:
+                updates.append((config_path, entry.document))
+            state = root / "plugins" / plugin_id
+            if state.is_dir():
+                state_dirs.append(state)
+        for path, document in updates:
+            write_document(path, document)
+        uninstall_plugin(home, plugin_id)
+    sys.stdout.write(
+        f"{plugin_id}: 已从全局插件目录卸载，并清理 {len(updates)} 个实例的配置引用。\n"
+        "被覆盖的内建能力会在实例下次启动时恢复。\n"
+    )
+    for state in state_dirs:
+        sys.stdout.write(
+            f"状态目录仍保留：{state}\n"
+            f"  要删除它：nm plugins purge {plugin_id} --confirm "
+            f"--instance-dir {state.parent.parent}\n"
+        )
+    return 0
+
+
+# --------------------------------------------------------------- enable / disable
 
 
 def _enable(layout: InstanceLayout, args: Sequence[str]) -> int:
-    """写入 `plugins.enabled`，并把它从 `plugins.disable` 里摘掉。
+    """启用外部插件，或撤销对内建插件的禁用。
 
-    **摘掉是必须的，不是顺手**：`disable` 压过 `enabled`（`D25`），不摘就等于让一条明确
-    的「启用」静默失效。摘掉了什么会印出来——这条命令不做用户看不见的事。
+    外部插件写入 ``plugins.enabled``；内建插件已经随 Kernel 安装，只需从
+    ``plugins.disable`` 摘掉。两种路径都不能留下相反指令，否则一次明确的“启用”会静默
+    失效。
     """
     plugin_id = _plugin_id(args, "nm plugins enable <插件 id>")
+    installed = {item.plugin_id for item in GlobalPluginHome.resolve().catalog()}
+    builtin = plugin_id in {manifest.id for manifest in BUILTIN_MANIFESTS}
+    if plugin_id not in installed and not builtin:
+        raise NucleaError(
+            ErrorCode.PLUGIN_LOAD_FAILED,
+            "插件尚未全局安装，不能在实例中启用。",
+            detail={"plugin_id": plugin_id, "suggestion": "nm plugins install <来源>"},
+        )
     document = read_document(layout.config_path)
+    if builtin:
+        undisabled = remove_from_list(document, _PLUGINS, _DISABLE, plugin_id)
+        if not undisabled.changed:
+            sys.stdout.write(f"{plugin_id}: 本来就已启用。\n")
+            return 3
+        write_document(layout.config_path, undisabled.document)
+        sys.stdout.write(f"{plugin_id}: 已从 plugins.disable 移除，内建插件恢复启用。\n")
+        sys.stdout.write(_RESTART_HINT + "\n")
+        return 0
+
     added = add_to_list(document, _PLUGINS, _ENABLED, plugin_id)
     undisabled = remove_from_list(added.document, _PLUGINS, _DISABLE, plugin_id)
     if not added.changed and not undisabled.changed:
@@ -206,12 +335,14 @@ def _on_disable_hint(layout: InstanceLayout, plugin_id: str) -> str:
         inventory = inspect_plugins(instance_dir=layout.root).inventory
     except NucleaError:
         return ""
-    overridden = [
-        target.target
-        for item in inventory.skipped
-        if item.candidate.plugin_id == plugin_id and item.manifest is not None
-        for target in override_targets(item.manifest)
-    ]
+    overridden: list[str] = []
+    for item in inventory.skipped:
+        if item.candidate.plugin_id != plugin_id:
+            continue
+        manifest = item.manifest
+        if manifest is None:
+            continue
+        overridden.extend(target.target for target in override_targets(manifest))
     if not overridden:
         return ""
     return (
@@ -219,38 +350,6 @@ def _on_disable_hint(layout: InstanceLayout, plugin_id: str) -> str:
         f'  在 config.json 的 plugins.{plugin_id} 里写 "on_disable"——\n'
         "  restore_builtin（被顶掉的实现重新生效）或 leave_missing（保持缺失）。\n"
     )
-
-
-def _uninstall(layout: InstanceLayout, args: Sequence[str]) -> int:
-    """从两张表里移除引用，**保留状态目录**（`EDG-505`）。
-
-    **不碰已安装的发行包**：那是 pip 的事，一条 CLI 子命令去卸别人装的包只会在权限、
-    虚拟环境与卸载失败三件事上各留一个坑。这句印在输出里，免得用户以为包已经没了。
-    """
-    plugin_id = _plugin_id(args, "nm plugins uninstall <插件 id>")
-    document = read_document(layout.config_path)
-    from_enabled = remove_from_list(document, _PLUGINS, _ENABLED, plugin_id)
-    from_disable = remove_from_list(from_enabled.document, _PLUGINS, _DISABLE, plugin_id)
-    state_dir = layout.plugins_dir / plugin_id
-    if not from_enabled.changed and not from_disable.changed:
-        sys.stdout.write(f"{plugin_id}: 配置里本来就没有它。\n")
-        _write_state_note(state_dir, plugin_id)
-        return 3
-    write_document(layout.config_path, from_disable.document)
-    sys.stdout.write(f"{plugin_id}: 已从配置里移除引用。\n")
-    sys.stdout.write("发行包本身不受影响（要卸载请用 pip）。\n")
-    _write_state_note(state_dir, plugin_id)
-    sys.stdout.write(_RESTART_HINT + "\n")
-    return 0
-
-
-def _write_state_note(state_dir: Path, plugin_id: str) -> None:
-    """状态目录仍在哪、怎么删掉它。没有目录时不提，免得指向一个不存在的路径。"""
-    if state_dir.is_dir():
-        sys.stdout.write(
-            f"状态目录仍保留：{state_dir}\n"
-            f"  要一并删除：nm plugins purge {plugin_id} --confirm\n"
-        )
 
 
 # ----------------------------------------------------------------------- purge

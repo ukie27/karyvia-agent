@@ -56,15 +56,15 @@ python -m venv .venv
 # Plugins are discovered through entry points, so they must actually be
 # installed. `--no-deps` keeps platform SDKs out of the test environment on
 # purpose: no plugin's test tree may depend on its vendor SDK.
-.venv/bin/python -m pip install --no-deps -e examples/plugins/nucleamind-plugin-echo-tool
-.venv/bin/python -m pip install --no-deps -e examples/plugins/nucleamind-plugin-session-memory
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-openai-api
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-anthropic
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-feishu
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-web
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-mcp
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-memory
-.venv/bin/python -m pip install --no-deps -e plugins/nucleamind-plugin-cron
+nm plugins install --no-deps examples/plugins/nucleamind-plugin-echo-tool
+nm plugins install --no-deps examples/plugins/nucleamind-plugin-session-memory
+nm plugins install --no-deps plugins/nucleamind-plugin-openai-api
+nm plugins install --no-deps plugins/nucleamind-plugin-anthropic
+nm plugins install --no-deps plugins/nucleamind-plugin-feishu
+nm plugins install --no-deps plugins/nucleamind-plugin-web
+nm plugins install --no-deps plugins/nucleamind-plugin-mcp
+nm plugins install --no-deps plugins/nucleamind-plugin-memory
+nm plugins install --no-deps plugins/nucleamind-plugin-cron
 ```
 
 On Windows use `.venv\Scripts\python.exe` instead of `.venv/bin/python`.

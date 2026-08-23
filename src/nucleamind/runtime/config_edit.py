@@ -33,7 +33,14 @@ from pathlib import Path
 from nucleamind.contracts import ErrorCode, JsonValue, NucleaError
 from nucleamind.kernel.config import read_config_file
 
-__all__ = ["ListEdit", "add_to_list", "read_document", "remove_from_list", "write_document"]
+__all__ = [
+    "ListEdit",
+    "add_to_list",
+    "read_document",
+    "remove_from_list",
+    "remove_plugin_entry",
+    "write_document",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +154,19 @@ def remove_from_list(
     return ListEdit(
         document=_apply(document, section_name, key, kept), changed=True, values=tuple(kept)
     )
+
+
+def remove_plugin_entry(
+    document: Mapping[str, JsonValue], plugin_id: str
+) -> ListEdit:
+    """移除 ``plugins.<id>`` 的实例配置块，供全局卸载收回所有实例引用。"""
+    section = _section(document, "plugins")
+    if plugin_id not in section:
+        return ListEdit(document=dict(document), changed=False, values=())
+    del section[plugin_id]
+    updated = dict(document)
+    updated["plugins"] = section
+    return ListEdit(document=updated, changed=True, values=())
 
 
 def write_document(path: Path, document: Mapping[str, JsonValue]) -> None:

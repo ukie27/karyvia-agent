@@ -56,7 +56,7 @@ PLUGINS_SECTION: Final = "plugins"
 #: 保留键与插件 id 共用一个命名空间，但撞不上：插件 id 只允许小写字母、数字与中划线
 #: （`sdk/manifest.py` 的 `_ID_CHARS`），带下划线的键名因此永远不是一个合法的插件 id
 #: ——新增保留键时请沿用这条形状。
-RESERVED_PLUGIN_KEYS: Final = ("enabled", "disable", "search_paths", "stop_timeout_ms")
+RESERVED_PLUGIN_KEYS: Final = ("enabled", "disable", "stop_timeout_ms")
 
 #: 一个插件条目里的两个键。写成常量是因为 `json_schema.py` 要按名字给它们各
 #: 派生一段 schema——两处各写一个字面量就会在改名时安静地对不上。

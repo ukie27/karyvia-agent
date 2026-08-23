@@ -45,14 +45,10 @@ from .capabilities import (
 from .declarations import CapabilityDeclaration, LoadRequest
 from .discovery import (
     ENTRY_POINT_GROUP,
-    MANIFEST_ATTRIBUTE,
-    MANIFEST_FILENAME,
     Discovery,
     EntryPointLister,
     PluginCandidate,
-    SourceKind,
     discover,
-    installed_entry_points,
     read_candidate,
 )
 from .host import CapabilityHost
@@ -83,8 +79,6 @@ from .loader import (
 __all__ = [
     "DEFAULT_STOP_TIMEOUT_MS",
     "ENTRY_POINT_GROUP",
-    "MANIFEST_ATTRIBUTE",
-    "MANIFEST_FILENAME",
     "PHASE_STATES",
     "PHASE_TRANSITIONS",
     "STATE_FILE",
@@ -116,7 +110,6 @@ __all__ = [
     "RegistrationHost",
     "SessionStoreBinding",
     "SetupFn",
-    "SourceKind",
     "StopAction",
     "StopOutcome",
     "StopUnit",
@@ -126,7 +119,6 @@ __all__ = [
     "context_compactors_from",
     "discover",
     "import_setup",
-    "installed_entry_points",
     "load_into",
     "memory_providers_from",
     "model_providers_from",

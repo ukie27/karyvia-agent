@@ -13,13 +13,15 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 
 import pytest
 
 from nucleamind.contracts import CapabilityKind, ToolSpec
 from nucleamind.runtime.cli.main import app
-from nucleamind.sdk import NucleaAPI
+from nucleamind.runtime.plugin_home import GlobalPluginHome, InstalledPlugin
+from nucleamind.sdk import NucleaAPI, parse_manifest
 from nucleamind.sdk.testing import EchoTool, InMemorySessionStore
 
 from .._support import SCRIPT, text_response, write_config
@@ -66,10 +68,10 @@ def instance(tmp_path: Path) -> Path:
     write_config(
         tmp_path,
         plugins={
-            "search_paths": ["ext"],
             "model-openai": {"secrets": {"api_key": "${NM_TEST_KEY}"}},
         },
     )
+    GlobalPluginHome.resolve().register_instance(tmp_path)
     return tmp_path
 
 
@@ -81,6 +83,27 @@ def _config(root: Path) -> dict[str, object]:
     return json.loads((root / "config.json").read_text(encoding="utf-8"))
 
 
+def _register_manifest(path: Path) -> None:
+    """把测试 manifest 放进全局目录；实例目录不再兼任代码搜索路径。"""
+    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    manifest = parse_manifest(raw, origin=str(path))
+    attribute = f"_MANIFEST_{manifest.id.replace('-', '_').upper()}"
+    globals()[attribute] = manifest
+    home = GlobalPluginHome.resolve()
+    home.package_dir(manifest.id).mkdir(parents=True, exist_ok=True)
+    rows = [item for item in home.catalog() if item.plugin_id != manifest.id]
+    home.write_catalog(
+        (*rows, InstalledPlugin(manifest.id, manifest.version, "test", f"{__name__}:{attribute}", str(path)))
+    )
+
+
+def _install_test_plugin(root: Path, plugin_id: str, **kwargs: object) -> Path:
+    package = write_plugin(root / "ext", plugin_id, **kwargs)
+    path = package / "plugin.toml"
+    _register_manifest(path)
+    return package
+
+
 # ------------------------------------------------------------------------------ list
 
 
@@ -89,6 +112,7 @@ def test_usage_and_unknown_subcommands(instance: Path, capsys: pytest.CaptureFix
     assert "nm plugins" in capsys.readouterr().out
     assert app(_args(instance, "plugins", "nope")) == 2
     assert app(_args(instance, "plugins", "list", "--wat")) == 2
+    assert app(["plugins", "install", "demo", "--instance", "work"]) == 2
 
 
 def test_list_says_so_when_there_are_no_plugins(
@@ -102,7 +126,7 @@ def test_list_says_so_when_there_are_no_plugins(
 def test_list_shows_state_reason_and_capabilities(
     instance: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    write_plugin(instance / "ext", "alpha")
+    _install_test_plugin(instance, "alpha")
     assert app(_args(instance, "plugins", "list")) == 0
     out = capsys.readouterr().out
     assert "alpha" in out and "disabled" in out
@@ -117,7 +141,7 @@ def test_list_shows_state_reason_and_capabilities(
 
 
 def test_list_json_is_machine_readable(instance: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    write_plugin(instance / "ext", "alpha")
+    _install_test_plugin(instance, "alpha")
     assert app(_args(instance, "plugins", "list", "--json")) == 0
     payload = json.loads(capsys.readouterr().out)
     assert [row["plugin_id"] for row in payload["plugins"]] == ["alpha"]
@@ -128,7 +152,7 @@ def test_list_json_is_machine_readable(instance: Path, capsys: pytest.CaptureFix
 
 def test_enable_only_touches_the_config(instance: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """**首版不热更新**（需求 §4.2）：写进 `plugins.enabled`，当前进程什么都没变。"""
-    write_plugin(instance / "ext", "alpha")
+    _install_test_plugin(instance, "alpha")
     assert app(_args(instance, "plugins", "enable", "alpha")) == 0
     assert "下次启动" in capsys.readouterr().out
     assert _config(instance)["plugins"]["enabled"] == ["alpha"]  # type: ignore[index]
@@ -137,6 +161,7 @@ def test_enable_only_touches_the_config(instance: Path, capsys: pytest.CaptureFi
 def test_enabling_twice_reports_nothing_to_do(
     instance: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    _install_test_plugin(instance, "alpha")
     assert app(_args(instance, "plugins", "enable", "alpha")) == 0
     capsys.readouterr()
     assert app(_args(instance, "plugins", "enable", "alpha")) == 3
@@ -150,6 +175,7 @@ def test_enable_lifts_an_existing_disable(
 
     摘掉这件事印在输出里——这条命令不做用户看不见的改动。
     """
+    _install_test_plugin(instance, "alpha")
     assert app(_args(instance, "plugins", "disable", "alpha")) == 0
     capsys.readouterr()
     assert app(_args(instance, "plugins", "enable", "alpha")) == 0
@@ -160,10 +186,25 @@ def test_enable_lifts_an_existing_disable(
 
 def test_disable_leaves_enabled_alone(instance: Path) -> None:
     """`enable` 是 `disable` 的逆操作，因此后者不动 `enabled`。"""
+    _install_test_plugin(instance, "alpha")
     assert app(_args(instance, "plugins", "enable", "alpha")) == 0
     assert app(_args(instance, "plugins", "disable", "alpha")) == 0
     plugins = _config(instance)["plugins"]
     assert plugins["enabled"] == ["alpha"] and plugins["disable"] == ["alpha"]  # type: ignore[index]
+
+
+def test_enable_restores_a_disabled_builtin_without_marking_it_external(
+    instance: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """内建本来就存在；恢复它只需撤销 disable，不能伪造一条外部安装引用。"""
+    assert app(_args(instance, "plugins", "disable", "model-openai")) == 0
+    capsys.readouterr()
+
+    assert app(_args(instance, "plugins", "enable", "model-openai")) == 0
+    assert "内建插件恢复启用" in capsys.readouterr().out
+    plugins = _config(instance)["plugins"]
+    assert plugins["disable"] == []  # type: ignore[index]
+    assert "enabled" not in plugins  # type: ignore[operator]
 
 
 def test_disabling_twice_reports_nothing_to_do(instance: Path) -> None:
@@ -191,20 +232,46 @@ def test_uninstall_keeps_the_state_directory(
     state = instance / "plugins" / "alpha"
     state.mkdir(parents=True)
     (state / "state.json").write_text("{}", encoding="utf-8")
+    _install_test_plugin(instance, "alpha")
     assert app(_args(instance, "plugins", "enable", "alpha")) == 0
     capsys.readouterr()
 
-    assert app(_args(instance, "plugins", "uninstall", "alpha")) == 0
+    assert app(["plugins", "uninstall", "alpha"]) == 0
     out = capsys.readouterr().out
     assert _config(instance)["plugins"]["enabled"] == []  # type: ignore[index]
     assert state.is_dir()
     assert "状态目录仍保留" in out and "purge alpha --confirm" in out
-    # 发行包不归这条命令管——不说清楚，用户会以为 pip 那边也干净了。
-    assert "pip" in out
+    assert not GlobalPluginHome.resolve().package_dir("alpha").exists()
 
 
 def test_uninstalling_something_absent_reports_nothing_to_do(instance: Path) -> None:
-    assert app(_args(instance, "plugins", "uninstall", "alpha")) == 3
+    assert app(["plugins", "uninstall", "alpha"]) == 3
+
+
+def test_global_uninstall_clears_every_known_instance(tmp_path: Path) -> None:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    for root in (first, second):
+        write_config(
+            root,
+            plugins={
+                "enabled": ["alpha"],
+                "disable": ["alpha"],
+                "alpha": {
+                    "config": {},
+                    "on_disable": "restore_builtin",
+                },
+            },
+        )
+        GlobalPluginHome.resolve().register_instance(root)
+    _install_test_plugin(first, "alpha")
+
+    assert app(["plugins", "uninstall", "alpha"]) == 0
+
+    for root in (first, second):
+        plugins = _config(root)["plugins"]
+        assert plugins["enabled"] == [] and plugins["disable"] == []  # type: ignore[index]
+        assert "alpha" not in plugins  # type: ignore[operator]
 
 
 # ---------------------------------------------------------------------------- purge
@@ -281,6 +348,7 @@ def test_capabilities_prints_the_shadowed_relation(
     package = instance / "ext" / "shadow"
     package.mkdir(parents=True)
     (package / "plugin.toml").write_text(_OVERRIDE_MANIFEST, encoding="utf-8")
+    _register_manifest(package / "plugin.toml")
     assert app(_args(instance, "plugins", "enable", "shadow")) == 0
     capsys.readouterr()
 
@@ -304,6 +372,7 @@ def test_disabling_an_overriding_plugin_says_a_choice_is_needed(
     package = instance / "ext" / "shadow"
     package.mkdir(parents=True)
     (package / "plugin.toml").write_text(_OVERRIDE_MANIFEST, encoding="utf-8")
+    _register_manifest(package / "plugin.toml")
     assert app(_args(instance, "plugins", "enable", "shadow")) == 0
     capsys.readouterr()
 
@@ -327,6 +396,7 @@ def test_disabling_a_plugin_without_overrides_says_nothing_extra(
         ),
         encoding="utf-8",
     )
+    _register_manifest(package / "plugin.toml")
     assert app(_args(instance, "plugins", "enable", "shadow")) == 0
     capsys.readouterr()
 
@@ -359,7 +429,7 @@ def test_list_prints_a_failed_plugin_with_its_reason(
     instance: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """阶段 A 落榜的插件在这里显示 `failed` 并带上 detail——那正是「为什么没加载」。"""
-    write_plugin(instance / "ext", "alpha", dependencies=("missing",))
+    _install_test_plugin(instance, "alpha", dependencies=("missing",))
     assert app(_args(instance, "plugins", "enable", "alpha")) == 0
     capsys.readouterr()
     assert app(_args(instance, "plugins", "list")) == 0
@@ -383,6 +453,7 @@ def test_capabilities_prints_conflicts(
         line for line in _OVERRIDE_MANIFEST.splitlines() if not line.startswith("overrides")
     )
     (package / "plugin.toml").write_text(manifest, encoding="utf-8")
+    _register_manifest(package / "plugin.toml")
     assert app(_args(instance, "plugins", "enable", "shadow")) == 0
     capsys.readouterr()
 

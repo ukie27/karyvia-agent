@@ -44,6 +44,9 @@
 - 内建与外部插件使用同一个 Host、Registry、冲突解析和生命周期。
 - 覆盖结果由声明和确定性 resolution 决定，不依赖 import/setup 顺序。
 - `PluginContext` 暴露窄资源门面，不暴露 Runtime/Kernel 内部对象。
+- 安装、更新和卸载是 NucleaMind home 级操作；实例只拥有启用、配置和业务状态。
+- 当前安装后端与执行宿主是 Python。增加 npm 或进程外插件时扩展 Runtime 的安装后端与
+  执行桥，不改变实例级启用语义，也不把包管理策略放进 Kernel。
 
 ### 配置与依赖方向
 

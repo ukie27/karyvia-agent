@@ -20,6 +20,7 @@ from nucleamind.contracts import ErrorCode, NucleaError
 from nucleamind.kernel.config import InstanceLayout
 
 from ...first_run import ensure_initial_config, guidance_lines
+from ...plugin_home import GlobalPluginHome
 from ..main import Options
 
 __all__ = ["init_command"]
@@ -52,6 +53,9 @@ def init_command(options: Options) -> int:
         instance_dir=options.instance_dir, instance=options.instance
     )
     result = ensure_initial_config(layout)
+    home = GlobalPluginHome.resolve()
+    with home.registration():
+        home.register_instance(layout.root)
     for line in guidance_lines(result):
         sys.stdout.write(line + "\n")
     return 0 if result.created else 3

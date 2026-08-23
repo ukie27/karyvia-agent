@@ -51,6 +51,7 @@ from ._support import (
     manifests_with_memory,
     manifests_without,
     memory_fragment,
+    register_test_manifest,
     text_response,
     write_config,
 )
@@ -469,13 +470,15 @@ async def test_external_plugin_discovery_reaches_the_diagnostics(tmp_path: Path)
     source = tmp_path / "ext"
     package = source / "acme"
     package.mkdir(parents=True)
-    (package / "plugin.toml").write_text(
+    manifest_path = package / "plugin.toml"
+    manifest_path.write_text(
         'id = "acme"\nversion = "2.0.0"\nsdk_range = ">=0.1"\n'
         'setup = "acme.plugin:setup"\n\n'
         '[[capabilities]]\nkind = "tool"\nname = "acme.ping"\n',
         encoding="utf-8",
     )
-    write_config(tmp_path, plugins={"enabled": ["acme"], "search_paths": ["ext"]})
+    register_test_manifest(manifest_path)
+    write_config(tmp_path, plugins={"enabled": ["acme"]})
     instance = await _boot(tmp_path)
     try:
         (status,) = instance.diagnostics.plugins()
@@ -484,28 +487,6 @@ async def test_external_plugin_discovery_reaches_the_diagnostics(tmp_path: Path)
         assert status.capabilities == ("tool:acme.ping",)
         # **发现不是加载**：`setup` 指向一个根本不存在的模块，实例照样起来了（`D27`）。
         assert "acme.ping" not in [spec.name for spec in instance.deps.tool_specs]
-    finally:
-        await instance.stop()
-
-
-async def test_a_relative_search_path_resolves_against_the_instance_dir(tmp_path: Path) -> None:
-    """用户写 `"./my-plugins"` 时「相对谁」的唯一合理答案是配置所在的目录。"""
-    (tmp_path / "ext").mkdir()
-    write_config(tmp_path, plugins={"search_paths": ["ext"]})
-    instance = await _boot(tmp_path)
-    try:
-        assert instance.diagnostics.plugins() == ()
-    finally:
-        await instance.stop()
-
-
-async def test_a_bad_search_path_does_not_stop_the_instance(tmp_path: Path) -> None:
-    """一条写错的插件路径不该让实例起不来，但必须留下事件与诊断。"""
-    write_config(tmp_path, plugins={"search_paths": ["nope"]})
-    instance = await _boot(tmp_path)
-    try:
-        names = [event.name for event in instance.diagnostics.events.events()]
-        assert EventName.PLUGIN_FAILED in names
     finally:
         await instance.stop()
 
