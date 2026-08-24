@@ -183,7 +183,7 @@ nm config show --origins
 
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| `provider_timeout_ms` | 正整数 | `3000` | 单个 Context Provider 的独立超时。超时按其关键性中止或跳过 |
+| `provider_timeout_ms` | 正整数 | `3000` | 单个 Context Provider 的独立超时。超时后记录故障并跳过 |
 | `compactor` | 字符串或 `null` | `null` | `COMPACTOR` 能力的名字。`null` = 只做确定性请求级裁剪、不改写 Session；**写了却不存在是启动失败** |
 | `compactor_timeout_ms` | 正整数 | `3000` | 单次 Context Compactor 调用预算。超时或非法结果会记录插件失败，并沿用首次裁剪结果 |
 

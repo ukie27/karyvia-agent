@@ -7,8 +7,7 @@
 停止顺序与停止超时）的公开表面。
 不负责：校验 manifest、构造 `PluginContext`、实现被守卫的资源门面、决定谁被启用——
 那些分别在 `sdk/manifest.py`、`runtime/plugin_context.py`、`runtime/access/` 与 `runtime/`；
-本包不读配置、不访问网络（`loader.py` 只读写
-插件状态目录里的版本标记）。
+本包不读配置、不访问网络（`loader.py` 只读写插件状态目录里的版本标记）。
 
 包内依赖单向：`declarations`、`capabilities`、`discovery` 与 `loader` 互不相识，
 `host` 用前两个，`builtin_loader` 用 `host`。

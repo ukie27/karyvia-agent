@@ -145,7 +145,7 @@ class ContextSection:
     的取值一一对应，搬过来会破坏那条已被测试钉死的对应关系。
     """
 
-    #: 单个 Context Provider 的独立超时。超时按其关键性中止或跳过（`CTX-005`、`EDG-302`）。
+    #: 单个 Context Provider 的独立超时。超时后记录故障并跳过（`CTX-005`、`EDG-302`）。
     provider_timeout_ms: int = DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS
     #: `COMPACTOR` 能力名。`None` = 不启用持久化压缩，只做逐请求确定性裁剪。
     compactor: str | None = None

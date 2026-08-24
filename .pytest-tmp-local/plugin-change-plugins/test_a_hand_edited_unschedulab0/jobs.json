@@ -1,0 +1,22 @@
+{
+  "jobs": [
+    {
+      "created_at": "2026-08-15T09:00:00+00:00",
+      "enabled": true,
+      "history": [],
+      "id": "cj-a0458f0dec",
+      "message": "看一眼构建状态。",
+      "name": "测试任务",
+      "origin": {
+        "channel_id": "cli",
+        "conversation_id": "local"
+      },
+      "schedule": {
+        "expr": "0 0 30 2 *",
+        "kind": "cron"
+      }
+    }
+  ],
+  "updated_at": "2026-08-15T09:00:00+00:00",
+  "version": 1
+}

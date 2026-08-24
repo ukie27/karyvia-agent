@@ -173,7 +173,8 @@ class TestFetch:
         assert result.error is not None
 
     async def test_a_resource_service_failure_fails_the_call_not_the_process(self) -> None:
-        ctx = WebContext(StubNet())
+        denied = NucleaError(ErrorCode.PERMISSION_DENIED, "资源服务拒绝了请求。")
+        ctx = WebContext(StubNet(error=denied))
         tool = WebFetchTool(ctx, resolve_settings({}))
         result = await tool.execute(invocation(FETCH_TOOL, {"url": "https://e.com"}), ManualCancel())
         assert result.ok is False

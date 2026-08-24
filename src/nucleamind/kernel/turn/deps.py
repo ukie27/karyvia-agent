@@ -111,11 +111,10 @@ class HookDispatcher(Protocol):
         """分发一个 Hook，返回**已归并**的处置。
 
         排序（`priority`, `plugin_id`）、每 handler 超时、多个拦截器的累积式改写、
-        非关键插件的失败隔离全在实现内。观察者一律返回 `HookAction.CONTINUE`——它们的返回值
+        插件失败的隔离全在实现内。观察者一律返回 `HookAction.CONTINUE`——它们的返回值
         按 §6.6 被忽略，engine 不该自己去判断这次分发的是不是观察者。
 
-        **异常约定**：只在 `critical=true` 的插件失败时抛 `PLUGIN_HOOK_FAILED`；engine 把它
-        转成 `TurnFailed`（`PLG-004`、`EDG-106`）。非关键插件的失败在实现内吞掉并记录。
+        **异常约定**：插件异常被实现折成诊断并跳过，不影响当前 turn。
         **取消语义**：不接受 `CancelSignal`。Hook 有自己的独立超时（观察者整批 2000ms、
         拦截器每个 5000ms），与 turn 取消是两件事。
         """

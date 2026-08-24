@@ -6,8 +6,8 @@
   照常启动」是 `PLG-007`/`EDG-101` 写死的需求，因此它有自己的用例。
 - **事务性**。`setup` 中途抛异常，registry 不得留下半注册状态（`EDG-103`）——这是
   `RegistrationBatch` 存在的全部理由，必须在真实调用链上被断言一次。
-- **失败的后果由 `critical` 决定**（`PLG-004`、`EDG-106`）：关键提供方失败即启动失败，
-  非关键的记进结果继续走。
+- **失败隔离**（`PLG-004`、`EDG-106`）：提供方失败记进结果，只跳过其依赖方，
+  无关提供方继续加载。
 
 `resolve_setup` 全程注入假解析器：本模块的可测性不该依赖任何真实内建存在，
 而 `D16` 恰好一个都没有。只有 `import_setup` 自己的用例碰导入系统。
@@ -43,15 +43,12 @@ from nucleamind.sdk.testing import ECHO_SPEC, EchoTool, FakeModelProvider, FakeP
 
 
 def host_for(batch: RegistrationBatch, request: LoadRequest) -> RegistrationHost:
-    return CapabilityHost(
-        batch, FakePluginContext(), declarations=request.declarations, critical=request.critical
-    )
+    return CapabilityHost(batch, FakePluginContext(), declarations=request.declarations)
 
 
 def request_for(
     setup: str = "fake:setup",
     *,
-    critical: bool = False,
     plugin: str | None = None,
     dependencies: tuple[str, ...] = (),
 ) -> LoadRequest:
@@ -64,7 +61,6 @@ def request_for(
             CapabilityDeclaration(kind=CapabilityKind.MODEL, name="model"),
         ),
         dependencies=dependencies,
-        critical=critical,
     )
 
 
@@ -187,30 +183,30 @@ async def test_an_unfulfilled_declaration_fails_the_load() -> None:
     assert error.code is ErrorCode.PLUGIN_LOAD_FAILED
 
 
-# -------------------------------------------------------------------------- critical 的分叉
+# -------------------------------------------------------------------------- 失败隔离
 
 
-async def test_a_critical_provider_failure_propagates() -> None:
-    """`PLG-004`：关键提供方失败即启动失败。"""
+async def test_a_provider_failure_is_reported_without_propagating() -> None:
+    """`PLG-004`：提供方不能决定中断宿主。"""
 
     def boom(api: object) -> None:
         del api
         raise RuntimeError("boom")
 
     registry = CapabilityRegistry()
-    with pytest.raises(NucleaError) as excinfo:
-        await load_into(
-            registry,
-            [request_for(critical=True)],
-            host_for=host_for,
-            resolve_setup=resolver(boom),
-        )
-    assert excinfo.value.code is ErrorCode.PLUGIN_LOAD_FAILED
+    outcomes = await load_into(
+        registry,
+        [request_for()],
+        host_for=host_for,
+        resolve_setup=resolver(boom),
+    )
+    assert outcomes[0].error is not None
+    assert outcomes[0].error.code is ErrorCode.PLUGIN_LOAD_FAILED
     assert registry.registrations == ()
 
 
-async def test_a_non_critical_failure_does_not_stop_the_remaining_providers() -> None:
-    """`EDG-106`：非关键插件坏掉，实例继续启动，其余能力照常注册。"""
+async def test_a_failure_does_not_stop_the_remaining_providers() -> None:
+    """`EDG-106`：插件坏掉，实例继续装配，其余能力照常注册。"""
     calls: list[str] = []
 
     def flaky(api: object) -> None:
@@ -266,7 +262,7 @@ async def test_a_failed_dependency_skips_only_its_transitive_dependents() -> Non
     assert len(registry.registrations) == 2
 
 
-async def test_a_critical_dependent_fails_startup_without_running_setup() -> None:
+async def test_a_dependent_is_reported_without_running_setup() -> None:
     calls: list[str] = []
 
     def resolve(target: str) -> SetupFn:
@@ -278,25 +274,23 @@ async def test_a_critical_dependent_fails_startup_without_running_setup() -> Non
 
         return setup
 
-    with pytest.raises(NucleaError) as caught:
-        await load_into(
-            CapabilityRegistry(),
-            [
-                request_for("fail:setup", plugin="a"),
-                request_for(
-                    "must-not-run:setup",
-                    plugin="b",
-                    dependencies=("a",),
-                    critical=True,
-                ),
-            ],
-            host_for=host_for,
-            resolve_setup=resolve,
-        )
-
+    outcomes = await load_into(
+        CapabilityRegistry(),
+        [
+            request_for("fail:setup", plugin="a"),
+            request_for(
+                "must-not-run:setup",
+                plugin="b",
+                dependencies=("a",),
+            ),
+        ],
+        host_for=host_for,
+        resolve_setup=resolve,
+    )
     assert calls == ["fail:setup"]
-    assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
-    assert caught.value.detail["plugin_id"] == "b"
+    assert outcomes[1].error is not None
+    assert outcomes[1].error.code is ErrorCode.PLUGIN_LOAD_FAILED
+    assert outcomes[1].error.detail["plugin_id"] == "b"
 
 
 # -------------------------------------------------------------------------------- import_setup

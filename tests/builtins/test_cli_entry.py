@@ -348,7 +348,7 @@ def test_settings_come_from_the_config_block() -> None:
 
 
 def test_a_bad_config_fails_at_setup_time() -> None:
-    """`critical=True` 的内建，一份写错的配置应当让实例启动失败而不是第一次输入时才炸。"""
+    """配置错误在 setup 时暴露，而不是第一次输入时才失败。"""
     ctx = FakePluginContext("cli-entry", config={"show_reasoning": "yes"})
     with pytest.raises(NucleaError) as caught:
         resolve_settings(ctx)
@@ -359,7 +359,6 @@ def test_the_manifest_declares_exactly_two_capabilities() -> None:
     """入口拥有进程、Channel 拥有消息路径——合成一条就得让其中一件事走近路。"""
     kinds = sorted(decl.kind.value for decl in CLI_ENTRY.capabilities)
     assert kinds == ["channel", "cli_entry"]
-    assert CLI_ENTRY.critical is True
 
 
 def test_setup_registers_both_capabilities() -> None:

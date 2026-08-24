@@ -23,14 +23,10 @@ import ast
 import inspect
 from pathlib import Path
 
-import pytest
-
 from nucleamind.builtins.registry import BUILTIN_MANIFESTS
 from nucleamind.contracts import (
     Builtin,
     CapabilityKind,
-    ErrorCode,
-    NucleaError,
     Plugin,
     PluginId,
     ToolSpec,
@@ -45,9 +41,7 @@ from nucleamind.sdk.testing import EchoTool, FakeModelProvider, FakePluginContex
 # ------------------------------------------------------------------------------------ 夹具
 
 
-def manifest(
-    plugin_id: str = "probe", *, priority: int | None = None, critical: bool = False
-) -> PluginManifest:
+def manifest(plugin_id: str = "probe", *, priority: int | None = None) -> PluginManifest:
     """一份最小 manifest。`priority` 为 `None` 时**根本不写这个字段**——那正是要测的。"""
     capability: dict[str, object] = {"kind": "model", "name": "probe-model"}
     if priority is not None:
@@ -59,7 +53,6 @@ def manifest(
             "sdk_range": ">=0.1.0",
             "setup": "probe.module:setup",
             "capabilities": [capability],
-            "critical": critical,
         },
         origin="test",
     )
@@ -155,10 +148,8 @@ async def test_a_builtin_capability_lands_on_the_builtin_baseline() -> None:
 # ---------------------------------------------------------------------------- manifest 翻译
 
 
-def test_critical_travels_from_the_manifest_into_the_load_request() -> None:
-    """`critical` 是提供方级的，Host 会把它灌进 HOOK / CONTEXT 载荷。"""
-    request = to_load_request(manifest(critical=True), Builtin())
-    assert request.critical is True
+def test_manifest_identity_and_declarations_travel_into_the_load_request() -> None:
+    request = to_load_request(manifest(), Builtin())
     assert request.setup == "probe.module:setup"
     assert request.declarations[0].kind is CapabilityKind.MODEL
 
@@ -172,22 +163,8 @@ def test_overrides_travel_as_a_raw_string() -> None:
 # ------------------------------------------------------------------------------ 失败的传播
 
 
-async def test_a_critical_manifest_failure_propagates() -> None:
-    def boom(api: object) -> None:
-        del api
-        raise RuntimeError("boom")
-
-    with pytest.raises(NucleaError) as excinfo:
-        await wire_capabilities(
-            manifests=[manifest(critical=True)],
-            context_for=context_for,
-            resolve_setup=resolver(boom),
-        )
-    assert excinfo.value.code is ErrorCode.PLUGIN_LOAD_FAILED
-
-
-async def test_a_non_critical_failure_is_reported_but_still_freezes() -> None:
-    """装配不替调用方决定后果——失败如实交出去，怎么处置是 `D23` 的策略。"""
+async def test_a_provider_failure_is_reported_but_still_freezes() -> None:
+    """提供方不能中断装配；失败如实交给 Runtime 做最终能力校验。"""
 
     def boom(api: object) -> None:
         del api

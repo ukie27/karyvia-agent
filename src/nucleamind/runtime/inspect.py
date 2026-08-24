@@ -131,7 +131,6 @@ def inspect_plugins(
             loaded.config,
             layout,
             bus,
-            strict_missing=False,
             entry_points=GlobalPluginHome.resolve(env=env, home=home).entry_points,
         ),
         loaded.config,
@@ -165,7 +164,6 @@ async def inspect_capabilities(
     退出。这里没有进入正式生命周期，只需把本次诊断创建的上下文按逆序还回去。
 
     **异常约定**：与 `inspect_plugins()` 相同——配置问题抛，插件问题进报告。
-    关键插件在阶段 A 失败同样只记不抛（`strict=False`）。
     """
     layout, loaded, builtins, bus = _prepare(
         instance_dir=instance_dir,
@@ -180,7 +178,6 @@ async def inspect_capabilities(
             loaded.config,
             layout,
             bus,
-            strict_missing=False,
             entry_points=GlobalPluginHome.resolve(env=env, home=home).entry_points,
         ),
         loaded.config,
@@ -205,9 +202,6 @@ async def inspect_capabilities(
             # `on_disable=leave_missing` 抑制掉的能力在这里同样要缺席，否则
             # 诊断与真实启动必须应用同一份能力抑制规则，否则报告会展示不可用的能力。
             suppressed=suppressed_capabilities(inventory, loaded.config),
-            # 关键提供方失败也只记不抛：凭据还没导出时，`model-openai` 的 `setup()` 会
-            # 取不到密钥，而那正是最需要看一眼能力表的时刻（见 `wire_capabilities`）。
-            halt_on_critical=False,
         )
     finally:
         await resources.rollback(timeout_ms=loaded.config.plugins.stop_timeout_ms)

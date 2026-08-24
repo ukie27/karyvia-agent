@@ -784,7 +784,7 @@ async def test_turn_end_receives_the_final_outcome() -> None:
     assert contexts[0].outcome.status is TurnStatus.COMPLETED
 
 
-async def test_a_non_critical_context_provider_failure_only_records_an_event() -> None:
+async def test_a_context_provider_failure_only_records_an_event() -> None:
     harness = build(
         ScriptedProvider([text_response("好")]),
         context_providers=[binding(Provider(error=RuntimeError("挂了")), name="memory")],

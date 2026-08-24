@@ -66,7 +66,7 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 - `NucleaError.category` 由错误码推导，调用方不能另传一份分类。
 - `contracts.errors.redact()` / `scrub()` 在数据构造时脱敏；不要把责任推给日志 sink。
 - `contracts.SecretStr` 是唯一密钥包装类型；明文只通过 `reveal()` 短暂取得。
-- SDK 当前为 `3.1.0`。`sdk.__all__`、`sdk.testing.__all__`、
+- SDK 当前为 `4.0.0`。`sdk.__all__`、`sdk.testing.__all__`、
   `CapabilityKind`、`NucleaAPI` 和 manifest schema 都受兼容承诺约束。
 - Session JSONL 格式是持久化契约，修改必须先设计迁移。
 

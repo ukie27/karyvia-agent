@@ -665,7 +665,7 @@ tests/sdk/test_public_surface.py
 - Context 裁剪：SYSTEM 不被裁剪；超预算时按 priority 逆序丢弃；HISTORY 从最旧丢
   （`CTX-003`、`EDG-301`）。
 - `UNTRUSTED` 片段被包裹且带固定前缀，无法出现在系统指令位置（`CMD-005`、`EDG-306`）。
-- Context Provider 超时：critical 插件 → turn FAILED；否则跳过并记录（`CTX-005`、`EDG-302`）。
+- Context Provider 超时：跳过并记录（`CTX-005`、`EDG-302`）。
 - Interceptor 顺序确定性测试：多次运行顺序一致。
 - Observer 抛异常不影响 turn 结果（`NFR-204`）。
 - 持久化失败 → turn `FAILED`，不伪装成功（`SES-003`）。
@@ -1018,7 +1018,7 @@ tests/embed/test_embed.py
 - 阶段 B 用 `RegistrationBatch`（D06 已实现），setup 抛异常即整体回滚。
 - 外部插件必须复用 D16 的 Host `NucleaAPI` 注册实现；本模块只能补充受限
   `PluginContext`、加载计划与错误编排，不得复制注册分派逻辑。
-- 阶段 A 失败按 `critical` 决定后果：critical → 启动失败；否则记入报告继续启动。
+- 阶段 A 失败记入报告，继续启动不依赖该插件的部分。
 - 未启用任何外部插件时，外部发现、依赖解析和生命周期阶段为空；Runtime 仍通过
   D16 的统一 Host API 注册 `BUILTIN_MANIFESTS`，实例照常启动（`PLG-007`）。
 
@@ -1031,8 +1031,8 @@ tests/embed/test_embed.py
 | 依赖缺失 / 依赖成环 | 阶段 A 错误，指出环路（`PLG-003`） |
 | 插件配置不合 schema | 阶段 A 错误，带字段路径 |
 | setup 中途抛异常 | 已注册能力全部回滚，registry 无残留（`EDG-103`） |
-| 非 critical 插件失败 | 实例继续启动，失败记入报告（`PLG-004`） |
-| critical 插件失败 | 启动失败 |
+| 插件失败 | 实例继续启动，失败记入报告（`PLG-004`） |
+| 最终基础能力缺失 | Runtime 统一拒绝启动 |
 | 全部插件禁用 | 实例按内建基线正常启动（`PLG-007`、`EDG-101`） |
 | 覆盖目标不存在 | 启动错误（复用 D06 语义） |
 

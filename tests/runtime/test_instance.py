@@ -29,7 +29,7 @@ from nucleamind.kernel.plugins import PluginPhase
 from nucleamind.kernel.turn import CancelToken
 from nucleamind.runtime.cli.commands.run import _Interrupts
 from nucleamind.runtime.instance import AgentInstance, delivery_error
-from nucleamind.sdk import CapabilityDecl, NucleaAPI, PluginManifest
+from nucleamind.sdk import NucleaAPI
 
 from ._support import (
     MULTI_CHANNEL_ID,
@@ -38,6 +38,7 @@ from ._support import (
     ScriptedChannel,
     inbound,
     manifests_with_multi_channel,
+    register_test_manifest,
     text_response,
     write_config,
 )
@@ -90,36 +91,43 @@ async def test_stop_is_idempotent_and_publishes_both_events(tmp_path: Path) -> N
     assert names.count(EventName.INSTANCE_STOPPING) == 1
 
 
-async def test_a_failed_channel_start_rolls_back_the_whole_instance(tmp_path: Path) -> None:
-    """部分启动不能留下泵、插件任务、错误生命周期或仍被占用的实例锁。"""
+async def test_a_failed_channel_start_is_isolated(tmp_path: Path) -> None:
+    """单个 Channel 启动失败只停掉自身，实例与其它入口继续运行。"""
     _FAILING_CHANNELS.clear()
-    failing = PluginManifest(
-        id="failing-channel",
-        version="0.1.0",
-        sdk_range=">=3.0.0,<4.0.0",
-        setup="tests.runtime.test_instance:setup_failing_channel",
-        capabilities=(
-            CapabilityDecl(kind=CapabilityKind.CHANNEL, name=MULTI_CHANNEL_ID),
-        ),
-    )
-    write_config(tmp_path)
-    instance = await _boot(tmp_path, manifests=(*TEST_MANIFESTS, failing))
+    manifest_path = tmp_path / "failing-channel.toml"
+    manifest_path.write_text(
+        f"""
+id = "failing-channel"
+version = "0.1.0"
+sdk_range = ">=4.0.0,<5.0.0"
+setup = "tests.runtime.test_instance:setup_failing_channel"
 
-    with pytest.raises(RuntimeError, match="channel start failed"):
-        await instance.start()
+[[capabilities]]
+kind = "channel"
+name = "{MULTI_CHANNEL_ID}"
+""".strip(),
+        encoding="utf-8",
+    )
+    register_test_manifest(manifest_path)
+    write_config(tmp_path, plugins={"enabled": ["failing-channel"]})
+    instance = await _boot(tmp_path)
+
+    await instance.start()
 
     channel = _FAILING_CHANNELS[0]
     assert channel.started == 1
     assert channel.stopped == 1
-    assert all(lifecycle.phase is PluginPhase.STOPPED for lifecycle in instance.lifecycles)
+    lifecycle = next(item for item in instance.lifecycles if item.plugin_id == "failing-channel")
+    assert lifecycle.phase is PluginPhase.FAILED
+    assert MULTI_CHANNEL_ID not in instance.active_channel_ids
+    assert "cli" in instance.active_channel_ids
     names = [event.name for event in instance.diagnostics.events.events()]
-    assert EventName.INSTANCE_READY not in names
-    assert names.count(EventName.INSTANCE_STOPPING) == 1
-    assert names.count(EventName.INSTANCE_STOPPED) == 1
-    InstanceLock(instance.layout.lock_path).acquire().release()
+    assert EventName.INSTANCE_READY in names
+    assert EventName.PLUGIN_FAILED in names
 
     await instance.stop()
     assert channel.stopped == 1
+    InstanceLock(instance.layout.lock_path).acquire().release()
     with pytest.raises(NucleaError) as caught:
         await instance.start()
     assert caught.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED

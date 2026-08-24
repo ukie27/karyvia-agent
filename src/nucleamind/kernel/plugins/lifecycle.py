@@ -126,6 +126,7 @@ class PluginLifecycle:
     """
 
     plugin_id: str
+    dependencies: tuple[str, ...] = ()
     phase: PluginPhase = PluginPhase.DISCOVERED
     #: 失败发生在哪个阶段（`phase is FAILED` 时非空）。
     failed_phase: PluginPhase | None = None

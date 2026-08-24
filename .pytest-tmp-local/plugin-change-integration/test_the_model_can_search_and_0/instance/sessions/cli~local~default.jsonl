@@ -1,0 +1,2 @@
+{"message_id": "cli-1", "role": "user", "content": "搜一下猫", "created_at": "2026-08-24T10:40:00.790391+00:00", "turn_id": "9439949bafd040eba0cc6dd95e78f7cc"}
+{"message_id": "9439949bafd040eba0cc6dd95e78f7cc-t-call-1", "role": "tool", "content": "错误：工具 web.search 不存在。本轮可用的工具：file.send、fs.edit、fs.grep、fs.list、fs.read、fs.write、shell.exec。", "created_at": "2026-08-24T10:40:00.790391+00:00", "turn_id": "9439949bafd040eba0cc6dd95e78f7cc", "tool_call_id": "call-1"}

@@ -41,7 +41,7 @@ MANIFEST = PluginManifest(
     version="0.1.0",
     # 你支持的 SDK 区间。宿主落在区间外时拒绝加载并报 PLUGIN_SDK_INCOMPATIBLE，
     # 不带病运行。
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind_plugin_my_plugin:setup",
     # 有约束力的全集：setup 里注册的每一项都必须在这里声明，反之亦然。
     capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="my.tool"),),
@@ -61,8 +61,8 @@ MANIFEST = PluginManifest(
 - **`capabilities` 是有约束力的**。声明了却没注册、注册了却没声明，都是
   `PLUGIN_LOAD_FAILED`。这不是形式主义——`overrides` 只能从声明来，`nm capabilities`
   与启动诊断都建立在「声明即全集」上。
-- **`critical=True` 意味着你坏了实例就起不来**。只有「没有它就没有 Agent」的能力才配得上
-  它，第三方插件一般不该写。
+- 外部插件加载失败会进入诊断并跳过，不会由插件自己决定中断实例。宿主自带的内建基线
+  若装配失败仍属于启动错误；这个边界由 Runtime 按提供方身份决定，不是 manifest 字段。
 
 ## 3. setup：注册
 

@@ -1,0 +1,1 @@
+{"model": {"name": "fake-model", "provider": "fake"}, "plugins": {"disable": ["tools-fs", "tools-file", "tools-shell", "commands-core"]}}

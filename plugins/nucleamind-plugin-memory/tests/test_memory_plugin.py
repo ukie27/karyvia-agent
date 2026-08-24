@@ -68,11 +68,6 @@ def test_the_manifest_declares_no_overrides() -> None:
     assert all(decl.overrides is None for decl in MANIFEST.capabilities)
 
 
-def test_the_manifest_is_not_critical() -> None:
-    """`MEM-003`「Memory 不可用时降级为无长期记忆模式」的落地形态。"""
-    assert MANIFEST.critical is False
-
-
 def test_register_registers_exactly_what_the_manifest_declares(tmp_path: Path) -> None:
     """**声明与注册严格相等**：外部插件用不上装配根的 `keep` 声明过滤。
 
@@ -113,7 +108,7 @@ async def test_all_capabilities_share_one_store(tmp_path: Path) -> None:
 
 
 def test_a_bad_configuration_fails_at_setup_not_at_the_first_call(tmp_path: Path) -> None:
-    """`critical=False` 的插件，配置错误只表现为 `nm plugins` 里的一行——因此要一次查完。"""
+    """配置错误在 setup 阶段一次查完，并进入插件失败诊断。"""
     from nucleamind.contracts import NucleaError
 
     api = Api(MemoryContext(tmp_path, config={"recall_limit": 0}))

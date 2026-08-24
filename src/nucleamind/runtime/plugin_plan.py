@@ -6,7 +6,7 @@
 失败清单，以及一份**修正过的**（落榜项已从 `discovered` 移进 `failures`）诊断清单。
 不负责：读 manifest 与判 id / 平台 / `sdk_range`（`D25` 的 `inventory.py`）、跑 `setup`
 与注册（`wiring.py` → `kernel.plugins.load_into`，外部与内建同一条路）
-（`bootstrap.approve()` 是唯一调用点）、决定非关键失败之后还做什么（装配根）。
+（`bootstrap.approve()` 是唯一调用点）。
 
 **这是 `R5` 的落点**，与 `inventory.py` / `wiring.py` / `plugin_context.py` 同一条理由：
 `PluginManifest` 在 `sdk/`，而 `R2` 禁止 `kernel/` import 它，因此「manifest → `PlanNode`」
@@ -60,8 +60,6 @@ class ExternalPlan:
 
     manifests: tuple[PluginManifest, ...] = ()
     failures: tuple[PluginFailure, ...] = ()
-    #: 关键插件的第一条失败。非空即意味着这次启动应当失败（`PLG-004`、`EDG-106`）。
-    critical_failure: PluginFailure | None = None
 
 
 def discover_plugins(
@@ -69,7 +67,6 @@ def discover_plugins(
     layout: InstanceLayout,
     bus: EventBus,
     *,
-    strict_missing: bool = True,
     entry_points: EntryPointLister = lambda: (),
 ) -> PluginInventory:
     """§10.1 步骤 3b：发现外部插件并把结果发成事件（`D25`）。
@@ -84,19 +81,6 @@ def discover_plugins(
         disabled=config.plugins.disable,
         entry_points=entry_points,
     )
-    missing = sorted(
-        failure.plugin_id
-        for failure in inventory.failures
-        if failure.error.code is ErrorCode.PLUGIN_LOAD_FAILED
-        and not failure.origin
-        and failure.plugin_id in config.plugins.enabled
-    )
-    if missing and strict_missing:
-        raise NucleaError(
-            ErrorCode.PLUGIN_LOAD_FAILED,
-            "实例启用了尚未全局安装的插件。",
-            detail={"plugins": missing, "suggestion": "nm plugins install <来源>"},
-        )
     for item in inventory.discovered:
         bus.publish(
             EventName.PLUGIN_DISCOVERED,
@@ -131,8 +115,7 @@ def plan_plugins(
     因此 `/plugins` 印出来的「已发现」与真的会被加载的那一批一致——一个配置写错的插件
     显示成 `DISCOVERED` 会让用户以为它在跑。
 
-    **异常约定**：关键插件在阶段 A 失败即原样抛（启动失败，`PLG-004`、`EDG-106`）；
-    其余失败发成事件并记进清单，实例继续启动。
+    **异常约定**：阶段 A 失败发成事件并记进清单，实例继续装配其余插件。
     """
     plan = plan_external_plugins(
         inventory.discovered,
@@ -146,8 +129,6 @@ def plan_plugins(
             payload={"plugin": failure.plugin_id, "phase": "validate"},
             error=failure.error,
         )
-    if plan.critical_failure is not None:
-        raise plan.critical_failure.error
     return plan, correct_inventory(inventory, plan)
 
 
@@ -155,8 +136,7 @@ def correct_inventory(inventory: PluginInventory, plan: ExternalPlan) -> PluginI
     """把阶段 A 落榜的插件从 `discovered` 移进 `failures`。
 
     单独成函数是因为它有**两个**调用方：`plan_plugins()`（启动路径）与 `D29` 的
-    `runtime/inspect.py`（只读诊断路径，它不能用前者——关键插件失败时前者抛异常，
-    而一条「列出全部插件及其失败原因」的命令恰恰要把那条失败印出来而不是死掉）。
+    `runtime/inspect.py`（只读诊断路径）。
     两处各写一遍会让「已发现 = 真的会被加载的那一批」在其中一处慢慢失真。
     """
     planned = {manifest.id for manifest in plan.manifests}
@@ -181,16 +161,34 @@ def plan_external_plugins(
     `state_dir_for` 交出 `<instance>/plugins/<id>/`；`check_state_version()` 只在那个目录
     **已经存在**时才做事，不会为一个从未写盘的插件建目录。
 
-    **异常约定**：不抛。每一条问题如实记进 `failures`，后果由装配根按
-    `ExternalPlan.critical_failure` 判——与 `build_inventory()` 的「一次报全」同构。
+    **异常约定**：不抛。每一条问题如实记进 `failures`，与 `build_inventory()` 的
+    「一次报全」同构。
     """
     by_id = {item.manifest.id: item for item in discovered}
+    provided_ids = set(provided)
     failures: list[PluginFailure] = []
     excluded: list[str] = []
 
     for plugin_id in sorted(by_id):
         item = by_id[plugin_id]
         manifest = item.manifest
+        if plugin_id in provided_ids:
+            failures.append(
+                PluginFailure(
+                    error=NucleaError(
+                        ErrorCode.PLUGIN_REGISTRATION_CONFLICT,
+                        "外部插件 id 不能与内建提供方 id 相同。",
+                        detail={
+                            "plugin_id": plugin_id,
+                            "suggestion": "修改插件 id；覆盖能力请使用 manifest.overrides。",
+                        },
+                    ),
+                    plugin_id=plugin_id,
+                    origin=item.candidate.origin,
+                )
+            )
+            excluded.append(plugin_id)
+            continue
         checks = (
             validate_plugin_config(
                 manifest.json_schema,
@@ -219,11 +217,10 @@ def plan_external_plugins(
             PlanNode(
                 plugin_id=item.manifest.id,
                 dependencies=item.manifest.dependencies,
-                critical=item.manifest.critical,
             )
             for item in by_id.values()
         ],
-        provided=provided,
+        provided=provided_ids,
         excluded=excluded,
     )
     failures.extend(
@@ -237,24 +234,4 @@ def plan_external_plugins(
     return ExternalPlan(
         manifests=tuple(by_id[plugin_id].manifest for plugin_id in plan.order),
         failures=tuple(failures),
-        critical_failure=_first_critical(failures, by_id),
-    )
-
-
-def _first_critical(
-    failures: Sequence[PluginFailure], by_id: Mapping[str, DiscoveredPlugin]
-) -> PluginFailure | None:
-    """第一条关键失败。
-
-    `critical` 从 manifest 上读而不是从失败上读：`PluginFailure` 是诊断形状（与发现阶段
-    共用），给它加一个只有阶段 A 才填得上的字段，会让 `/plugins` 那侧多一个恒为 `False`
-    的列。
-    """
-    return next(
-        (
-            failure
-            for failure in failures
-            if failure.plugin_id in by_id and by_id[failure.plugin_id].manifest.critical
-        ),
-        None,
     )

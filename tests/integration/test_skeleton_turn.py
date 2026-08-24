@@ -501,8 +501,8 @@ async def test_context_is_trimmed_by_priority_while_the_system_segment_survives(
     assert "插件 A 的大段资料。" not in rendered, "priority 逆序：100 先于 10 被丢"
 
 
-async def test_a_non_critical_context_provider_failure_only_costs_its_fragments() -> None:
-    """步骤 7b（`CTX-005`、`EDG-302`）：非关键 Provider 抛异常 → 跳过并记录，turn 继续。"""
+async def test_a_context_provider_failure_only_costs_its_fragments() -> None:
+    """步骤 7b（`CTX-005`、`EDG-302`）：Provider 抛异常后跳过并记录，turn 继续。"""
 
     class Broken:
         async def provide(self, snapshot: object, correlation: object, cancel: object) -> tuple[()]:
@@ -513,7 +513,7 @@ async def test_a_non_critical_context_provider_failure_only_costs_its_fragments(
         [text_response("照常回答。")],
         context=[
             _basic_context(),
-            ("broken", RegisteredContextProvider(provider=Broken(), critical=False)),
+            ("broken", RegisteredContextProvider(provider=Broken())),
         ],
     )
 
@@ -526,26 +526,6 @@ async def test_a_non_critical_context_provider_failure_only_costs_its_fragments(
     assert failures[0].error is not None
 
 
-async def test_a_critical_context_provider_failure_fails_the_turn() -> None:
-    """同一条需求的另一半：关键插件失败必须让 turn `FAILED`，不静默降级。"""
-
-    class Broken:
-        async def provide(self, snapshot: object, correlation: object, cancel: object) -> tuple[()]:
-            del snapshot, correlation, cancel
-            raise RuntimeError("关键 provider 炸了")
-
-    skeleton = wire(
-        [text_response("不会用到")],
-        context=[("broken", RegisteredContextProvider(provider=Broken(), critical=True))],
-    )
-
-    receipt = await skeleton.send("你好")
-
-    assert receipt.outcome is not None
-    assert receipt.outcome.status is TurnStatus.FAILED
-    assert skeleton.model.requests == []
-
-
 async def test_an_observer_that_throws_does_not_change_the_turn_outcome() -> None:
     """`NFR-204`：观察者的异常被隔离，turn 照常完成。"""
 
@@ -556,16 +536,14 @@ async def test_an_observer_that_throws_does_not_change_the_turn_outcome() -> Non
 
     skeleton = wire(
         [text_response("照常完成。")],
-        hooks=[("angry", RegisteredHook(hook=HookName.TURN_END, handler=Angry(), critical=True))],
+        hooks=[("angry", RegisteredHook(hook=HookName.TURN_END, handler=Angry()))],
         context=[_basic_context()],
     )
 
     receipt = await skeleton.send("你好")
 
     assert receipt.outcome is not None
-    assert receipt.outcome.status is TurnStatus.COMPLETED, (
-        "观察者忽略 critical——它连返回值都不被采纳，不该有拦截器才有的权力"
-    )
+    assert receipt.outcome.status is TurnStatus.COMPLETED
 
 
 async def test_hooks_fire_in_the_documented_order_across_a_whole_turn() -> None:

@@ -15,6 +15,7 @@ from collections.abc import Callable, Collection, Mapping, Sequence
 from pathlib import Path
 
 from nucleamind.builtins import cli_entry, commands_core, session_jsonl, tools_fs, tools_shell
+from nucleamind.builtins.registry import BUILTIN_MANIFESTS
 from nucleamind.contracts import (
     Builtin,
     CapabilityKind,
@@ -174,9 +175,12 @@ async def wire_all(
     builtin_cli_only: bool = False,
     external_ids: Collection[str] = (),
     suppressed: SuppressedCapabilities | None = None,
-    halt_on_critical: bool = True,
 ) -> Wiring:
-    """让内建与外部插件经同一 Host、配置和能力筛选路径完成注册。"""
+    """让内建与外部插件经同一 Host、配置和能力筛选路径完成注册。
+
+    外部插件失败保留在 ``Wiring.outcomes``，由诊断呈现并继续装配。内建清单是宿主自己
+    发布的基线，不属于第三方故障隔离边界；其 setup 失败时保留原始错误并终止启动。
+    """
     derived = builtin_config_blocks(config, layout, workspace)
     keep = capability_filter(config, derived)
     external = set(external_ids)
@@ -212,14 +216,25 @@ async def wire_all(
         bus.publish(EventName.PLUGIN_DISCOVERED, payload={"plugin": manifest.id})
         return ctx
 
-    return await wire_capabilities(
+    wiring = await wire_capabilities(
         manifests=manifests,
         context_for=context_for,
         provider_for=provider_for,
         keep=keep_with_cli,
         suppressed=suppressed,
-        halt_on_critical=halt_on_critical,
     )
+    _raise_builtin_failure(manifests, wiring.outcomes)
+    return wiring
+
+
+def _raise_builtin_failure(
+    manifests: Sequence[PluginManifest], outcomes: Sequence[LoadOutcome]
+) -> None:
+    """内建装配错误属于宿主启动错误，不降级成后续的泛化能力缺失。"""
+    builtin_ids = {manifest.id for manifest in BUILTIN_MANIFESTS}
+    for manifest, outcome in zip(manifests, outcomes, strict=True):
+        if manifest.id in builtin_ids and outcome.error is not None:
+            raise outcome.error
 
 
 def build_lifecycles(
@@ -228,7 +243,10 @@ def build_lifecycles(
     """按 Manifest/加载结果的位置对应关系建立正式生命周期。"""
     lifecycles: list[PluginLifecycle] = []
     for manifest, outcome in zip(manifests, outcomes, strict=False):
-        lifecycle = PluginLifecycle(plugin_id=manifest.id)
+        lifecycle = PluginLifecycle(
+            plugin_id=manifest.id,
+            dependencies=manifest.dependencies,
+        )
         lifecycle.advance(PluginPhase.VALIDATED)
         if outcome.error is None:
             lifecycle.advance(PluginPhase.LOADED)

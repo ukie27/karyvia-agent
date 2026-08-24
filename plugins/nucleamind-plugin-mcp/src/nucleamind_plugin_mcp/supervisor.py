@@ -19,7 +19,7 @@
 预算是 `plugins.stop_timeout_ms`（默认 5000，每插件各算一份）。
 
 **单个 server 连不上不致命**：记进 `failures`、跳过它的工具，其余照常。一个拼错的
-server 配置不该让另外三个也用不成（`critical=False` 的同一条精神）。
+server 配置不该让另外三个也用不成。
 """
 
 from __future__ import annotations

@@ -22,8 +22,7 @@ def setup(api: NucleaAPI) -> None:
     """注册命令。
 
     **配置在这里校验一次**，不拖到第一次敲命令：一份写错的 `disable` 应当在启动时被指出来。
-    本内建 `critical=False`，因此那会让 `commands-core` 单独加载失败并留下诊断，
-    实例仍然起得来——只是没有斜杠命令。
+    失败会让 `commands-core` 单独落榜并留下诊断，实例仍然起得来——只是没有斜杠命令。
     """
     settings = resolve_settings(api.ctx.config)
     for spec, handler in build_handlers(api.ctx, settings).values():

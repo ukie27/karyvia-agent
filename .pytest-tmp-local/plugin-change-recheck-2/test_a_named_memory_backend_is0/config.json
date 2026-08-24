@@ -1,0 +1,1 @@
+{"model": {"name": "fake-model", "provider": "fake"}, "plugins": {"enabled": []}, "memory": {"provider": "fake-memory", "recall_limit": 2, "on_failure": "fail"}}

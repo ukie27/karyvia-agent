@@ -81,15 +81,13 @@ def setup_fake_model(api: NucleaAPI) -> None:
     api.register_model_provider("fake", FakeModelProvider(list(SCRIPT)))
 
 
-#: 假模型的 manifest。`critical=True` 与真的 `model-openai` 一致——没有模型的实例
-#: 起不来这件事要在用例里同样成立。
+#: 假模型的 manifest。没有模型时由 Runtime 的基础能力校验拒绝启动。
 FAKE_MODEL: PluginManifest = PluginManifest(
     id="model-openai",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="tests.runtime._support:setup_fake_model",
     capabilities=(CapabilityDecl(kind=CapabilityKind.MODEL, name="fake"),),
-    critical=True,
 )
 
 #: 真实内建清单，模型换成 Fake。其余六份**原封不动**。
@@ -208,7 +206,7 @@ class ScriptedChannel:
 MULTI_CHANNEL: PluginManifest = PluginManifest(
     id="multi-channel",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="tests.runtime._support:setup_multi_channel",
     capabilities=(CapabilityDecl(kind=CapabilityKind.CHANNEL, name=MULTI_CHANNEL_ID),),
 )
@@ -274,7 +272,7 @@ class FakeMemoryProvider:
 FAKE_MEMORY: PluginManifest = PluginManifest(
     id="fake-memory",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="tests.runtime._support:setup_fake_memory",
     capabilities=(CapabilityDecl(kind=CapabilityKind.MEMORY, name=MEMORY_NAME),),
 )

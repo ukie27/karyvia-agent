@@ -26,7 +26,6 @@ from nucleamind.builtins.registry import BUILTIN_MANIFESTS
 from nucleamind.contracts import (
     CapabilityKind,
     CliEntry,
-    ErrorCode,
     EventName,
     InstanceId,
     JsonValue,
@@ -239,14 +238,6 @@ async def _build_instance(
         inventory, config, layout, loaded.workspace_root, bus, selected
     )
     external_ids = [manifest.id for manifest in plan.manifests]
-    builtin_ids = {manifest.id for manifest in selected}
-    collisions = sorted(builtin_ids.intersection(external_ids))
-    if collisions:
-        raise NucleaError(
-            ErrorCode.PLUGIN_REGISTRATION_CONFLICT,
-            "外部插件 id 不能与内建插件 id 相同；覆盖能力应使用 manifest.overrides。",
-            detail={"plugins": collisions},
-        )
     # 被禁用的覆盖者留下的空缺：`BAS-004` 不允许内建在这里**隐式**复活，因此用户必须
     # 对每一条 `on_disable` 表态。判定在配置层与注册之间——它是配置错误，不该等到
     # 一次白跑的 `setup()` 之后才报出来。
@@ -302,8 +293,6 @@ async def _build_instance(
             payload={"provider": str(outcome.provider)},
             error=outcome.error,
         )
-    wiring.report.raise_if_failed()
-
     # Registry 冻结后才能可靠地选择启动必需的单值能力。
     registry = wiring.registry
     sessions = require_sessions(registry)
@@ -325,6 +314,7 @@ async def _build_instance(
         model_info=model_info,
         cli=cli.value,
         contexts=tuple(resources.contexts),
+        external_plugin_ids=frozenset(external_ids),
         lifecycles=build_lifecycles(all_manifests, wiring.outcomes),
         runtime=runtime,
         lock=lock,
@@ -357,7 +347,18 @@ def _plugin_status_source(
                 # 后续生命周期状态盖掉。
                 rows.append(status)
                 continue
-            rows.append(replace(status, state=lifecycle.state))
+            rows.append(
+                replace(
+                    status,
+                    state=lifecycle.state,
+                    failure=lifecycle.error,
+                    failed_phase=(
+                        None
+                        if lifecycle.failed_phase is None
+                        else lifecycle.failed_phase.value
+                    ),
+                )
+            )
         return tuple(rows)
 
     return statuses
@@ -386,6 +387,7 @@ def _assemble(
     model_info: ModelInfo | None,
     cli: CliEntry,
     contexts: tuple[RuntimePluginContext, ...],
+    external_plugin_ids: frozenset[str],
     lifecycles: tuple[PluginLifecycle, ...],
     runtime: PluginRuntime,
     lock: InstanceLock | None,
@@ -477,6 +479,7 @@ def _assemble(
         channels=channels,
         outcomes=wiring.outcomes,
         contexts=contexts,
+        external_plugin_ids=external_plugin_ids,
         lifecycles=lifecycles,
         stop_timeout_ms=config.plugins.stop_timeout_ms,
         channel_concurrency=config.routing.channel_concurrency,

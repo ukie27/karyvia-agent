@@ -1,0 +1,16 @@
+{
+  "plugins": [
+    {
+      "backend": "python",
+      "dependencies": [],
+      "distribution": "test",
+      "entry_point": "tests.runtime.cli.test_plugins_cli:_MANIFEST_ALPHA",
+      "plugin_id": "alpha",
+      "resolved_distributions": [],
+      "source": "D:\\project\\NucleaMind\\.pytest-tmp-local\\plugin-change-runtime\\test_disable_leaves_enabled_al0\\ext\\alpha\\plugin.toml",
+      "version": "1.0.0",
+      "with_dependencies": true
+    }
+  ],
+  "version": 2
+}

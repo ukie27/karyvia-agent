@@ -36,18 +36,15 @@ __all__ = [
     "TOOLS_SHELL",
 ]
 
-#: `D17` 内建 Session（技术方案 §8.1）。
-#:
-#: `critical=True`：没有会话存储就没有历史，而 `SES-003` 不允许把持久化失败伪装成成功。
-#: 它加载失败时实例应当直接启动失败，而不是带着一个「说完就忘」的 Agent 继续跑。
-#: `critical` 是**提供方级**的，同一份 manifest 里的全部能力共享它（`D16` 的结论）。
+#: `D17` 内建 Session（技术方案 §8.1）。没有会话存储时，Runtime 的基础能力校验会拒绝
+#: 启动；这不是 manifest 提供方可以选择的策略。
 #:
 #: 会话存储直接使用 pathlib，因为 `FileAccess` 没有追加、`fsync` 与原子替换；用门面实现
 #: 追加写会迫使它每次重写整个会话文件。
 SESSION_JSONL: Final = PluginManifest(
     id="session-jsonl",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind.builtins.session_jsonl:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.SESSION_STORE, name="jsonl"),),
     config_schema={
@@ -61,20 +58,18 @@ SESSION_JSONL: Final = PluginManifest(
         },
         "additionalProperties": False,
     },
-    critical=True,
 )
 
 #: `D18` 内建 Context Provider（技术方案 §8.1）。
 #:
-#: `critical=True`：它是 `CTX-006` 的兜底——没有它、也没装任何 Memory 或检索插件时，
-#: 模型将拿不到任何系统指令。一份写错的配置（`resolve_settings` 抛 `CONFIG_INVALID`）
-#: 应当让实例启动失败，而不是让一个「没人告诉它自己是谁」的 Agent 上线。
+#: 它是默认上下文来源，但 Context Provider 故障统一被隔离；插件不能借 manifest 获得
+#: 中断 turn 或启动的权力。
 #:
 #: 本内建纯内存、不读盘、不出网（技术方案 §14 的「Provider 只读不写」）。
 CONTEXT_BASIC: Final = PluginManifest(
     id="context-basic",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind.builtins.context_basic:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.CONTEXT, name="basic"),),
     config_schema={
@@ -101,13 +96,11 @@ CONTEXT_BASIC: Final = PluginManifest(
         },
         "additionalProperties": False,
     },
-    critical=True,
 )
 
 #: `D19` 内建 Model Provider（技术方案 §8.1、§15 第 5 项）。
 #:
-#: `critical=True`：没有模型就没有 Agent。一份写错的 `base_url`、一个没导出的
-#: `OPENAI_API_KEY`，都应当在启动时被指出来，而不是等用户发出第一条消息才炸。
+#: 没有模型就没有 Agent；本项是宿主发布的内建基线，加载错误由 Runtime 原样拒绝启动。
 #:
 #: 直接用 httpx 而不是 `ctx.net`：模型端点由运维配置，必须支持本地 vLLM / Ollama /
 #: LM Studio，而安全客户端会拒绝私有网段。凭据只从 `ctx.secret("api_key")` 来，配置块里
@@ -115,7 +108,7 @@ CONTEXT_BASIC: Final = PluginManifest(
 MODEL_OPENAI: Final = PluginManifest(
     id="model-openai",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind.builtins.model_openai:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.MODEL, name="openai"),),
     config_schema={
@@ -205,14 +198,12 @@ MODEL_OPENAI: Final = PluginManifest(
         },
         "additionalProperties": False,
     },
-    critical=True,
 )
 
 #: `D20` 内建文件工具（技术方案 §8.2 的冻结清单，`shell.exec` 是 `D21`）。
 #:
-#: `critical=False`：没有文件工具的 Agent 仍然能对话，这与「没有模型」「没有会话存储」
-#: 不是一回事。一份写错的 workspace 路径应当让这一项加载失败并留下诊断，而不是把整个
-#: 实例拽下水。
+#: 没有文件工具的 Agent 仍然能对话。一份写错的 workspace 路径只让这一项加载失败并
+#: 留下诊断。
 #:
 #: **五条声明必须与 `tools_fs.TOOL_NAMES` 逐一对应**，由测试对照。被 `disable` 关掉的
 #: 工具**不会**被注册，因此装配根必须用同一份配置过滤这里的声明
@@ -224,7 +215,7 @@ MODEL_OPENAI: Final = PluginManifest(
 TOOLS_FS: Final = PluginManifest(
     id="tools-fs",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind.builtins.tools_fs:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.TOOL, name="fs.read"),
@@ -274,7 +265,6 @@ TOOLS_FS: Final = PluginManifest(
         },
         "additionalProperties": False,
     },
-    critical=False,
 )
 
 #: 默认文件投递工具。它只表达“把这个 workspace 文件附加到当前回复”，实际上传仍走
@@ -282,7 +272,7 @@ TOOLS_FS: Final = PluginManifest(
 TOOLS_FILE: Final = PluginManifest(
     id="tools-file",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind.builtins.tools_file:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="file.send"),),
     config_schema={
@@ -297,19 +287,18 @@ TOOLS_FILE: Final = PluginManifest(
         },
         "additionalProperties": False,
     },
-    critical=False,
 )
 
 #: `D21` 内建 shell 工具（技术方案 §8.2 冻结清单的第 6 项，至此六件套齐）。
 #:
-#: `critical=False`：没有 shell 工具的 Agent 仍然能对话，与 `tools_fs` 同一条理由。
+#: 没有 shell 工具的 Agent 仍然能对话，与 `tools_fs` 同一条理由。
 #:
 #: 子进程环境默认一个变量都不继承（`environ.py` 是白名单，不是黑名单）；这是真正影响
 #: 执行边界的机制，与插件加载状态无关。
 TOOLS_SHELL: Final = PluginManifest(
     id="tools-shell",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind.builtins.tools_shell:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="shell.exec"),),
     config_schema={
@@ -357,14 +346,11 @@ TOOLS_SHELL: Final = PluginManifest(
         },
         "additionalProperties": False,
     },
-    critical=False,
 )
 
 #: `D22` 内建命令集（技术方案 §8.1）。
 #:
-#: `critical=False`：没有斜杠命令的 Agent 仍然能对话——这与「没有模型」「没有会话存储」
-#: 不是一回事。一份写错的 `disable` 应当让这一项加载失败并留下诊断，而不是把整个实例
-#: 拽下水。
+#: 没有斜杠命令的 Agent 仍然能对话。一份写错的 `disable` 只让这一项加载失败并留下诊断。
 #:
 #: 六个命令的数据全部来自 `ctx.instance` / `ctx.turns`。本内建不读盘、不出网、
 #: 不起子进程。
@@ -376,7 +362,7 @@ TOOLS_SHELL: Final = PluginManifest(
 COMMANDS_CORE: Final = PluginManifest(
     id="commands-core",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind.builtins.commands_core:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.COMMAND, name="help"),
@@ -410,14 +396,12 @@ COMMANDS_CORE: Final = PluginManifest(
         },
         "additionalProperties": False,
     },
-    critical=False,
 )
 
 #: `D23` 内建 CLI 入口（技术方案 §8.1，需求 `BAS-009`、`BAS-010`、`EDG-108`）。
 #:
-#: `critical=True`：CLI 入口不可禁用——不装任何 Channel 插件也必须存在本地交互入口。
-#: 它加载失败时实例没有任何可用入口，那不是「少一个功能」而是「起来了也没人能说话」。
-#: 装配根另有一条守卫：`plugins.disable` 试图关掉本项时**显式拒绝配置**（`EDG-108`）。
+#: CLI 入口不可禁用；它加载失败后，Runtime 的基础能力校验会拒绝启动。装配根另有一条
+#: 守卫：`plugins.disable` 试图关掉本项时显式拒绝配置（`EDG-108`）。
 #:
 #: **两条能力，一份 manifest**：`CLI_ENTRY` 拥有进程（决定 `nm` 返回什么退出码），
 #: `CHANNEL` 拥有消息路径（`MSG-007`：CLI 的输入输出与其它平台走同一条契约）。
@@ -427,7 +411,7 @@ COMMANDS_CORE: Final = PluginManifest(
 CLI_ENTRY: Final = PluginManifest(
     id="cli-entry",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind.builtins.cli_entry:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.CLI_ENTRY, name="stdio"),
@@ -470,7 +454,6 @@ CLI_ENTRY: Final = PluginManifest(
         },
         "additionalProperties": False,
     },
-    critical=True,
 )
 
 #: 全部内建能力的 manifest。

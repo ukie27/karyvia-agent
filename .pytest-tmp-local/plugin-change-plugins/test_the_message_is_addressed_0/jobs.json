@@ -1,0 +1,29 @@
+{
+  "jobs": [
+    {
+      "created_at": "2026-08-15T09:00:00+00:00",
+      "enabled": true,
+      "history": [
+        {
+          "detail": "",
+          "fired_at": "2026-08-15T09:01:01+00:00",
+          "status": "dispatched"
+        }
+      ],
+      "id": "cj-419aae22b2",
+      "message": "看一眼构建状态。",
+      "name": "测试任务",
+      "next_run_at": "2026-08-15T09:02:01+00:00",
+      "origin": {
+        "channel_id": "chat",
+        "conversation_id": "42"
+      },
+      "schedule": {
+        "every_ms": 60000,
+        "kind": "every"
+      }
+    }
+  ],
+  "updated_at": "2026-08-15T09:01:01+00:00",
+  "version": 1
+}

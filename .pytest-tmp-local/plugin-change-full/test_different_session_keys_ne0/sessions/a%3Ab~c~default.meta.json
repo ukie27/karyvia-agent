@@ -1,0 +1,12 @@
+{
+  "schema_version": 2,
+  "session_key": {
+    "channel_id": "a:b",
+    "conversation_id": "c",
+    "scope": "default"
+  },
+  "created_at": "2026-08-24T10:32:16.914191+00:00",
+  "updated_at": "2026-08-24T10:32:16.914191+00:00",
+  "compacted_through": 0,
+  "committed_bytes": 111
+}

@@ -1,0 +1,19 @@
+{
+  "model": {
+    "name": "fake-model",
+    "provider": "fake"
+  },
+  "plugins": {
+    "model-openai": {
+      "secrets": {
+        "api_key": "${NM_TEST_KEY}"
+      }
+    },
+    "enabled": [
+      "shadow"
+    ],
+    "disable": [
+      "shadow"
+    ]
+  }
+}

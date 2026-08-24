@@ -15,10 +15,10 @@
 `load_into(registry, ())` 返回空元组
 并让 registry 保持可写可空，它有自己的测试，不是一条退化分支。
 
-**`critical` 决定失败的后果**（`PLG-004`、`EDG-106`）：关键提供方失败直接抛，非关键的
-记进 `LoadOutcome.error` 由调用方折进 `ResolutionReport.failures`，实例继续启动。依赖失败
-同样是一种加载失败：只跳过它的传递依赖者，不妨碍无关插件启动。
-两种情况下批次都已回滚，registry 不留半注册状态（`EDG-103`）。
+提供方失败记进 `LoadOutcome.error`，并只跳过它的传递依赖者，不妨碍无关提供方继续加载。
+Runtime 再按提供方身份决定：外部插件进入诊断并隔离，宿主发布的内建基线错误直接中止。
+这个策略不来自 manifest，也不由插件作者控制。失败批次均已回滚，registry 不留半注册状态
+（`EDG-103`）。
 """
 
 from __future__ import annotations
@@ -160,9 +160,9 @@ async def load_into(
     `runtime/wiring.py`，「Host 满足 `NucleaAPI`」那句类型标注就落在真实装配路径上，
     而不是一个只为证明而存在的函数里。
 
-    **异常约定**：`critical=True` 的提供方失败时原样抛出（启动失败）；非关键提供方的失败
-    记进对应的 `LoadOutcome.error`。依赖已失败的请求不构造 Host、不执行 setup，并以
-    `PLUGIN_LOAD_FAILED` 记录依赖链；无关请求继续。实际执行失败的批次均已回滚。
+    **异常约定**：提供方失败记进对应的 `LoadOutcome.error`。依赖已失败的请求不构造
+    Host、不执行 setup，并以 `PLUGIN_LOAD_FAILED` 记录依赖链；无关请求继续。实际执行
+    失败的批次均已回滚。
     """
     outcomes: list[LoadOutcome] = []
     failed: set[str] = set()
@@ -182,8 +182,6 @@ async def load_into(
         else:
             batch = registry.batch(request.provider)
             outcome = await _run_one(batch, request, host_for(batch, request), resolve_setup)
-        if outcome.error is not None and request.critical:
-            raise outcome.error
         if outcome.error is not None:
             failed.add(request.plugin_id)
         outcomes.append(outcome)

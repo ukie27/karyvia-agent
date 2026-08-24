@@ -334,32 +334,26 @@ def wire(
     注册**走生产 Host**（`CapabilityHost`），因此这条链子顺带核对了 Host 的分派：
     能力名怎么定、载荷是什么形状、声明表是否与实际注册一致，全都由它说了算。
 
-    **`critical` 按提供方分批**：它在 manifest 里是**提供方级**字段（`PluginManifest.critical`），
-    Host 因此把同一个值灌给自己注册的每一项——`D15` 手写 `batch.add` 时可以逐项指定，
-    生产路径上不能。这里按 `critical` 把能力分成两批、各开一个 Host，两批共用
-    `Builtin()`（`ProviderId` 与 priority 基准因此完全不变），既保住了各用例原有的语义，
-    也如实反映了「关键性是插件的属性，不是单个能力的属性」。
+    所有能力走同一个 Host 和 RegistrationBatch；插件故障的隔离语义由消费者统一处理，
+    注册载荷不携带提供方自行决定的中断策略。
     """
     registry = CapabilityRegistry()
-    groups: dict[bool, list[tuple[CapabilityDeclaration, object]]] = {False: [], True: []}
+    entries: list[tuple[CapabilityDeclaration, object]] = []
     for item in tools:
-        groups[False].append((_declare(CapabilityKind.TOOL, item.spec.name), item))
+        entries.append((_declare(CapabilityKind.TOOL, item.spec.name), item))
     for _, hook in hooks:
-        groups[hook.critical].append((_declare(CapabilityKind.HOOK, hook.hook.value), hook))
+        entries.append((_declare(CapabilityKind.HOOK, hook.hook.value), hook))
     for name, provider in context:
-        groups[provider.critical].append((_declare(CapabilityKind.CONTEXT, name), provider))
+        entries.append((_declare(CapabilityKind.CONTEXT, name), provider))
     for name, registered in commands:
-        groups[False].append((_declare(CapabilityKind.COMMAND, name), registered))
+        entries.append((_declare(CapabilityKind.COMMAND, name), registered))
 
-    for critical, entries in groups.items():
-        if not entries:
-            continue
+    if entries:
         batch = registry.batch(Builtin())
         host = CapabilityHost(
             batch,
             FakePluginContext("d15-skeleton"),
             declarations=tuple(declaration for declaration, _ in entries),
-            critical=critical,
         )
         for declaration, payload in entries:
             _dispatch(host, declaration, payload)

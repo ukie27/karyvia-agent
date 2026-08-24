@@ -425,10 +425,6 @@ class TestRegistration:
     def test_is_part_of_the_builtin_manifest_list(self) -> None:
         assert COMMANDS_CORE in BUILTIN_MANIFESTS
 
-    def test_is_not_critical(self) -> None:
-        """没有斜杠命令的 Agent 仍然能对话。"""
-        assert COMMANDS_CORE.critical is False
-
     async def test_registers_through_the_ordinary_builtin_path(self) -> None:
         """`BAS-005`：普通 manifest + `setup(api)`，没有内建专用注册通道。"""
         dispatcher, _ = await wire()

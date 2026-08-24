@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "scope": "agent",
+  "token": "agent",
+  "created_at": "2026-08-15T09:00:02+00:00",
+  "updated_at": "2026-08-15T09:00:06+00:00",
+  "next_sequence": 3,
+  "committed_bytes": 408
+}

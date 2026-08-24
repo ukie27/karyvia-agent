@@ -25,7 +25,7 @@ from nucleamind.sdk.version import SDK_VERSION
 VALID: Final[dict[str, object]] = {
     "id": "memory-sqlite",
     "version": "0.1.0",
-    "sdk_range": ">=3.0,<4.0",
+    "sdk_range": ">=4.0,<5.0",
     "setup": "nucleamind_plugin_memory_sqlite.plugin:setup",
     "capabilities": [{"kind": "memory", "name": "sqlite"}],
 }
@@ -45,7 +45,13 @@ def test_minimal_manifest_parses() -> None:
     # 未声明的字段取默认值，而不是 None——加载器不必到处判空。
     assert manifest.dependencies == ()
     assert manifest.state_version == 1
-    assert manifest.critical is False
+
+
+def test_removed_critical_field_is_rejected() -> None:
+    """SDK 4 不再接受由插件决定宿主是否中断的旧字段。"""
+    with pytest.raises(NucleaError) as excinfo:
+        parse(critical=True)
+    assert "critical" in str(excinfo.value.detail)
 
 
 def test_manifest_is_frozen() -> None:

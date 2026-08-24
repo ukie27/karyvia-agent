@@ -94,6 +94,25 @@ async def test_a_failed_start_releases_the_lock(tmp_path: Path) -> None:
     InstanceLock(tmp_path / "instance.lock").acquire().release()
 
 
+async def test_a_builtin_setup_failure_keeps_its_precise_error(tmp_path: Path) -> None:
+    """外部插件可隔离；宿主自己的内建基线坏了必须原样拒绝启动。"""
+    broken_model = next(manifest for manifest in TEST_MANIFESTS if manifest.id == "model-openai")
+    broken_model = broken_model.model_copy(
+        update={"setup": "tests.runtime.test_bootstrap:setup_optional_failure"}
+    )
+    manifests = tuple(
+        broken_model if manifest.id == "model-openai" else manifest
+        for manifest in TEST_MANIFESTS
+    )
+    write_config(tmp_path)
+
+    with pytest.raises(NucleaError) as caught:
+        await _boot(tmp_path, manifests=manifests)
+
+    assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
+    assert caught.value.detail["exception"] == "RuntimeError"
+
+
 async def test_a_broken_config_is_written_to_the_logs(tmp_path: Path) -> None:
     """`EDG-501` 的后半句。这是 `write_config_error()` 唯一的调用点。"""
     tmp_path.mkdir(parents=True, exist_ok=True)
@@ -130,7 +149,7 @@ async def test_disabling_the_cli_entry_is_rejected(tmp_path: Path) -> None:
     assert caught.value.detail["plugin"] == "cli-entry"
 
 
-async def test_disabling_a_non_critical_builtin_is_honoured(tmp_path: Path) -> None:
+async def test_disabling_an_optional_builtin_is_honoured(tmp_path: Path) -> None:
     write_config(tmp_path, plugins={"disable": ["tools-shell"]})
     instance = await _boot(tmp_path)
     try:
@@ -273,14 +292,13 @@ async def test_a_failing_cli_override_falls_back_to_the_builtin(tmp_path: Path) 
     broken = PluginManifest(
         id="cli-broken",
         version="0.1.0",
-        sdk_range=">=3.0.0,<4.0.0",
+        sdk_range=">=4.0.0,<5.0.0",
         setup="tests.runtime.test_bootstrap:setup_broken_cli",
         capabilities=(
             CapabilityDecl(
                 kind=CapabilityKind.CLI_ENTRY, name="broken", overrides="builtin:stdio"
             ),
         ),
-        critical=False,
     )
     write_config(tmp_path)
     instance = await _boot(tmp_path, manifests=(*TEST_MANIFESTS, broken))
@@ -297,25 +315,23 @@ async def test_cli_fallback_stops_the_discarded_setup_attempt(
 ) -> None:
     """回落会重跑 setup；第一轮产生的任务和订阅必须先被完整清理。"""
     _SETUP_CONTEXTS.clear()
-    _SETUP_TASKS.clear()
     tracked = PluginManifest(
         id="tracked-setup",
         version="0.1.0",
-        sdk_range=">=3.0.0,<4.0.0",
+        sdk_range=">=4.0.0,<5.0.0",
         setup="tests.runtime.test_bootstrap:setup_with_side_effects",
         capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="startup.probe"),),
     )
     broken = PluginManifest(
         id="cli-broken",
         version="0.1.0",
-        sdk_range=">=3.0.0,<4.0.0",
+        sdk_range=">=4.0.0,<5.0.0",
         setup="tests.runtime.test_bootstrap:setup_broken_cli",
         capabilities=(
             CapabilityDecl(
                 kind=CapabilityKind.CLI_ENTRY, name="broken", overrides="builtin:stdio"
             ),
         ),
-        critical=False,
     )
     write_config(tmp_path)
     actual_cli_entry_from = bootstrap_module.cli_entry_from
@@ -334,52 +350,56 @@ async def test_cli_fallback_stops_the_discarded_setup_attempt(
     try:
         assert len(_SETUP_CONTEXTS) == 2
         discarded, active = _SETUP_CONTEXTS
-        discarded_task, active_task = _SETUP_TASKS
         assert discarded.stopping
         assert discarded.bridge._subscription is None  # noqa: SLF001 - 验失败回滚
-        assert discarded_task.cancelled()
+        assert not discarded.pending_tasks
         assert not active.stopping
+        assert len(active.pending_tasks) == 1
+        await instance.start()
+        (active_task,) = active.tasks
         assert not active_task.done()
     finally:
         await instance.stop()
     assert active_task.cancelled()
 
 
-async def test_critical_setup_failure_rolls_back_prior_plugin_side_effects(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+async def test_optional_setup_failure_keeps_prior_plugin_resources_owned(
+    tmp_path: Path,
 ) -> None:
-    """启动没有返回实例时，装配根仍拥有并必须清理已经产生的资源。"""
+    """可选提供方失败后，已成功装配的插件资源仍由返回的实例持有。"""
     _SETUP_CONTEXTS.clear()
-    _SETUP_TASKS.clear()
     tracked = PluginManifest(
         id="tracked-setup",
         version="0.1.0",
-        sdk_range=">=3.0.0,<4.0.0",
+        sdk_range=">=4.0.0,<5.0.0",
         setup="tests.runtime.test_bootstrap:setup_with_side_effects",
         capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="startup.probe"),),
     )
     failing = PluginManifest(
-        id="critical-failure",
+        id="optional-failure",
         version="0.1.0",
-        sdk_range=">=3.0.0,<4.0.0",
-        setup="tests.runtime.test_bootstrap:setup_critical_failure",
+        sdk_range=">=4.0.0,<5.0.0",
+        setup="tests.runtime.test_bootstrap:setup_optional_failure",
         capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="startup.fail"),),
-        critical=True,
     )
-    sink = _TrackingSink()
-    monkeypatch.setattr(bootstrap_module, "JsonlFileSink", lambda path: sink)
-    write_config(tmp_path, logging={"file_enabled": True})
-
-    with pytest.raises(NucleaError) as caught:
-        await _boot(tmp_path, manifests=(*TEST_MANIFESTS, tracked, failing))
-
-    assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
+    write_config(tmp_path)
+    instance = await _boot(tmp_path, manifests=(*TEST_MANIFESTS, tracked, failing))
     tracked_ctx = _SETUP_CONTEXTS[0]
-    assert tracked_ctx.stopping
-    assert tracked_ctx.bridge._subscription is None  # noqa: SLF001 - 验失败回滚
-    assert _SETUP_TASKS[0].cancelled()
-    assert sink.closed
-    InstanceLock(tmp_path / "instance.lock").acquire().release()
+    try:
+        assert not tracked_ctx.stopping
+        assert tracked_ctx.bridge._subscription is not None  # noqa: SLF001 - 实例仍持有
+        assert len(tracked_ctx.pending_tasks) == 1
+        assert any(
+            outcome.error is not None
+            and outcome.error.code is ErrorCode.PLUGIN_LOAD_FAILED
+            for outcome in instance.outcomes
+        )
+        await instance.start()
+        (tracked_task,) = tracked_ctx.tasks
+        assert not tracked_task.done()
+    finally:
+        await instance.stop()
+    assert tracked_task.cancelled()
 
 
 def setup_broken_cli(api: object) -> None:
@@ -388,7 +408,6 @@ def setup_broken_cli(api: object) -> None:
 
 
 _SETUP_CONTEXTS: list[RuntimePluginContext] = []
-_SETUP_TASKS: list[asyncio.Task[None]] = []
 
 
 class _TrackingSink:
@@ -425,7 +444,6 @@ def setup_with_side_effects(api: NucleaAPI) -> None:
     ctx.events.subscribe(EventName.INSTANCE_READY, lambda event: None)
     ctx.spawn_task(_wait_forever(), name="startup-probe")
     _SETUP_CONTEXTS.append(ctx)
-    _SETUP_TASKS.append(next(iter(ctx.tasks)))
     api.register_tool(
         ToolSpec(
             name="startup.probe",
@@ -436,7 +454,7 @@ def setup_with_side_effects(api: NucleaAPI) -> None:
     )
 
 
-def setup_critical_failure(api: NucleaAPI) -> None:
+def setup_optional_failure(api: NucleaAPI) -> None:
     del api
     raise RuntimeError("boom")
 

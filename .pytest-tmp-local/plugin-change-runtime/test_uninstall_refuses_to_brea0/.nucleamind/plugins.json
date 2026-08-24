@@ -1,0 +1,29 @@
+{
+  "plugins": [
+    {
+      "backend": "python",
+      "dependencies": [],
+      "distribution": "alpha-dist",
+      "entry_point": "alpha:MANIFEST",
+      "plugin_id": "alpha",
+      "resolved_distributions": [],
+      "source": "alpha-source",
+      "version": "1.0.0",
+      "with_dependencies": true
+    },
+    {
+      "backend": "python",
+      "dependencies": [
+        "alpha"
+      ],
+      "distribution": "beta-dist",
+      "entry_point": "beta:MANIFEST",
+      "plugin_id": "beta",
+      "resolved_distributions": [],
+      "source": "beta-source",
+      "version": "1.0.0",
+      "with_dependencies": true
+    }
+  ],
+  "version": 2
+}

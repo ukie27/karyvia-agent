@@ -269,9 +269,8 @@ def build_inventory(
     `platform` 交给 `matches_platform()`，默认 `sys.platform`——平台矩阵测试需要在一个
     平台上断言另一个平台的插件会被跳过。
 
-    **异常约定**：不抛。一份写错的插件不该让实例起不来（`PLG-004`：`critical` 决定后果，
-    而那是 `D27` 在加载阶段的判断）；本函数把每一条问题如实记进 `failures`，
-    与 `validate_config()` 的「一次报全」同构。
+    **异常约定**：不抛。一份写错的插件不该让实例起不来；本函数把每一条问题如实记进
+    `failures`，与 `validate_config()` 的「一次报全」同构。
     """
     scan = discover(entry_points=entry_points)
     failures = [PluginFailure(error=error) for error in scan.failures]

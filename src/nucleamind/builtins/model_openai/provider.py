@@ -333,8 +333,8 @@ def read_credential(ctx: PluginContext, settings: OpenAISettings) -> SecretStr |
 def setup(api: NucleaAPI) -> None:
     """内建注册入口，`BUILTIN_MANIFESTS` 里那条 manifest 的 `setup` 指向它。
 
-    配置与凭据都在这里解析一次：本内建 `critical=True`，一份写错的配置或一个没导出的
-    环境变量应当让实例启动失败，而不是等用户发出第一条消息才炸。
+    配置与凭据都在这里解析一次。加载失败后 Runtime 会因没有可用模型而拒绝启动，
+    不把错误拖到用户发出第一条消息时。
     """
     settings = resolve_settings(api.ctx)
     provider = OpenAIModelProvider(settings, credential=read_credential(api.ctx, settings))

@@ -75,8 +75,8 @@ class MemoryContextProvider:
     ) -> tuple[ContextFragment, ...]:
         """贡献片段。
 
-        **异常约定**：可以抛 `NucleaError`。本插件 `critical=False`，因此读盘故障只会让
-        这一次贡献被跳过并记录（`CTX-005`），不会让 turn 失败——那正是 `MEM-003`
+        **异常约定**：可以抛 `NucleaError`。读盘故障只会让这一次贡献被跳过并记录
+        （`CTX-005`），不会让 turn 失败——那正是 `MEM-003`
         「Memory 不可用时降级为无长期记忆模式」的落地形态，**不需要**在这里 try/except
         把故障吞成空结果。吞掉它会让「记忆一直召不回来」查不出原因。
         **取消语义**：检索前检查一次（`store.search` 内部做），被取消时抛 `CANCELLED` 类。

@@ -2,7 +2,7 @@
 
 职责：把一组 `HookBinding` 归并成 `deps.HookDispatcher` 要的那**一个** `HookOutcome`——
 观察者并发执行、整批超时、失败一律隔离；拦截器按 `(priority, provider, name)` 顺序执行、
-每个独立超时、`REPLACE` 累积、`REJECT`/`BLOCK` 短路；失败按插件关键性分叉。
+每个独立超时、`REPLACE` 累积、`REJECT`/`BLOCK` 短路；失败上报后跳过。
 不负责：发布事件、认识 `EventBus`、决定某个 Hook 在什么时候被分发、判断 Hook 的处置对
 业务是否合理——分发时机在 `engine.py`（4 个）与 `orchestrator.py`（3 个），失败的去向由
 注入的 `on_failure` 决定；本模块不做任何 IO。
@@ -12,9 +12,8 @@
 `kernel/observability/`，测试里用一个 list 就能断言隔离行为，而 orchestrator 传的正是
 `bus.publish(PLUGIN_FAILED, ...)`。
 
-**观察者忽略 `critical`**。§6.6 与 `NFR-204` 都写死了「观察者的异常与超时不影响 turn」，
-让 `critical=True` 的观察者能打掉 turn，等于给了它一条拦截器才有的权力，而它连返回值
-都不被采纳。关键性只在拦截器上有意义。
+观察者与拦截器的异常都被隔离并上报。拦截器只有返回合法的 `REJECT` / `BLOCK` 才能改变
+turn 结果，插件自身故障不能中断 turn。
 
 **顺序是 `(priority, provider, name)` 而不是注册顺序**（`CTX-002`）。前两项是 §6.6 的原文，
 末尾补 `name` 是因为同一个插件可以注册多个同优先级的 Hook——少了它，报告与行为都会随
@@ -90,15 +89,10 @@ _CONTINUE: Final = HookOutcome(HookAction.CONTINUE)
 
 @dataclass(frozen=True, slots=True)
 class RegisteredHook:
-    """`CapabilityKind.HOOK` 的注册载荷形状。
-
-    与 `D13` 的 `RegisteredCommand` 同构：`kernel/` 不认识 manifest，因此「这个插件的这个
-    Hook 是不是关键的」必须由注册方（`D16` 的 Host）在载荷里带过来。
-    """
+    """`CapabilityKind.HOOK` 的注册载荷形状。"""
 
     hook: HookName
     handler: HookHandler
-    critical: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -110,7 +104,6 @@ class HookBinding:
     provider: ProviderId
     name: str
     priority: int = 0
-    critical: bool = False
 
     @property
     def sort_key(self) -> tuple[int, str, str]:
@@ -148,7 +141,6 @@ def bindings_from(registry: CapabilityRegistry) -> tuple[HookBinding, ...]:
                 provider=registration.ref.provider,
                 name=registration.ref.name,
                 priority=registration.priority,
-                critical=payload.critical,
             )
         )
     return tuple(bindings)
@@ -183,9 +175,8 @@ class HookRouter:
     async def dispatch(self, context: HookContext) -> HookOutcome:
         """分发一个 Hook，返回**已归并**的处置。
 
-        **异常约定**：只有 `critical=true` 的拦截器失败会抛（`PLG-004`、`EDG-106`）；
-        观察者的失败一律被隔离（`NFR-204`）。handler 抛出的 `NucleaError` 原样上抛——
-        实现方给的诊断比 Kernel 能编的更准；其余异常包成 `PLUGIN_HOOK_FAILED`。
+        **异常约定**：handler 失败或返回非法结果时上报并跳过；其余 handler 继续执行。
+        `NucleaError` 原样上报，其余异常包成 `PLUGIN_HOOK_FAILED`。
         **取消语义**：不接受 `CancelSignal`。Hook 有自己的独立超时，与 turn 取消是两件事。
         """
         bindings = self._by_hook.get(context.hook, ())
@@ -246,7 +237,7 @@ class HookRouter:
     async def _call_interceptor(
         self, binding: HookBinding, context: HookContext
     ) -> HookOutcome | None:
-        """跑一个拦截器并校验它的处置；失败按关键性分叉。"""
+        """跑一个拦截器并校验它的处置；失败上报后跳过。"""
         try:
             outcome = await asyncio.wait_for(
                 binding.handler.handle(context), timeout=self._interceptor_timeout_ms / 1000
@@ -290,10 +281,8 @@ class HookRouter:
         )
 
     def _settle(self, binding: HookBinding, error: NucleaError) -> None:
-        """拦截器失败的归宿：关键插件抛出，其余上报后继续（`PLG-004`、`EDG-106`）。"""
+        """拦截器失败的归宿：上报后继续。"""
         self._report(error)
-        if binding.critical:
-            raise error
 
     def _report(self, error: NucleaError) -> None:
         if self._on_failure is not None:

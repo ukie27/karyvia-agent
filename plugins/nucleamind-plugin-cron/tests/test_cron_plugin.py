@@ -50,11 +50,6 @@ def test_manifest_declares_five_capabilities() -> None:
     }
 
 
-def test_manifest_is_not_critical() -> None:
-    """没有定时任务的 Agent 照样对话，因此配置错误只该表现为一行 `PLUGIN_LOAD_FAILED`。"""
-    assert MANIFEST.critical is False
-
-
 def test_manifest_declares_no_priority() -> None:
     """manifest 里写 `priority` 会被原样采纳（默认 100），而内建基准是 0。"""
     assert all("priority" not in decl.model_fields_set for decl in MANIFEST.capabilities)

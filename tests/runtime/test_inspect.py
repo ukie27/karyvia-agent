@@ -66,13 +66,13 @@ def test_a_phase_a_failure_is_recorded_instead_of_raised(tmp_path: Path) -> None
     assert _states(tmp_path)["alpha"] is PluginState.FAILED
 
 
-def test_a_critical_plugin_failing_does_not_kill_the_query(tmp_path: Path) -> None:
+def test_a_failing_plugin_does_not_kill_the_query(tmp_path: Path) -> None:
     """**这条命令的全部意义就是把失败印出来**，跟着它一起死掉是最没用的行为。
 
     同一份插件在 `bootstrap()` 那条路上会让启动失败（`test_plugin_plan.py` 钉着），
     差别只在 `plan_external(strict=...)`——判定本身两条路完全相同。
     """
-    write_plugin(tmp_path / "ext", "alpha", dependencies=("missing",), critical=True)
+    write_plugin(tmp_path / "ext", "alpha", dependencies=("missing",))
     _instance(tmp_path, enabled=["alpha"])
     assert _states(tmp_path)["alpha"] is PluginState.FAILED
 

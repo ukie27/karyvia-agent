@@ -114,7 +114,7 @@ STORE_NAME: Final = "jsonl"
 MANIFEST: Final = PluginManifest(
     id="memory",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind_plugin_memory:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.MEMORY, name=STORE_NAME),
@@ -123,10 +123,6 @@ MANIFEST: Final = PluginManifest(
         CapabilityDecl(kind=CapabilityKind.COMMAND, name=COMMAND_NAME),
     ),
     config_schema=CONFIG_SCHEMA,
-    # `critical=False`：没有长期记忆的 Agent 仍然能对话——这正是 `MEM-003`
-    # 「Memory 不可用时降级为无长期记忆模式」的落地形态。配置错误因此只表现为
-    # `nm plugins` 里的一行 `PLUGIN_LOAD_FAILED`，所以校验必须在 `setup()` 里一次做完。
-    critical=False,
 )
 
 

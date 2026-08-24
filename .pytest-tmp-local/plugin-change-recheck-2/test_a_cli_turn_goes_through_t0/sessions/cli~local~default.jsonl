@@ -1,0 +1,2 @@
+{"message_id": "cli-1", "role": "user", "content": "统计一下", "created_at": "2026-08-24T10:30:50.757650+00:00", "turn_id": "03e7da47e5c84ec4a74c333d71b28e90"}
+{"message_id": "03e7da47e5c84ec4a74c333d71b28e90-a1", "role": "assistant", "content": "好的。", "created_at": "2026-08-24T10:30:50.757650+00:00", "turn_id": "03e7da47e5c84ec4a74c333d71b28e90"}

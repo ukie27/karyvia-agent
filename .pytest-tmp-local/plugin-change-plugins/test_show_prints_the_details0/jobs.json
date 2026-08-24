@@ -1,0 +1,23 @@
+{
+  "jobs": [
+    {
+      "created_at": "2026-08-15T09:00:00+00:00",
+      "enabled": true,
+      "history": [],
+      "id": "cj-005ca5a652",
+      "message": "看一眼构建。",
+      "name": "构建检查",
+      "next_run_at": "2026-08-15T09:01:00+00:00",
+      "origin": {
+        "channel_id": "cli",
+        "conversation_id": "local"
+      },
+      "schedule": {
+        "every_ms": 60000,
+        "kind": "every"
+      }
+    }
+  ],
+  "updated_at": "2026-08-15T09:00:00+00:00",
+  "version": 1
+}

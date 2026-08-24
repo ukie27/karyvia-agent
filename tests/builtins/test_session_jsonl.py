@@ -796,7 +796,6 @@ class TestRegistration:
     def test_the_manifest_is_listed_as_a_builtin(self) -> None:
         assert SESSION_JSONL in BUILTIN_MANIFESTS
         assert SESSION_JSONL.id == "session-jsonl"
-        assert SESSION_JSONL.critical is True
         declaration = SESSION_JSONL.capabilities[0]
         assert declaration.kind is CapabilityKind.SESSION_STORE
         assert declaration.name == CAPABILITY_NAME

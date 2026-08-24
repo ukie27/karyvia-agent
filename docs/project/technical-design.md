@@ -531,7 +531,7 @@ class CapabilityRef:
 由 `tests/contracts/test_capability.py` 逐行断言。
 
 **从冻结的 registry 取回生效实现，每个 kind 一个具名函数**，且注册载荷的形状由那个函数
-当场核对（`kernel/` 不认识 manifest，因此 `critical` 这类元数据只能由注册方带进载荷里）。
+当场核对。
 `D14` 已落地四个：`turn.tools_from` / `turn.bindings_from` / `turn.context_providers_from`
 与 `routing.build_command_index`，对应载荷 `RegisteredTool` / `RegisteredHook` /
 `RegisteredContextProvider` / `RegisteredCommand`。**`D15` 暴露的缺口已由 `D16` 补齐**：
@@ -571,9 +571,9 @@ capabilities = [
 3. 同一目标被两个插件同时声明覆盖 → 启动错误 `capability.override_conflict`，
    要求用户在配置中显式选择。
 4. 覆盖生效后，被覆盖实现进入 `shadowed` 状态并在报告中可见（`NFR-502`）。
-5. 覆盖插件加载失败时的行为由配置 `plugins.<id>.on_override_failure` 决定：
-   `fail_start`（默认）或 `use_builtin`。唯一例外：`CLI_ENTRY` 强制 `use_builtin`，
-   且配置该项为 `fail_start` 时直接拒绝配置（`BAS-010`、`EDG-107`）。
+5. 覆盖插件加载失败时，能力解析不会因为加载顺序随机选择实现。除 CLI 入口按
+   `BAS-010` 强制回落到内建实现外，其他覆盖失败的能力保持缺失，由 Runtime 的最终能力
+   校验决定实例是否具备运行条件。
 
 解析产物是一个可序列化报告，供 `nm capabilities` 与诊断接口输出：
 
@@ -882,9 +882,9 @@ return_exceptions=True)`，整体超时 `observer_timeout_ms`（默认 2000）�
 | `after_tool_call` | Interceptor | 可覆盖 result 字段（累积式） |
 | `turn_end` | Observer | — |
 
-Interceptor 异常处理按插件关键性区分（`PLG-004`、`EDG-106`、`CTX-005`）：
-`critical=true` 的插件异常 → turn `FAILED`；否则跳过该 handler，记录原因后继续。
-关键性在 manifest 声明，用户可在配置中覆盖。
+Interceptor 异常与超时统一隔离：记录插件故障、跳过该 handler，然后继续当前 turn
+（`PLG-004`、`CTX-005`）。只有 handler 正常返回合法的 `REJECT` / `BLOCK`，才能改变
+turn 结果。
 
 Hook 契约写进 docstring：**handler 不应抛出异常，抛出被视为插件故障并被隔离**。这是
 Pi 在 `AgentLoopConfig` 中反复强调的约定，本方案照搬。
@@ -897,9 +897,8 @@ Pi 在 `AgentLoopConfig` 中反复强调的约定，本方案照搬。
 - **顺序是 `(priority, provider, name)`** 而不是 §6.6 原文的两项。同一个插件可以注册多个
   同优先级的 Hook，少了 `name` 这一项，行为会随字典插入顺序漂移，`CTX-002` 的确定性也就
   断言不了。
-- **观察者忽略 `critical`**。§6.6 与 `NFR-204` 都写死了「观察者的异常与超时不影响 turn」，
-  让 `critical=True` 的观察者能打掉 turn 等于给了它拦截器才有的权力，而它连返回值都不被
-  采纳。关键性只在拦截器上有意义。
+- **观察者与拦截器故障都隔离**。观察者返回值不被采纳；拦截器只有合法返回值能改变流水线，
+  自身异常不能获得中断 turn 的权力。
 - **用错处置或载荷 = 插件故障**，不是静默忽略。一个在 `before_model_request` 上返回
   `REJECT` 的 handler，作者认为自己拒掉了这个 turn；忽略它会让用户看到「什么都没发生」。
 - **四项超时进配置**：`hooks.observer_timeout_ms`（2000）、`hooks.interceptor_timeout_ms`
@@ -1066,13 +1065,12 @@ class PluginManifest(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     id: str                            # 小写、`[a-z0-9-]`，全局唯一
     version: str                       # PEP 440
-    sdk_range: str                     # PEP 440 specifier，如 ">=3.0,<4.0"
+    sdk_range: str                     # PEP 440 specifier，如 ">=4.0,<5.0"
     setup: str                         # "pkg.module:setup"，仅在阶段 B 导入
     capabilities: tuple[CapabilityDecl, ...]
     dependencies: tuple[str, ...] = ()          # 其他 plugin id
     config_schema: JsonSchema | None = None
     state_version: int = 1
-    critical: bool = False
     platforms: tuple[str, ...] = ()             # 空 = 全平台
 ```
 
@@ -1122,10 +1120,12 @@ class PluginManifest(BaseModel):
 `RegistrationBatch` 是 `EDG-103` 的落地手段：`setup` 期间的所有注册先进入批次暂存区，
 只在 `setup` 正常返回后一次性并入 registry。中途抛异常 → 批次整体丢弃，registry
 不会留下半注册状态。阶段 A 的拓扑排序并不能预知 setup 是否成功，因此阶段 B 继续携带
-`plugin_id/dependencies`：依赖失败会沿图级联，但不会把无关的非关键插件一起停掉。
+`plugin_id/dependencies`：依赖失败会沿图级联，但不会影响无关插件。
 
-阶段 A 失败的插件根据 `critical` 决定后果：`critical=true` → 启动失败；否则记入
-`ResolutionReport.failures`，实例继续启动（`PLG-004`、`EDG-106`）。
+外部插件在阶段 A、`setup()`、激活和 Channel 启动时失败，都进入插件诊断并跳过，实例继续
+装配或启动其余能力。插件不能通过 manifest 决定中断实例。宿主发布的内建基线若在 setup
+阶段失败，Runtime 原样拒绝启动；外部插件隔离后最终仍缺少 Session、Model、CLI 等基础
+能力时，再由统一能力校验拒绝启动（`PLG-004`、`EDG-106`）。
 
 **未启用任何外部插件时，外部发现、依赖解析和生命周期阶段为空；Runtime 仍通过统一
 Host API 注册 `BUILTIN_MANIFESTS` 并正常启动**（`PLG-007`、`EDG-101`）。
@@ -1258,9 +1258,8 @@ Protocol）：`kernel/` 与 `runtime/` 都要调用 CLI 能力，而 `R2` 禁止
 回答 §17.2 第 10 项。
 
 - `sdk/version.py` 导出 `SDK_VERSION`，语义化版本，与主程序版本独立演进。
-  **当前为 `3.1.0`**；3.1 为 `PluginContext` 兼容新增激活与资源清理登记，3.x 不再包含
-  无消费者的 `runtime_requires`，也不暴露从未分发且与 `session.started` 事件重叠的
-  `session_start` Hook。
+  **当前为 `4.0.0`**；4.0 删除 manifest 的 `critical` 字段与跨层关键性传播。外部插件
+  故障统一进入诊断；内建基线装配错误由 Runtime 按宿主身份拒绝，均不受插件字段控制。
 - 插件用 `sdk_range` 声明兼容范围，不满足即拒绝加载（`SDK-005`）。
 - minor 版本只允许新增；移除或语义变更必须 major，且提前一个 minor 打运行期
   `DeprecationWarning` 并在 `ResolutionReport` 中标注。
@@ -1523,7 +1522,7 @@ Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中
  7  context 组装：
       a. registry 取全部 CONTEXT provider，按 (priority, provider) 排序
       b. 并发调用，各自独立超时 context_provider_timeout_ms（默认 3000）
-         -> 超时/失败：critical 插件 -> turn FAILED；否则跳过并记录（CTX-005、EDG-302）
+         -> 超时/失败：跳过并记录（CTX-005、EDG-302）
       c. 收集 ContextFragment；按 trust 决定放置位置，UNTRUSTED 包裹为数据块
       d. context_assemble Interceptor 顺序执行
       e. 按 context_max_tokens 裁剪：SYSTEM 不裁剪，其余按 priority 逆序丢弃，
@@ -1985,7 +1984,7 @@ a 步同样不再是「补基线测试」：`D32` 起就改成直接读旧实现
 | 3 | Capability arity | 按 kind 固定 arity（见 §6.1 表）；内建 priority 基准 0；覆盖必须显式声明 | `SDK-003`、`EDG-102` 禁止顺序决定 | registry 冲突分支全覆盖单测 |
 | 4 | 内建能力发布方式 | 同仓库同 wheel 的独立子包 `builtins/`，受 `R4` 约束 | `DST-001`、`DST-003` | `test_builtin_no_privilege.py` |
 | 5 | 内建 Model 协议 | OpenAI 兼容 Chat Completions | 覆盖面最广，使 `BAS-001` 对最多用户成立 | `ModelProviderContract` + e2e |
-| 6 | Hook 同步/并发/错误 | Observer 并发只读、失败隔离；Interceptor 顺序执行、可改流水线、按 critical 决定后果 | `NFR-204`、`CTX-002`、`CTX-005` | Hook 顺序与故障隔离测试 |
+| 6 | Hook 同步/并发/错误 | Observer 并发只读、失败隔离；Interceptor 顺序执行、可改流水线、自身故障隔离 | `NFR-204`、`CTX-002`、`CTX-005` | Hook 顺序与故障隔离测试 |
 | 7 | 中断检查点粒度 | 固定 6 个命名检查点；不可取消工具 grace 2000 ms 后标记 `side_effect=UNKNOWN` | `KER-007`、`EDG-407` | 每个检查点独立测试 |
 | 8 | 插件状态目录语义 | `<instance_dir>/plugins/<id>/` 归插件所有；卸载默认保留，清理需显式确认；`state_version` 驱动迁移 | `EDG-505`、`EDG-503` | 卸载/清理/迁移失败测试 |
 | 9 | 多实例布局与冲突 | 实例目录为唯一状态边界 + `instance.lock` + 端口显式声明先 bind | `DST-005`、`EDG-507` | 双实例并发启动测试 |

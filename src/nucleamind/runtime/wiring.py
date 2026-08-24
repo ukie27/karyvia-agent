@@ -23,7 +23,7 @@ basedpyright 配置是 `include = ["src/nucleamind"]` + `exclude = ["**/tests"]`
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from nucleamind.builtins.registry import BUILTIN_MANIFESTS
 from nucleamind.contracts import Builtin, ProviderId
@@ -64,8 +64,8 @@ CapabilityFilter = Callable[[PluginManifest, CapabilityDecl], bool]
 class Wiring:
     """一次装配的产物：冻结的能力表、覆盖解析报告与逐提供方的加载结果。
 
-    **不在这里 `raise_if_failed()`**：失败后果（`critical`、`on_override_failure`、
-    CLI 入口强制回落）是 bootstrap 的策略，装配只负责如实交出发生了什么。
+    **不在这里 `raise_if_failed()`**：覆盖冲突与 CLI 入口强制回落是 bootstrap 的策略，
+    装配只负责如实交出发生了什么。
     """
 
     registry: CapabilityRegistry
@@ -105,10 +105,6 @@ def to_load_request(
 ) -> LoadRequest:
     """把一份 manifest 投影成 kernel 认识的加载请求。
 
-    `critical` 是提供方级的，Host 会把它灌进 `RegisteredHook` 与
-    `RegisteredContextProvider`——`kernel/` 不认识 manifest，而 `CTX-005`/`PLG-004`
-    的分叉必须在 kernel 里判。
-
     **`keep` 是 `TOL-006` 的落点**。`CapabilityHost` 要求 manifest 声明的每一项
     都真的被注册，而「按名字单独禁用一个工具」要求被禁用的那项从 registry 里消失——静态
     manifest 无法按配置少声明一项，于是由这里裁掉。裁剪与 `setup()` 的注册决定必须**同源
@@ -127,7 +123,6 @@ def to_load_request(
         setup=manifest.setup,
         declarations=tuple(to_declaration(decl) for decl in declarations),
         dependencies=manifest.dependencies,
-        critical=manifest.critical,
     )
 
 
@@ -140,7 +135,6 @@ async def wire_capabilities(
     disabled: Mapping[ProviderId, str] | None = None,
     suppressed: SuppressedCapabilities | None = None,
     keep: CapabilityFilter | None = None,
-    halt_on_critical: bool = True,
 ) -> Wiring:
     """注册全部 manifest 声明的能力 → 解析覆盖 → 冻结，返回装配产物。
 
@@ -159,16 +153,8 @@ async def wire_capabilities(
     照常注册、照常出现在报告里，只是标着「被禁用」而不生效。这是刻意的——`nm capabilities`
     要答得出「它为什么不在」，而一项从未注册过的能力在报告里连一行都没有。
 
-    `halt_on_critical=False` 把每一份请求都当作非关键，供只读诊断路径使用：
-    `nm capabilities` 要在**凭据还没导出**时也答得出「哪项能力由谁提供」，而
-    `model-openai` 是 `critical=True` 且它的 `setup()` 会去取密钥——照常抛出会让最需要
-    看一眼能力表的那一刻恰好看不到。失败照样进 `Wiring.outcomes`，由调用方印出来。
-    **这是「失败的后果由装配根决定」（`PLG-004`）的一次应用**，不是把 `critical` 改掉：
-    那个标志在 manifest 里一个字都没动，只是这一次调用不据它中止。
-
-    **异常约定**：`critical=True` 的提供方加载失败时原样抛出（`halt_on_critical=False`
-    时不抛）；其余失败记进 `Wiring.outcomes`。覆盖冲突不抛，进 `report.failures`
-    由调用方处置。
+    **异常约定**：提供方加载失败记进 `Wiring.outcomes`；覆盖冲突不抛，进
+    `report.failures` 由调用方处置。
     """
     registry = CapabilityRegistry()
     requests: list[LoadRequest] = []
@@ -178,8 +164,6 @@ async def wire_capabilities(
     origin: dict[int, PluginManifest] = {}
     for manifest in manifests:
         request = to_load_request(manifest, provider_for(manifest), keep=keep)
-        if not halt_on_critical:
-            request = replace(request, critical=False)
         origin[id(request)] = manifest
         requests.append(request)
 
@@ -188,7 +172,6 @@ async def wire_capabilities(
             batch,
             context_for(origin[id(request)]),
             declarations=request.declarations,
-            critical=request.critical,
         )
         # 「Host 满足 `NucleaAPI`」的唯一证明点，见模块 docstring。
         conformance: NucleaAPI = host

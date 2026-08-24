@@ -348,7 +348,7 @@ def test_a_bad_plugin_config_is_reported_and_the_instance_still_starts(
 ) -> None:
     """第一类：**配置错误**。`prefix` 声明为 string，给一个整数。
 
-    非关键插件写错配置时实例仍要起得来（`PLG-004`），那个插件被丢掉并留下一条带 JSON
+    插件写错配置时实例仍要起得来（`PLG-004`），那个插件被丢掉并留下一条带 JSON
     Pointer 的记录。
     """
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
@@ -439,7 +439,7 @@ def test_a_setup_that_cannot_be_loaded_is_reported_per_provider(
         {
             "id": "broken-setup",
             "version": "1.0.0",
-            "sdk_range": ">=3.0.0,<4.0.0",
+            "sdk_range": ">=4.0.0,<5.0.0",
             "setup": "nucleamind_plugin_echo_tool:no_such_function",
             "capabilities": [{"kind": "tool", "name": "broken.thing"}],
         },

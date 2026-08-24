@@ -154,7 +154,7 @@ Lifecycle activate → ready → reverse-order stop
 
 加载顺序只保证依赖先 setup，不决定覆盖胜负。覆盖语义只在 Registry resolution 中解释。
 `RegistrationBatch` 回滚能力表；`StartupResources` 同时接管 `setup()` 已产生的任务与订阅。
-某个非关键插件在 setup 阶段失败时，其传递依赖者不再执行 setup；无关插件仍继续加载。
+某个插件在 setup 阶段失败时，其传递依赖者不再执行 setup；无关插件仍继续加载。
 任一步失败时先逆序清理这些运行资源，再释放实例锁；成功后所有权一次性交给
 `AgentInstance`。CLI 回落等二次装配也必须先撤销前一次尝试。
 

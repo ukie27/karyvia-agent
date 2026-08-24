@@ -18,9 +18,8 @@
   降级」才真的成立——否则一份声明得漂亮的配置会让组装器以为拿得到思考内容。
 - **`describe()` 不得发网络请求**（契约写死：它在预算推导路径上）。因此模型窗口只能来自
   配置，`models` / `default_*` 因此存在。`models` 非空即视为**白名单**。
-- **坏配置让实例启动失败，而不是让第一次 turn 失败**（`D18` 的先例）。本插件
-  `critical=False`，因此「启动失败」的实际形态是 `PLUGIN_LOAD_FAILED` 落进
-  `nm plugins` 的状态里——是「响」而不是静默。
+- **坏配置在加载期暴露，而不是拖到第一次 turn**。失败以 `PLUGIN_LOAD_FAILED` 落进
+  `nm plugins` 的状态与启动控制台提示里，不影响实例使用其余模型提供方。
 """
 
 from __future__ import annotations

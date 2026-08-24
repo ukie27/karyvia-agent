@@ -1,0 +1,10 @@
+{
+  "model": {
+    "name": "fake-model",
+    "provider": "fake"
+  },
+  "plugins": {
+    "enabled": [],
+    "disable": []
+  }
+}

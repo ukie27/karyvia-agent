@@ -45,8 +45,8 @@ NucleaMind 已经具备一套可运行、受架构守卫约束的 Agent Kernel �
 ### 对外表面
 
 - 包版本：`0.3.0`（alpha）。
-- SDK 版本：`3.1.0`；3.1 增加插件激活与资源清理登记，3.x 移除了无效的
-  `runtime_requires` 与死 `session_start` Hook。
+- SDK 版本：`4.0.0`；4.0 删除 manifest 的 `critical` 字段。外部插件故障统一隔离并进入
+  诊断；宿主发布的内建基线装配错误仍直接拒绝启动。
 - `NucleaAPI` 与 `CapabilityKind` 当前一一覆盖十类能力。
 - `nm init`、`nm run`、`nm serve`、`nm config show`、`nm session`、
   `nm plugins`、`nm capabilities` 已可用。
@@ -81,7 +81,7 @@ MCP Server 适配、Cron 调度、OpenAI API 兼容服务。内建能力也只�
 - 配置优先级和 Secret 引用不落明文；
 - Turn 的取消检查点、预算、单终态和工具副作用边界；
 - 同 Session 单写者与去重优先的准入顺序；
-- SDK 3.x 已发布的名字、签名和 Manifest 语义；
+- SDK 4.x 已发布的名字、签名和 Manifest 语义；
 - 插件依赖方向与 Runtime 作为唯一组装根。
 
 它们可以演进，但需要显式版本或迁移，而不能在普通重构里顺手改变。完整分类见

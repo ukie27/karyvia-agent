@@ -750,7 +750,6 @@ class TestRegistration:
     def test_the_manifest_is_listed_as_a_builtin(self) -> None:
         assert TOOLS_FS in BUILTIN_MANIFESTS
         assert TOOLS_FS.id == "tools-fs"
-        assert TOOLS_FS.critical is False, "没有文件工具的 Agent 仍然能对话"
 
     def test_every_declaration_matches_the_frozen_tool_list(self) -> None:
         """§8.2 的清单本身是接口：manifest、`TOOL_NAMES` 与装配表必须三处同集。"""

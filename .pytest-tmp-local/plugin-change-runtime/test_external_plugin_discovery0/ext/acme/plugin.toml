@@ -1,0 +1,8 @@
+id = "acme"
+version = "2.0.0"
+sdk_range = ">=0.1"
+setup = "acme.plugin:setup"
+
+[[capabilities]]
+kind = "tool"
+name = "acme.ping"

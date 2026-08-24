@@ -124,8 +124,8 @@ class CapabilityBinding(Generic[_T]):
 
     五个 kind 共用一个泛型类而不是各写一遍：它们的元数据完全相同（谁提供的、叫什么、
     优先级多少），五份同构的 dataclass 只会让「改一处忘四处」有五倍的机会。这与
-    `HookBinding` / `ContextProviderBinding` 各自独立并不矛盾——那两个各有独有字段
-    （`hook`、`critical`），这五个没有。
+    `HookBinding` / `ContextProviderBinding` 各自独立并不矛盾——前者有独有的 `hook`
+    字段，后者承载上下文提供者本身。
     """
 
     kind: CapabilityKind

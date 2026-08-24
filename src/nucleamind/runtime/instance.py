@@ -32,6 +32,7 @@ from enum import StrEnum
 
 from nucleamind.contracts import (
     CancelSignal,
+    CapabilityKind,
     Channel,
     CliEntry,
     Correlation,
@@ -43,6 +44,7 @@ from nucleamind.contracts import (
     InstanceId,
     NucleaError,
     OutboundMessage,
+    Plugin,
     SessionKey,
     StreamState,
     TurnId,
@@ -115,6 +117,8 @@ class AgentInstance:
     channels: tuple[tuple[str, Channel], ...] = ()
     outcomes: tuple[LoadOutcome, ...] = ()
     contexts: tuple[RuntimePluginContext, ...] = ()
+    #: 只有这些由全局插件目录发现的提供方享受启动故障隔离；内建错误仍使实例启动失败。
+    external_plugin_ids: frozenset[str] = frozenset()
     #: 每个提供方的生命周期，与 `contexts` 同序。装配根按加载结果把它们置于
     #: `LOADED` 或 `FAILED`；`start()` / `stop()` 在这里继续推进。
     lifecycles: tuple[PluginLifecycle, ...] = ()
@@ -136,7 +140,7 @@ class AgentInstance:
     # ------------------------------------------------------------------ 生命周期
 
     async def start(self) -> None:
-        """原子启动 Channel 与入站泵；任一步失败都把整个实例停止干净后原样抛出。"""
+        """启动插件与入站泵；外部插件失败隔离，内建失败走实例原子停止。"""
         async with self._lifecycle_lock:
             if self._phase is _InstancePhase.RUNNING:
                 return
@@ -150,9 +154,34 @@ class AgentInstance:
             try:
                 await self._start_plugins()
                 for channel_id, channel in self.channels:
-                    # 即使 start() 做到一半才抛，stop() 仍应有机会释放它已经拿到的资源。
+                    lifecycle = self._channel_lifecycle(channel_id)
+                    if lifecycle is not None and lifecycle.phase is PluginPhase.FAILED:
+                        continue
+                    try:
+                        await channel.start()
+                    except Exception as exc:  # noqa: BLE001 - 外部 Channel 在此隔离
+                        error = _as_nuclea(exc)
+                        if lifecycle is not None:
+                            lifecycle.fail(error)
+                        self.bus.publish(
+                            EventName.PLUGIN_FAILED,
+                            payload={
+                                "plugin": (
+                                    lifecycle.plugin_id
+                                    if lifecycle is not None
+                                    else self._channel_owner(channel_id)
+                                ),
+                                "phase": "start",
+                            },
+                            error=error,
+                        )
+                        await self._safe(channel.stop())
+                        if lifecycle is None:
+                            if error is exc:
+                                raise
+                            raise error from exc
+                        continue
                     self._active_channels.append(channel)
-                    await channel.start()
                     fanout = self._fanout_for(channel)
                     self._fanouts.append(fanout)
                     self._pumps.append(
@@ -239,15 +268,39 @@ class AgentInstance:
     # ------------------------------------------------------------------ 内部
 
     async def _start_plugins(self) -> None:
-        """按加载拓扑激活插件；失败由统一停止路径逆序回滚。"""
+        """按加载拓扑激活插件；失败只影响自身及其依赖者。"""
         lifecycles = {item.plugin_id: item for item in self.lifecycles}
         for context in self.contexts:
             lifecycle = lifecycles.get(context.plugin_id)
             if lifecycle is None or lifecycle.phase is not PluginPhase.LOADED:
                 continue
+            blocked_by = tuple(
+                dependency
+                for dependency in lifecycle.dependencies
+                if (
+                    dependency_lifecycle := lifecycles.get(dependency)
+                ) is not None
+                and dependency_lifecycle.phase is PluginPhase.FAILED
+            )
+            if blocked_by:
+                error = NucleaError(
+                    ErrorCode.PLUGIN_LOAD_FAILED,
+                    "插件依赖未能启动，因此跳过激活。",
+                    detail={
+                        "plugin_id": context.plugin_id,
+                        "failed_dependencies": blocked_by,
+                    },
+                )
+                lifecycle.fail(error)
+                self.bus.publish(
+                    EventName.PLUGIN_FAILED,
+                    payload={"plugin": context.plugin_id, "phase": "start"},
+                    error=error,
+                )
+                continue
             try:
                 await context.activate()
-            except Exception as exc:  # noqa: BLE001 - 转成稳定诊断后触发原子回滚
+            except Exception as exc:  # noqa: BLE001 - 转成稳定诊断后跳过本插件
                 error = _as_nuclea(exc)
                 lifecycle.fail(error)
                 self.bus.publish(
@@ -255,11 +308,55 @@ class AgentInstance:
                     payload={"plugin": context.plugin_id, "phase": "start"},
                     error=error,
                 )
-                if error is exc:
-                    raise
-                raise error from exc
+                if context.plugin_id not in self.external_plugin_ids:
+                    if error is exc:
+                        raise
+                    raise error from exc
+                continue
             lifecycle.advance(PluginPhase.STARTED)
             self.bus.publish(EventName.PLUGIN_ACTIVATED, payload={"plugin": context.plugin_id})
+
+    @property
+    def active_channel_ids(self) -> tuple[str, ...]:
+        """实际启动成功并已接入消息泵的 Channel。"""
+        return tuple(
+            channel_id
+            for channel_id, channel in self.channels
+            if channel in self._active_channels
+        )
+
+    def _channel_owner(self, channel_id: str) -> str:
+        """从冻结报告回查 Channel 的提供方，供启动失败诊断使用。"""
+        binding = next(
+            (
+                item
+                for item in self.report.active
+                if item.kind is CapabilityKind.CHANNEL and item.name == channel_id
+            ),
+            None,
+        )
+        return str(binding.provider) if binding is not None else channel_id
+
+    def _channel_lifecycle(self, channel_id: str) -> PluginLifecycle | None:
+        """外部 Channel 所属插件的生命周期；内建 Channel 没有外部插件状态。"""
+        binding = next(
+            (
+                item
+                for item in self.report.active
+                if item.kind is CapabilityKind.CHANNEL and item.name == channel_id
+            ),
+            None,
+        )
+        if binding is None or not isinstance(binding.provider, Plugin):
+            return None
+        return next(
+            (
+                lifecycle
+                for lifecycle in self.lifecycles
+                if lifecycle.plugin_id == binding.provider.plugin_id
+            ),
+            None,
+        )
 
     async def _stop_plugins(self) -> None:
         """按逆加载序停掉每个提供方，并把结果发成事件。

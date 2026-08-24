@@ -28,6 +28,7 @@ from ...bootstrap import bootstrap
 from ...first_run import ensure_initial_config, guidance_lines
 from ...instance import AgentInstance
 from ..main import Options, install_cancel_handler
+from ..plugin_warnings import write_plugin_failures
 
 __all__ = ["serve_command"]
 
@@ -67,7 +68,10 @@ async def _serve(options: Options, overrides: list[str]) -> int:
     install_cancel_handler(asyncio.get_running_loop(), interrupts)
     try:
         await instance.start()
-        served = [channel_id for channel_id, _ in instance.channels if channel_id != "cli"]
+        write_plugin_failures(instance)
+        served = [
+            channel_id for channel_id in instance.active_channel_ids if channel_id != "cli"
+        ]
         if not served:
             sys.stderr.write(
                 "nm: 没有可服务的 Channel。用 nm plugins list 看看有没有启用一个"

@@ -1,0 +1,11 @@
+
+id = "gamma"
+version = "1.0.0"
+sdk_range = ">=0.1"
+setup = "tests.runtime.test_plugin_plan:setup_gamma"
+dependencies = []
+
+
+[[capabilities]]
+kind = "tool"
+name = "gamma.ping"

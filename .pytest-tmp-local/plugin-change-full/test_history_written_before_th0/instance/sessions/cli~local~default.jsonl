@@ -1,0 +1,4 @@
+{"message_id": "cli-1", "role": "user", "content": "第一句", "created_at": "2026-08-24T10:32:28.505902+00:00", "turn_id": "20af36f9fb0d46779e7e005d2d3bbfff"}
+{"message_id": "20af36f9fb0d46779e7e005d2d3bbfff-a1", "role": "assistant", "content": "第一句好了。", "created_at": "2026-08-24T10:32:28.505902+00:00", "turn_id": "20af36f9fb0d46779e7e005d2d3bbfff"}
+{"message_id": "cli-1", "role": "user", "content": "第二句", "created_at": "2026-08-24T10:32:28.587941+00:00", "turn_id": "bcb6122aa3d1453298c85d96b3d297f7"}
+{"message_id": "bcb6122aa3d1453298c85d96b3d297f7-a1", "role": "assistant", "content": "第二句好了。", "created_at": "2026-08-24T10:32:28.587941+00:00", "turn_id": "bcb6122aa3d1453298c85d96b3d297f7"}

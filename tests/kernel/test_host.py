@@ -77,13 +77,10 @@ def declare(kind: CapabilityKind, name: str, **kwargs: object) -> CapabilityDecl
 def make_host(
     *declarations: CapabilityDeclaration,
     provider: ProviderId | None = None,
-    critical: bool = False,
 ) -> tuple[CapabilityRegistry, RegistrationBatch, CapabilityHost[FakePluginContext]]:
     registry = CapabilityRegistry()
     batch = registry.batch(provider or Builtin())
-    host = CapabilityHost(
-        batch, FakePluginContext(), declarations=declarations, critical=critical
-    )
+    host = CapabilityHost(batch, FakePluginContext(), declarations=declarations)
     return registry, batch, host
 
 
@@ -302,23 +299,6 @@ def test_two_handlers_on_one_hook_get_distinct_registry_names() -> None:
     host.on(HookName.TURN_START, RecordingHook())
     batch.commit()
     assert [item.ref.name for item in registry.registrations] == ["turn_start", "turn_start.2"]
-
-
-def test_critical_is_stamped_onto_hook_and_context_payloads() -> None:
-    """`critical` 是提供方级的，kernel 不认识 manifest，只能由 Host 带进载荷。"""
-    registry, batch, host = make_host(
-        declare(CapabilityKind.HOOK, HookName.TURN_START.value),
-        declare(CapabilityKind.CONTEXT, "ctx"),
-        critical=True,
-    )
-    host.on(HookName.TURN_START, RecordingHook())
-    host.register_context_provider("ctx", StaticContextProvider())
-    batch.commit()
-    payloads = [item.payload for item in registry.registrations]
-    assert all(
-        isinstance(payload, RegisteredHook | RegisteredContextProvider) and payload.critical
-        for payload in payloads
-    )
 
 
 # ------------------------------------------------------------------------------ 批次的所有权

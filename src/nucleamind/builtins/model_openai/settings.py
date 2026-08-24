@@ -7,8 +7,8 @@
 
 三条决定了本模块形状的规则：
 
-- **坏配置让实例启动失败，而不是让第一次 turn 失败**（`D18` 的先例）。本内建
-  `critical=True`，一份写错的 `base_url` 应当在启动时就被指出来。
+- **坏配置在加载期暴露，而不是让第一次 turn 失败**。若没有其他可用模型，Runtime
+  随后的基础能力校验会拒绝启动。
 - **`max_tokens_field` 与 `supports_temperature` 是配置项，不是按模型名猜的表。**
   gpt-5 / o1 / o3 / o4 只认 `max_completion_tokens` 且拒绝 `temperature`，旧实现为此维护
   了一张靠 slug 匹配、越滚越大的厂商特例表。做成配置意味着用户换一个新模型只需改一行，

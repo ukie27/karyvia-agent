@@ -118,10 +118,6 @@ class TestManifest:
         """写了默认值 100 会被原样采纳，而内建基准是 0（`D16` 记的坑）。"""
         assert "priority" not in MANIFEST.capabilities[0].model_fields_set
 
-    def test_a_platform_outage_must_not_take_the_instance_down(self) -> None:
-        """`critical=False`：飞书连不上不该让 CLI 与其它 Channel 一起下线（`PLG-004`）。"""
-        assert MANIFEST.critical is False
-
     def test_config_schema_matches_the_settings_table(self) -> None:
         """两处都「自洽」而对不上时，一个写对了的配置会在阶段 A 被 schema 拒掉。"""
         assert set(CONFIG_SCHEMA["properties"]) == set(CONFIG_KEYS)

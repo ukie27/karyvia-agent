@@ -4,8 +4,7 @@
 | --- | --- |
 | A 顺序 | 拦截器按 `(priority, provider, name)` 顺序执行且多次运行一致（`CTX-002`） |
 | B 累积与短路 | `REPLACE` 逐个回灌、`REJECT`/`BLOCK` 首个即短路 |
-| C 隔离 | 观察者异常/超时不影响 turn（`NFR-204`）；非关键拦截器跳过后继续 |
-| D 关键性 | `critical=True` 的拦截器失败抛出（`PLG-004`、`EDG-106`） |
+| C 隔离 | 观察者与拦截器异常/超时不影响 turn（`NFR-204`） |
 | E 形状 | 用错处置/载荷被当作插件故障，而不是静默忽略 |
 | F 注册 | `bindings_from()` 认 `RegisteredHook`，别的载荷当场报错 |
 """
@@ -79,7 +78,6 @@ def binding(
     priority: int = 0,
     name: str = "a",
     plugin: str | None = None,
-    critical: bool = False,
 ) -> HookBinding:
     return HookBinding(
         hook=hook,
@@ -87,7 +85,6 @@ def binding(
         provider=Plugin(PluginId(plugin)) if plugin else Builtin(),
         name=name,
         priority=priority,
-        critical=critical,
     )
 
 
@@ -324,7 +321,7 @@ async def test_observer_timeout_is_reported_and_the_task_is_cancelled() -> None:
     assert [error.code for error in failures] == [ErrorCode.TIMEOUT_HOOK]
 
 
-async def test_non_critical_interceptor_failure_is_skipped_and_the_rest_continue() -> None:
+async def test_interceptor_failure_is_skipped_and_the_rest_continue() -> None:
     trace: list[str] = []
     failures: list[NucleaError] = []
     router = HookRouter(
@@ -375,22 +372,8 @@ async def test_failure_detail_never_carries_the_exception_message() -> None:
     assert "sk-live-should-not-leak" not in rendered
 
 
-# ------------------------------------------------------------------ D 关键性
-
-
-async def test_critical_interceptor_failure_raises() -> None:
-    router = HookRouter([binding(Script("boom", [], error=RuntimeError("炸")), critical=True)])
-
-    try:
-        await router.dispatch(request_context())
-    except NucleaError as error:
-        assert error.code is ErrorCode.PLUGIN_HOOK_FAILED
-    else:  # pragma: no cover - 失败路径
-        raise AssertionError("critical 插件的失败必须抛出")
-
-
-async def test_critical_observer_failure_still_does_not_raise() -> None:
-    """观察者忽略 `critical`：它的返回值都不被采纳，不该有打掉 turn 的权力（`NFR-204`）。"""
+async def test_observer_failure_does_not_raise() -> None:
+    """观察者失败只上报，不改变 turn 结果（`NFR-204`）。"""
     from nucleamind.contracts import TurnOutcome, TurnStatus
 
     router = HookRouter(
@@ -398,7 +381,6 @@ async def test_critical_observer_failure_still_does_not_raise() -> None:
             binding(
                 Script("boom", [], error=RuntimeError("炸")),
                 hook=HookName.TURN_END,
-                critical=True,
             )
         ]
     )

@@ -163,7 +163,7 @@ class TestUsableWithoutPlugins:
         assert assembled.dropped == ()
 
     async def test_the_provider_never_raises_on_a_valid_configuration(self) -> None:
-        """配置合法时 `provide()` 没有可失败的外部依赖——`critical=True` 才敢这么设。"""
+        """配置合法时 `provide()` 没有可失败的外部依赖。"""
         for snapshot in (
             SessionSnapshot(session_key=KEY),
             snapshot_with("hi", "hello"),
@@ -377,7 +377,6 @@ class TestRegistration:
     def test_the_manifest_is_listed_as_a_builtin(self) -> None:
         assert CONTEXT_BASIC in BUILTIN_MANIFESTS
         assert CONTEXT_BASIC.id == "context-basic"
-        assert CONTEXT_BASIC.critical is True
         declaration = CONTEXT_BASIC.capabilities[0]
         assert declaration.kind is CapabilityKind.CONTEXT
         assert declaration.name == CAPABILITY_NAME

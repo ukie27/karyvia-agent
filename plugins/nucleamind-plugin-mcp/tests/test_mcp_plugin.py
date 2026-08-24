@@ -325,9 +325,6 @@ class TestManifest:
     def test_it_does_not_declare_a_priority(self) -> None:
         assert "priority" not in MANIFEST.capabilities[0].model_fields_set
 
-    def test_it_is_not_critical(self) -> None:
-        assert MANIFEST.critical is False
-
     def test_the_config_schema_forbids_unknown_keys(self) -> None:
         assert CONFIG_SCHEMA["additionalProperties"] is False
 

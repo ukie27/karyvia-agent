@@ -71,8 +71,7 @@ def _load_failures(outcomes: Sequence[LoadOutcome]) -> str:
     """`setup()` 没跑通的提供方。
 
     与「冲突」分开印：这些提供方的能力**从来没进过** registry（因此不会出现在上面四段
-    里的任何一段），而冲突说的是进了又被判出局。最常见的一条是模型凭据还没导出——
-    这条命令刻意不为此失败（`halt_on_critical=False`），而是把它印在这里。
+    里的任何一段），而冲突说的是进了又被判出局。最常见的一条是模型凭据还没导出。
     """
     failed = [outcome for outcome in outcomes if outcome.error is not None]
     if not failed:

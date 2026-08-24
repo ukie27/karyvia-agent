@@ -1,0 +1,52 @@
+{
+  "jobs": [
+    {
+      "created_at": "2026-08-15T09:00:00+00:00",
+      "enabled": true,
+      "history": [
+        {
+          "detail": "",
+          "fired_at": "2026-08-15T09:03:20+00:00",
+          "status": "dispatched"
+        }
+      ],
+      "id": "cj-5ddecbea1f",
+      "message": "晚的那条",
+      "name": "晚",
+      "next_run_at": "2026-08-15T09:05:20+00:00",
+      "origin": {
+        "channel_id": "cli",
+        "conversation_id": "local"
+      },
+      "schedule": {
+        "every_ms": 120000,
+        "kind": "every"
+      }
+    },
+    {
+      "created_at": "2026-08-15T09:00:00+00:00",
+      "enabled": true,
+      "history": [
+        {
+          "detail": "",
+          "fired_at": "2026-08-15T09:03:20+00:00",
+          "status": "dispatched"
+        }
+      ],
+      "id": "cj-bacd02c620",
+      "message": "早的那条",
+      "name": "早",
+      "next_run_at": "2026-08-15T09:04:20+00:00",
+      "origin": {
+        "channel_id": "cli",
+        "conversation_id": "local"
+      },
+      "schedule": {
+        "every_ms": 60000,
+        "kind": "every"
+      }
+    }
+  ],
+  "updated_at": "2026-08-15T09:03:20+00:00",
+  "version": 1
+}

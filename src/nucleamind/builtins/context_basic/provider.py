@@ -257,7 +257,6 @@ def resolve_settings(ctx: PluginContext) -> BasicContextSettings:
 def setup(api: NucleaAPI) -> None:
     """内建注册入口，`BUILTIN_MANIFESTS` 里那条 manifest 的 `setup` 指向它。
 
-    配置在这里校验一次并固化进 Provider：一份写错的配置应当让实例启动失败（本内建
-    `critical=True`），而不是在用户发出第一条消息时才炸。
+    配置在这里校验一次并固化进 Provider，避免把错误拖到用户发出第一条消息时。
     """
     api.register_context_provider(CAPABILITY_NAME, BasicContextProvider(resolve_settings(api.ctx)))

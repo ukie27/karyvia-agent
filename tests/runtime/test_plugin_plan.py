@@ -10,7 +10,7 @@
 - **加载成功**：外部插件以 `plugin:<id>` 身份注册，配置块与内建同一条路交下去。
 - **阶段 A 的三种落榜**（依赖缺失 / 成环 / 配置不合 schema）都不打掉实例（`PLG-004`），
   但都在 `/plugins` 的数据源里留下 `FAILED`。
-- **`critical` 决定后果**（`EDG-106`）：关键插件失败即启动失败。
+- **失败隔离**（`EDG-106`）：插件不能决定中断宿主。
 - **事务性**（`EDG-103`）：`setup` 中途抛异常时 registry 不留半注册状态。
 - **零外部插件是一等路径**（`PLG-007`）：内建基线照常启动。
 
@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError, Plugin, PluginId, ToolSpec
+from nucleamind.contracts import ErrorCode, Plugin, PluginId, ToolSpec
 from nucleamind.kernel.observability import PluginState
 from nucleamind.kernel.plugins import STATE_FILE
 from nucleamind.runtime.bootstrap import bootstrap
@@ -95,7 +95,6 @@ version = "1.0.0"
 sdk_range = ">=0.1"
 setup = "tests.runtime.test_plugin_plan:setup_{setup}"
 dependencies = [{dependencies}]
-critical = {critical}
 {extra}
 
 [[capabilities]]
@@ -110,7 +109,6 @@ def write_plugin(
     *,
     setup: str | None = None,
     dependencies: tuple[str, ...] = (),
-    critical: bool = False,
     extra: str = "",
 ) -> Path:
     """在搜索路径下放一个目录形态的插件。"""
@@ -122,7 +120,6 @@ def write_plugin(
             plugin_id=plugin_id,
             setup=setup or plugin_id,
             dependencies=", ".join(f'"{item}"' for item in dependencies),
-            critical="true" if critical else "false",
             extra=extra,
         ),
         encoding="utf-8",
@@ -212,7 +209,7 @@ async def test_a_dependency_on_a_builtin_is_satisfied(tmp_path: Path) -> None:
 
 
 async def test_a_missing_dependency_keeps_the_instance_up(tmp_path: Path) -> None:
-    """`PLG-004`：非关键插件落榜不打掉实例，但要在诊断里查得到。"""
+    """`PLG-004`：插件落榜不打掉实例，但要在诊断里查得到。"""
     write_plugin(tmp_path / "ext", "alpha", dependencies=("nope",))
     instance = await boot(tmp_path, {"enabled": ["alpha"]})
     try:
@@ -295,28 +292,6 @@ async def test_a_state_version_change_drops_the_plugin_and_keeps_the_state(
         await instance.stop()
 
 
-# ------------------------------------------------------------------------------ critical
-
-
-async def test_a_critical_plugin_failing_phase_a_stops_the_instance(tmp_path: Path) -> None:
-    """`EDG-106`：关键插件失败即启动失败，不「降级运行」。"""
-    write_plugin(tmp_path / "ext", "alpha", dependencies=("nope",), critical=True)
-    write_config(tmp_path, plugins={"enabled": ["alpha"]})
-    with pytest.raises(NucleaError) as caught:
-        await bootstrap(instance_dir=tmp_path, manifests=TEST_MANIFESTS)
-    assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
-    assert caught.value.detail["missing"] == ["nope"]
-
-
-async def test_a_critical_plugin_failing_setup_stops_the_instance(tmp_path: Path) -> None:
-    """阶段 B 同理：`load_into` 对 `critical` 的处置是原样抛（`D16` 的既有语义）。"""
-    write_plugin(tmp_path / "ext", "boom", setup="explodes", critical=True)
-    write_config(tmp_path, plugins={"enabled": ["boom"]})
-    with pytest.raises(NucleaError) as caught:
-        await bootstrap(instance_dir=tmp_path, manifests=TEST_MANIFESTS)
-    assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
-
-
 # ------------------------------------------------------------------------------ 事务性
 
 
@@ -354,8 +329,8 @@ async def test_one_broken_plugin_does_not_take_the_others_down(tmp_path: Path) -
 
 # ------------------------------------------------------------------------------ 覆盖
 
-async def test_an_override_target_that_does_not_exist_fails_the_start(tmp_path: Path) -> None:
-    """覆盖语义复用 `D06`：目标不存在是启动错误，而不是「那就当没覆盖」。"""
+async def test_an_override_target_that_does_not_exist_is_reported(tmp_path: Path) -> None:
+    """目标不存在时该能力不生效，但插件不能借此中断实例启动。"""
     write_plugin(tmp_path / "ext", "alpha")
     manifest = tmp_path / "ext" / "alpha" / MANIFEST_FILENAME
     manifest.write_text(
@@ -363,6 +338,11 @@ async def test_an_override_target_that_does_not_exist_fails_the_start(tmp_path: 
     )
     register_test_manifest(manifest)
     write_config(tmp_path, plugins={"enabled": ["alpha"]})
-    with pytest.raises(NucleaError) as caught:
-        await bootstrap(instance_dir=tmp_path, manifests=TEST_MANIFESTS)
-    assert caught.value.code is ErrorCode.CAPABILITY_OVERRIDE_TARGET_MISSING
+    instance = await bootstrap(instance_dir=tmp_path, manifests=TEST_MANIFESTS)
+    try:
+        assert [error.code for error in instance.report.failures] == [
+            ErrorCode.CAPABILITY_OVERRIDE_TARGET_MISSING
+        ]
+        assert "alpha.ping" not in tool_names(instance)
+    finally:
+        await instance.stop()

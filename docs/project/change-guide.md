@@ -57,8 +57,8 @@
 | Session Store | `register_session_store` | Orchestrator/Runtime instance |
 | CLI Entry | `register_cli_entry` | Runtime CLI bootstrap |
 
-每个能力至少检查：名字/namespace、arity、override 目标、critical 传播、加载失败
-回滚和停机行为。能力对象应通过 Registry 取回，不能由列表直接塞进 Orchestrator。
+每个能力至少检查：名字/namespace、arity、override 目标、加载失败隔离、回滚和停机行为。
+能力对象应通过 Registry 取回，不能由列表直接塞进 Orchestrator。
 
 ## 4. 新增一种 CapabilityKind
 

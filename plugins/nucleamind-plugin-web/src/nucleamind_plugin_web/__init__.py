@@ -212,15 +212,13 @@ CONFIG_SCHEMA: Final[ManifestJsonSchema] = {
 MANIFEST: Final = PluginManifest(
     id="web",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind_plugin_web:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.TOOL, name=FETCH_TOOL),
         CapabilityDecl(kind=CapabilityKind.TOOL, name=SEARCH_TOOL),
     ),
     config_schema=CONFIG_SCHEMA,
-    # `critical=False`：没有网页工具的 Agent 仍然能对话，这与「没有模型」不是一回事。
-    critical=False,
 )
 
 

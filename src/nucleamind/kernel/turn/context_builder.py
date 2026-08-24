@@ -1,6 +1,6 @@
 """Context 组装：Provider 调度、trust 放置与预算裁剪（技术方案 §10.2 第 7 步 a–e）。
 
-职责：并发调用全部生效的 `ContextProvider`（各自独立超时、失败按关键性分叉），分发
+职责：并发调用全部生效的 `ContextProvider`（各自独立超时、失败隔离），分发
 `context_assemble` 拦截器，按 `trust` 决定片段的放置位置，并在 `context_max_tokens`
 之内裁剪出一份 `ModelMessage` 序列。
 不负责：调用模型、决定谁是 Provider（Registry 说了算）、持久化压缩历史
@@ -93,14 +93,9 @@ _CHARS_PER_TOKEN: Final = 3
 
 @dataclass(frozen=True, slots=True)
 class RegisteredContextProvider:
-    """`CapabilityKind.CONTEXT` 的注册载荷形状（与 `hooks.RegisteredHook` 同构）。
-
-    `critical` 由 Host 从 manifest 带进来：`kernel/` 不认识 manifest，
-    而 `CTX-005` 的「按关键性中止或跳过」必须在这一层判定。
-    """
+    """`CapabilityKind.CONTEXT` 的注册载荷形状。"""
 
     provider: ContextProvider
-    critical: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -111,7 +106,6 @@ class ContextProviderBinding:
     owner: ProviderId
     name: str
     priority: int = 0
-    critical: bool = False
 
     @property
     def sort_key(self) -> tuple[int, str, str]:
@@ -168,7 +162,6 @@ def context_providers_from(registry: CapabilityRegistry) -> tuple[ContextProvide
                 owner=registration.ref.provider,
                 name=registration.ref.name,
                 priority=registration.priority,
-                critical=payload.critical,
             )
         )
     return tuple(sorted(bindings, key=lambda item: item.sort_key))
@@ -222,8 +215,8 @@ async def assemble(
     「片段从哪来」有两个答案，而 `orchestrator.py` 也贴着 500 行上限。**查询词是本次输入**
     （`MemoryRecall` 自己挡掉空串）；策略与降级全在 `memory.py`，这里只调它。
 
-    **异常约定**：关键 Provider 失败、关键插件的 `context_assemble` 失败原样上抛；
-    裁剪到底仍超预算抛 `INPUT_TOO_LARGE`。非关键失败交给 `on_failure` 后跳过。
+    **异常约定**：Provider 失败交给 `on_failure` 后跳过；裁剪到底仍超预算抛
+    `INPUT_TOO_LARGE`。
     记忆后端的失败按 `MemoryRecall.critical` 分叉（`MEM-003`），判定在那一侧。
     **取消语义**：`cancel` 透传给每个 Provider 与记忆后端；本函数自身不设检查点
     （检查点 1 在 orchestrator，就在调用本函数之前）。
@@ -268,7 +261,7 @@ async def _collect(
     timeout_ms: int,
     on_failure: Callable[[NucleaError], None] | None,
 ) -> tuple[ContextFragment, ...]:
-    """并发调用全部 Provider，各自独立超时；失败按 `critical` 分叉（`CTX-005`、`EDG-302`）。
+    """并发调用全部 Provider，各自独立超时；失败上报后跳过（`CTX-005`、`EDG-302`）。
 
     片段的顺序由 `sort_key` 决定，与谁先返回无关——`CTX-002` 要的是确定的组合顺序，
     并发只是为了不让一个慢 Provider 串起全部延迟。**排序在这里做而不是指望调用方传进来
@@ -290,8 +283,6 @@ async def _collect(
             error = _provider_error(binding, result, timeout_ms)
             if on_failure is not None:
                 on_failure(error)
-            if binding.critical:
-                raise error
             continue
         fragments.extend(result)
     return tuple(fragments)

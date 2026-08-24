@@ -75,7 +75,7 @@ class CapabilityHost(Generic[_ContextT]):
     `EDG-103`「中途抛异常整批丢弃」要求提交发生在那之后。
     """
 
-    __slots__ = ("_batch", "_critical", "_ctx", "_declared", "_hook_counts", "_namespaces", "_used")
+    __slots__ = ("_batch", "_ctx", "_declared", "_hook_counts", "_namespaces", "_used")
 
     def __init__(
         self,
@@ -83,11 +83,9 @@ class CapabilityHost(Generic[_ContextT]):
         ctx: _ContextT,
         *,
         declarations: Sequence[CapabilityDeclaration] = (),
-        critical: bool = False,
     ) -> None:
         self._batch = batch
         self._ctx = ctx
-        self._critical = critical
         #: **精确声明表，命名空间不在其中**。分成两张表是为了让规则只有一条：
         #: 一条命名空间声明放行的**恰好是** `<前缀>.<后缀>`，前缀本身不在内。让它同时
         #: 落进精确表，就等于一条声明有两套判据，而其中一套没写在任何地方。
@@ -120,11 +118,11 @@ class CapabilityHost(Generic[_ContextT]):
         )
 
     def register_context_provider(self, name: str, provider: ContextProvider) -> None:
-        """注册一个上下文贡献者。`critical` 从 `LoadRequest` 带进载荷（`CTX-005`）。"""
+        """注册一个上下文贡献者。"""
         self._register(
             CapabilityKind.CONTEXT,
             name,
-            RegisteredContextProvider(provider=provider, critical=self._critical),
+            RegisteredContextProvider(provider=provider),
         )
 
     def register_context_compactor(self, name: str, compactor: ContextCompactor) -> None:
@@ -177,7 +175,7 @@ class CapabilityHost(Generic[_ContextT]):
         self._register(
             CapabilityKind.HOOK,
             name,
-            RegisteredHook(hook=hook, handler=handler, critical=self._critical),
+            RegisteredHook(hook=hook, handler=handler),
             slot_name=hook.value,
             priority=None if priority == PLUGIN_BASE_PRIORITY else priority,
         )

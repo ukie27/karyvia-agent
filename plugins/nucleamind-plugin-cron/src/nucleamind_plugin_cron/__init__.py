@@ -142,7 +142,7 @@ __all__ = [
 MANIFEST: Final = PluginManifest(
     id="cron",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind_plugin_cron:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.CHANNEL, name=CHANNEL_NAME),
@@ -150,9 +150,6 @@ MANIFEST: Final = PluginManifest(
         CapabilityDecl(kind=CapabilityKind.COMMAND, name=COMMAND_NAME),
     ),
     config_schema=CONFIG_SCHEMA,
-    # `critical=False`：没有定时任务的 Agent 照样对话。配置错误因此只表现为
-    # `nm plugins` 里的一行 `PLUGIN_LOAD_FAILED`，所以校验必须在 `setup()` 里一次做完。
-    critical=False,
 )
 
 

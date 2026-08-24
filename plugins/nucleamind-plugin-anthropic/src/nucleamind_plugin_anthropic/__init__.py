@@ -178,15 +178,11 @@ CONFIG_SCHEMA: Final[ManifestJsonSchema] = {
 MANIFEST: Final = PluginManifest(
     id="anthropic",
     version="0.1.0",
-    sdk_range=">=3.0.0,<4.0.0",
+    sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind_plugin_anthropic:setup",
     # **不写 `overrides`**：本插件与内建 `openai` 并存而不是取代它，因此 `D30` 的
     # `on_disable` 表态要求不适用（那条只对声明过覆盖的插件生效）。
     # **也不写 `priority`**：默认值 100 会被原样采纳，而内建基准是 0（`D16` 记的坑）。
     capabilities=(CapabilityDecl(kind=CapabilityKind.MODEL, name=CAPABILITY_NAME),),
     config_schema=CONFIG_SCHEMA,
-    # `critical=False`：第二个 Model Provider 起不来不该让实例整个起不来——内建 `openai`
-    # 仍在，装配根步骤 8 的必需能力判定照样通过。配置错误仍会以 `PLUGIN_LOAD_FAILED`
-    # 落进 `nm plugins` 的状态里，是「响」而不是静默。
-    critical=False,
 )

@@ -875,7 +875,7 @@ class TestSettings:
         assert caught.value.code is ErrorCode.CONFIG_UNKNOWN_FIELD
 
     def test_a_bad_configuration_fails_at_setup_rather_than_at_the_first_turn(self) -> None:
-        """本内建 critical=True，一份写错的配置应当让实例启动失败。"""
+        """配置错误在 setup 时暴露，不推迟到第一次 turn。"""
         class RefusingApi:
             ctx = FakePluginContext(
                 config={CONFIG_AUTH_KEY: "basic"}, secrets={SECRET_NAME: SENTINEL_KEY}
@@ -1072,7 +1072,6 @@ class TestRegistration:
     def test_the_manifest_is_listed_as_a_builtin(self) -> None:
         assert MODEL_OPENAI in BUILTIN_MANIFESTS
         assert MODEL_OPENAI.id == "model-openai"
-        assert MODEL_OPENAI.critical is True
         declaration = MODEL_OPENAI.capabilities[0]
         assert declaration.kind is CapabilityKind.MODEL
         assert declaration.name == CAPABILITY_NAME

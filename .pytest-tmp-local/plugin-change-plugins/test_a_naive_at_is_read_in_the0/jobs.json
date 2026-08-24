@@ -1,0 +1,23 @@
+{
+  "jobs": [
+    {
+      "created_at": "2026-08-15T09:00:00+00:00",
+      "enabled": true,
+      "history": [],
+      "id": "cj-3141d16831",
+      "message": "提醒",
+      "name": "提醒",
+      "next_run_at": "2027-08-20T16:30:00+00:00",
+      "origin": {
+        "channel_id": "cli",
+        "conversation_id": "local"
+      },
+      "schedule": {
+        "at": "2027-08-20T16:30:00+00:00",
+        "kind": "at"
+      }
+    }
+  ],
+  "updated_at": "2026-08-15T09:00:00+00:00",
+  "version": 1
+}

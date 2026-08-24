@@ -276,8 +276,7 @@ class ContextProvider(Protocol):
         与预算约束因此无法被绕过（`CMD-004`、`CMD-005`）。裁剪与排序由组装器负责，
         Provider 只需保证单个片段不超长并如实填写 `estimated_tokens`。
 
-        **异常约定**：可以抛 `NucleaError`。是否致命由插件的 `critical` 决定：
-        关键插件的异常让 turn `FAILED`，否则跳过本 Provider 并记录原因（`CTX-005`）。
+        **异常约定**：可以抛 `NucleaError`。宿主记录原因并跳过本 Provider（`CTX-005`）。
         **取消语义**：在每个外部查询前检查 `cancel`；被取消时抛 `CANCELLED` 类错误，
         本次贡献整体作废——半份上下文比没有上下文更危险。
         """
@@ -448,8 +447,7 @@ class Channel(Protocol):
     async def start(self) -> None:
         """建立与平台的连接。
 
-        **异常约定**：失败抛 `EXTERNAL_CHANNEL`；实例是否因此启动失败由插件的
-        `critical` 决定（`PLG-004`）。
+        **异常约定**：失败抛 `EXTERNAL_CHANNEL`；宿主记录失败并继续启动其余能力。
         **取消语义**：不接受取消；连接失败应快速返回而不是无限重试。
         """
         ...
@@ -529,9 +527,8 @@ class HookHandler(Protocol):
         `HookAction.REPLACE` 的说明。
 
         **异常约定**：**handler 不应抛出异常，抛出被视为插件故障并被隔离。**
-        Observer 的异常与超时只记 `PLUGIN_FAILURE` 事件，不影响 turn 结果（`NFR-204`）；
-        Interceptor 的异常按插件关键性区分：`critical=true` 让 turn `FAILED`，否则跳过
-        该 handler、记录原因后继续（`PLG-004`、`EDG-106`、`CTX-005`）。
+        Observer 与 Interceptor 的异常、超时只记 `PLUGIN_FAILURE` 事件，不影响 turn
+        结果；跳过该 handler 后继续（`NFR-204`、`CTX-005`）。
         **取消语义**：不接受 `CancelSignal`。Hook 有自己的独立超时
         （observer 2000ms / interceptor 5000ms），超时即按上面的隔离规则处理；
         把 turn 的取消信号交给 Hook 只会诱导它在 `turn_end` 这类清理点提前退出。

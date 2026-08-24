@@ -1,0 +1,1 @@
+{"model": {"name": "gpt-4o-mini", "provider": "openai"}, "plugins": {"model-openai": {"secrets": {"api_key": "${OPENAI_API_KEY}"}}, "enabled": ["session-memory"]}}

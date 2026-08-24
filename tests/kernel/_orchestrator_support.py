@@ -198,13 +198,11 @@ class FakeContextProvider:
 
 
 def binding(
-    provider: FakeContextProvider, *, name: str = "basic", priority: int = 0, critical: bool = False
+    provider: FakeContextProvider, *, name: str = "basic", priority: int = 0
 ) -> ContextProviderBinding:
     from nucleamind.contracts import Builtin
 
-    return ContextProviderBinding(
-        provider=provider, owner=Builtin(), name=name, priority=priority, critical=critical
-    )
+    return ContextProviderBinding(provider=provider, owner=Builtin(), name=name, priority=priority)
 
 
 # --------------------------------------------------------------------------------- 工具

@@ -1,0 +1,23 @@
+{
+  "jobs": [
+    {
+      "created_at": "2026-08-15T09:00:00+00:00",
+      "enabled": true,
+      "history": [],
+      "id": "cj-c78955359e",
+      "message": "看一眼构建\n然后汇报",
+      "name": "看一眼构建",
+      "next_run_at": "2026-08-15T09:01:00+00:00",
+      "origin": {
+        "channel_id": "cli",
+        "conversation_id": "local"
+      },
+      "schedule": {
+        "every_ms": 60000,
+        "kind": "every"
+      }
+    }
+  ],
+  "updated_at": "2026-08-15T09:00:00+00:00",
+  "version": 1
+}

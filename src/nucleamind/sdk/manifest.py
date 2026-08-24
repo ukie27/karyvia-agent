@@ -294,7 +294,6 @@ class PluginManifest(BaseModel):
     # dict 影响不到这里，快照语义已经成立，浅冻结只是装样子。
     config_schema: ManifestJsonSchema | None = None
     state_version: int = 1
-    critical: bool = False
     platforms: tuple[str, ...] = ()
 
     @field_validator("id")

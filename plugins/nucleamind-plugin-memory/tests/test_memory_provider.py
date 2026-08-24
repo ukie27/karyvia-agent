@@ -190,7 +190,7 @@ async def test_cancellation_propagates(store: MemoryStore) -> None:
 
 
 async def test_a_read_failure_is_not_swallowed(store: MemoryStore, tmp_path: Path) -> None:
-    """**不吞成空结果**：本插件 `critical=False`，跳过与记录由 kernel 负责（`CTX-005`）。
+    """**不吞成空结果**：跳过与记录由 Kernel 负责（`CTX-005`）。
 
     吞掉它会让「记忆一直召不回来」查不出原因。
     """

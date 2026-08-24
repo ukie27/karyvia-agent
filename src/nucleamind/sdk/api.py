@@ -263,7 +263,7 @@ class PluginContext(Protocol):
         """登记实例激活时执行的异步动作。
 
         `setup()` 只登记，不应自行连接外部服务。Runtime 在 Registry 冻结、实例门面可用后，
-        按插件依赖顺序逐个执行这些动作；失败会使本次实例启动回滚。
+        按插件依赖顺序逐个执行这些动作；失败会记录为插件故障并跳过该插件。
 
         **异常约定**：插件已经激活或进入停止流程后再登记，抛
         `KERNEL_INVARIANT_VIOLATED`。
@@ -455,7 +455,6 @@ class NucleaAPI(Protocol):
         不由注册方选择——同一个 Hook 对不同插件有不同语义，失败隔离规则就无法自洽。
 
         **异常约定**：批次已提交后再注册抛 `KERNEL_INVARIANT_VIOLATED`。
-        handler 自身的异常由 Kernel 按 `HookKind` 与插件的 `critical` 隔离处理
-        （`NFR-204`、`PLG-004`），不在注册时体现。
+        handler 自身的异常由 Kernel 隔离并上报，不影响其余 handler 或当前 turn。
         """
         ...

@@ -1,0 +1,1 @@
+{"model": {"name": "fake-model", "provider": "fake"}, "routing": {"channel_queue_max_size": 1}}

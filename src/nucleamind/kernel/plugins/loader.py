@@ -1,11 +1,11 @@
 """阶段 A 的三项机制：依赖拓扑、配置校验与状态版本（技术方案 §7.3 阶段 A 的 A4/A5/A7）。
 
-职责：把一组 `(id, dependencies, critical)` 排成一份确定的加载顺序并指出缺失与环路；
+职责：把一组 `(id, dependencies)` 排成一份确定的加载顺序并指出缺失与环路；
 把一份配置块对着一份 JSON Schema 校验成带字段路径的错误；把一个插件声明的
 `state_version` 与它状态目录里已记录的版本比对。
 不负责：认识 manifest（`R2` 禁止 `kernel/` import `sdk/`，翻译在 `runtime/plugin_plan.py`）、
-发现候选（`discovery.py`）、跑 `setup` 与事务性注册（`builtin_loader.py`），或决定失败的
-后果（那是装配根按 `critical` 判的）。
+发现候选（`discovery.py`）、跑 `setup` 与事务性注册（`builtin_loader.py`），或判断最终
+能力集合是否足以运行实例（那是 Runtime 装配根的职责）。
 
 **本模块与 `builtin_loader.py` 的分工就是阶段 A 与阶段 B**：前者只看声明、一个插件模块
 都不导入（§7.3 的「不导入插件实现」是阶段 A 的定义性约束），后者才 import `setup`。
@@ -74,28 +74,20 @@ class _Validator(Protocol):
 class PlanNode:
     """一个待加载插件在**依赖排序**这件事上的全部事实。
 
-    kernel 侧对 manifest 的投影，与 `LoadRequest` 同构地只留排序需要的三项：`R2` 够不着
+    kernel 侧对 manifest 的投影，与 `LoadRequest` 同构地只留排序需要的两项：`R2` 够不着
     `PluginManifest`，而排序本来也不需要知道它声明了什么能力。
     """
 
     plugin_id: str
     dependencies: tuple[str, ...] = ()
-    #: 关键插件失败即启动失败（`PLG-004`、`EDG-106`）。本模块只**如实带着**它，
-    #: 后果由装配根判——kernel 不知道「启动失败」是什么。
-    critical: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class PlanFailure:
-    """一个插件在阶段 A 就落榜的原因。
-
-    带上 `critical` 是因为调用方要能只扫一遍就回答「这次启动还继续吗」，
-    而 `NucleaError` 里没有、也不该有这个概念。
-    """
+    """一个插件在阶段 A 就落榜的原因。"""
 
     plugin_id: str
     error: NucleaError
-    critical: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -108,11 +100,6 @@ class LoadPlan:
 
     order: tuple[str, ...] = ()
     failures: tuple[PlanFailure, ...] = ()
-
-    @property
-    def critical_failure(self) -> PlanFailure | None:
-        """第一条关键失败。非空即意味着这次启动应当失败。"""
-        return next((item for item in self.failures if item.critical), None)
 
 
 def plan_load_order(
@@ -160,7 +147,6 @@ def plan_load_order(
             failures.append(
                 PlanFailure(
                     plugin_id=node.plugin_id,
-                    critical=node.critical,
                     error=NucleaError(
                         ErrorCode.PLUGIN_LOAD_FAILED,
                         "插件依赖的其他插件没有被加载。",
@@ -224,7 +210,6 @@ def _cycle_failures(
         failures.append(
             PlanFailure(
                 plugin_id=plugin_id,
-                critical=known[plugin_id].critical,
                 error=NucleaError(
                     ErrorCode.PLUGIN_LOAD_FAILED,
                     "插件依赖成环，无法确定加载顺序。",
@@ -259,7 +244,6 @@ def _cascade_failures(
     return [
         PlanFailure(
             plugin_id=plugin_id,
-            critical=known[plugin_id].critical,
             error=NucleaError(
                 ErrorCode.PLUGIN_LOAD_FAILED,
                 "插件依赖的其他插件自己没能加载。",
@@ -294,7 +278,7 @@ def validate_plugin_config(
     而不是一个相对于插件私有 schema 的路径。
 
     **异常约定**：不抛，返回 `NucleaError | None`。失败是阶段 A 的一条记录而不是一次崩溃，
-    非关键插件配置写错时实例仍要能起来（`PLG-004`）。
+    插件配置写错时实例仍要能起来（`PLG-004`）。
 
     **`jsonschema` 惰性 import**：这是全项目第二个接触点（另一处是
     `kernel/turn/invoker._compile`），两处都惰性——`import kernel.plugins` 出现在

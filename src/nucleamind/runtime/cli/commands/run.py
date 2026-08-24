@@ -30,6 +30,7 @@ from ...bootstrap import bootstrap
 from ...first_run import ensure_initial_config, guidance_lines
 from ...instance import AgentInstance
 from ..main import Options, install_cancel_handler
+from ..plugin_warnings import write_plugin_failures
 
 __all__ = ["run_command"]
 
@@ -73,6 +74,7 @@ async def _run(options: Options) -> int:
     install_cancel_handler(asyncio.get_running_loop(), interrupts)
     try:
         await instance.start()
+        write_plugin_failures(instance)
         return await instance.run_cli(options.rest, cancel)
     finally:
         await instance.stop()

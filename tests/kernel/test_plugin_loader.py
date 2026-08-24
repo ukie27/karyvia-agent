@@ -29,8 +29,8 @@ from nucleamind.kernel.plugins import (
 # ------------------------------------------------------------------------------ 拓扑序
 
 
-def node(plugin_id: str, *dependencies: str, critical: bool = False) -> PlanNode:
-    return PlanNode(plugin_id=plugin_id, dependencies=dependencies, critical=critical)
+def node(plugin_id: str, *dependencies: str) -> PlanNode:
+    return PlanNode(plugin_id=plugin_id, dependencies=dependencies)
 
 
 def test_no_nodes_is_an_ordinary_path() -> None:
@@ -104,16 +104,6 @@ def test_one_broken_plugin_does_not_take_the_others_down() -> None:
     assert plan.order == ("b",)
 
 
-def test_critical_failures_are_singled_out() -> None:
-    plan = plan_load_order([node("a", "nope", critical=True), node("b", "nope")])
-    assert plan.critical_failure is not None
-    assert plan.critical_failure.plugin_id == "a"
-
-
-def test_no_critical_failure_when_none_is_critical() -> None:
-    assert plan_load_order([node("a", "nope")]).critical_failure is None
-
-
 # ------------------------------------------------------------------------------ 配置校验
 
 _SCHEMA = {
@@ -168,7 +158,7 @@ def test_a_broken_schema_blames_the_plugin_not_the_user() -> None:
 
 
 def test_validation_never_raises_on_a_hostile_config() -> None:
-    """约定不抛：非关键插件配置写错时实例仍要能起来（`PLG-004`）。"""
+    """约定不抛：插件配置写错时实例仍要能起来（`PLG-004`）。"""
     error = validate_plugin_config(
         _SCHEMA, {"retries": 1, "extra": {"deep": [1, 2]}}, plugin_id="acme", pointer="/p"
     )

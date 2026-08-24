@@ -2,7 +2,7 @@
 
 | 组 | 验收内容 |
 | --- | --- |
-| A Provider 调度 | 并发调用、顺序确定、超时/失败按 `critical` 分叉（`CTX-005`、`EDG-302`） |
+| A Provider 调度 | 并发调用、顺序确定、超时/失败隔离（`CTX-005`、`EDG-302`） |
 | B 放置 | `trust` 决定位置；`UNTRUSTED` 被包裹且进不了系统指令位（`CMD-005`、`EDG-306`） |
 | C 过滤 | `SECRET` 与过期片段被丢弃并记录 |
 | D 拦截器 | `context_assemble` 在裁剪之前，累积生效 |
@@ -130,7 +130,7 @@ async def test_providers_are_called_concurrently_and_ordered_by_binding() -> Non
     assert [item.source for item in context.fragments] == ["builtin:fast", "plugin:slow"]
 
 
-async def test_non_critical_provider_failure_is_skipped_and_recorded() -> None:
+async def test_provider_failure_is_skipped_and_recorded() -> None:
     failures: list[NucleaError] = []
     context = await build(
         bindings=[
@@ -144,20 +144,6 @@ async def test_non_critical_provider_failure_is_skipped_and_recorded() -> None:
     assert [error.code for error in failures] == [ErrorCode.PLUGIN_HOOK_FAILED]
 
 
-async def test_critical_provider_failure_fails_the_turn() -> None:
-    with pytest.raises(NucleaError) as caught:
-        await build(
-            bindings=[
-                binding(
-                    FakeContextProvider(error=NucleaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "挂了")),
-                    name="memory",
-                    critical=True,
-                )
-            ]
-        )
-    assert caught.value.code is ErrorCode.EXTERNAL_MODEL_PROVIDER
-
-
 async def test_provider_timeout_does_not_block_the_turn() -> None:
     failures: list[NucleaError] = []
     context = await build(
@@ -168,15 +154,6 @@ async def test_provider_timeout_does_not_block_the_turn() -> None:
 
     assert context.fragments == ()
     assert [error.code for error in failures] == [ErrorCode.TIMEOUT_HOOK]
-
-
-async def test_critical_provider_timeout_fails_the_turn() -> None:
-    with pytest.raises(NucleaError) as caught:
-        await build(
-            bindings=[binding(FakeContextProvider(hang=True), name="memory", critical=True)],
-            provider_timeout_ms=10,
-        )
-    assert caught.value.code is ErrorCode.TIMEOUT_HOOK
 
 
 # ------------------------------------------------------------------ B 放置
@@ -414,7 +391,7 @@ def test_context_providers_from_reads_registered_providers() -> None:
 
     bindings = context_providers_from(registry)
 
-    assert [(item.name, item.priority, item.critical) for item in bindings] == [("basic", 0, False)]
+    assert [(item.name, item.priority) for item in bindings] == [("basic", 0)]
 
 
 def test_context_providers_from_rejects_a_foreign_payload() -> None:

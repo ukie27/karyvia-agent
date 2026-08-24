@@ -373,11 +373,7 @@ def test_capabilities_lists_active_providers(
 def test_capabilities_answers_even_without_credentials(
     instance: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """凭据没导出恰恰是最需要看能力表的时刻（`halt_on_critical=False`）。
-
-    `model-openai` 是 `critical=True`，照常抛出会让这条命令以退出码 2 死掉；这里它变成
-    「加载失败的提供方」一节，其余三段照印。
-    """
+    """凭据没导出时仍应展示能力表，并把模型提供方列为加载失败。"""
     monkeypatch.delenv("NM_TEST_KEY", raising=False)
     assert app(_args(instance, "capabilities")) == 0
     out = capsys.readouterr().out
