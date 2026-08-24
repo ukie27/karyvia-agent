@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "scope": "session",
-  "token": "cli~local~proj",
-  "created_at": "2026-08-15T09:00:02+00:00",
-  "updated_at": "2026-08-15T09:00:04+00:00",
-  "next_sequence": 1,
-  "committed_bytes": 0
-}

@@ -1,5 +1,0 @@
-id = "from-the-future"
-version = "1.0.0"
-sdk_range = ">=99.0.0,<100.0.0"
-setup = "nucleamind_plugin_echo_tool:setup"
-capabilities = [{ kind = "tool", name = "future.thing" }]

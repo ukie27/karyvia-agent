@@ -1,5 +1,0 @@
-id = "broken-setup"
-version = "1.0.0"
-sdk_range = ">=4.0.0,<5.0.0"
-setup = "nucleamind_plugin_echo_tool:no_such_function"
-capabilities = [{ kind = "tool", name = "broken.thing" }]

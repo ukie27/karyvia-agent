@@ -1,1 +1,0 @@
-{"model": {"name": "gpt-4o-mini", "provider": "openai"}, "plugins": {"enabled": ["openai-api"], "model-openai": {"secrets": {"api_key": "${OPENAI_API_KEY}"}}, "openai-api": {"config": {"port": 0, "model": "gpt-4o-mini"}}}}
