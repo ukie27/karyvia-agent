@@ -100,15 +100,14 @@ def test_disable_beats_enabled(tmp_path: Path) -> None:
     assert skipped.reason is SkipReason.DISABLED
 
 
-def test_an_enabled_but_disabled_plugin_still_hands_over_its_manifest(tmp_path: Path) -> None:
-    """`D30`：被关掉的插件仍然读一次 manifest，只为知道它覆盖过什么（`BAS-004`）。
-
-    没有这一份，`on_disable` 就无从判定——而不判定的话内建会在覆盖者被禁用后自动复活。
-    """
-    _plugin(tmp_path, "acme")
-    (skipped,) = _inventory(tmp_path, enabled=["acme"], disabled=["acme"]).skipped
-    assert skipped.manifest is not None
-    assert skipped.manifest.id == "acme"
+def test_an_enabled_but_disabled_plugin_is_not_read(tmp_path: Path) -> None:
+    """`disable` 是最终闸门；即使仍在 `enabled`，也不读取插件声明。"""
+    _plugin(tmp_path, "acme", "id = ")  # 读到就会产生 manifest 失败
+    inventory = _inventory(tmp_path, enabled=["acme"], disabled=["acme"])
+    assert not inventory.failures
+    (skipped,) = inventory.skipped
+    assert skipped.reason is SkipReason.DISABLED
+    assert skipped.manifest is None
 
 
 def test_a_disabled_plugin_that_was_never_enabled_is_not_read(tmp_path: Path) -> None:
@@ -123,16 +122,6 @@ def test_a_disabled_plugin_that_was_never_enabled_is_not_read(tmp_path: Path) ->
     (skipped,) = inventory.skipped
     assert skipped.reason is SkipReason.DISABLED
     assert skipped.manifest is None
-
-
-def test_a_broken_manifest_on_a_disabled_plugin_is_recorded_not_raised(tmp_path: Path) -> None:
-    """读不出来时如实记一条，插件仍按禁用处理——不为一个已经被关掉的插件让实例起不来。"""
-    _plugin(tmp_path, "acme", "id = ")
-    inventory = _inventory(tmp_path, enabled=["acme"], disabled=["acme"])
-    (failure,) = inventory.failures
-    assert failure.plugin_id == "acme"
-    (skipped,) = inventory.skipped
-    assert skipped.reason is SkipReason.DISABLED and skipped.manifest is None
 
 
 def test_an_unenabled_module_plugin_is_not_imported(tmp_path: Path) -> None:

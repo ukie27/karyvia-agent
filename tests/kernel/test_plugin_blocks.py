@@ -12,7 +12,7 @@ import json
 import pytest
 
 from nucleamind.contracts import ErrorCode, JsonValue, NucleaError
-from nucleamind.kernel.config import OnDisable, PluginEntry, validate_config
+from nucleamind.kernel.config import PluginEntry, validate_config
 from nucleamind.kernel.config.plugin_blocks import (
     ENTRY_KEYS,
     RESERVED_PLUGIN_KEYS,
@@ -87,25 +87,9 @@ def test_all_problems_are_reported_at_once() -> None:
     assert len(caught.value.detail["errors"]) == 2
 
 
-def test_entry_keys_are_exactly_config_secrets_and_on_disable() -> None:
-    """`on_override_failure`（§10.4）仍未落地——现在放行它等于让一个没人读的键
-    看起来生效了。`on_disable` 由 `D30` 兑现，因此它在表里。"""
-    assert ENTRY_KEYS == ("config", "secrets", "on_disable")
-
-
-def test_on_disable_only_accepts_the_two_documented_values() -> None:
-    """写错时不回落到任何一个：这个键存在的意义就是让用户表态（`BAS-004`）。"""
-    with pytest.raises(NucleaError) as caught:
-        validate_config(_plugins(acme={"on_disable": "restore"}))
-    pointers = [item["pointer"] for item in caught.value.detail["errors"]]
-    assert "/plugins/acme/on_disable" in pointers
-
-
-def test_on_disable_round_trips_as_an_enum() -> None:
-    config = validate_config(_plugins(acme={"on_disable": "leave_missing"}))
-    assert config.plugins.entry("acme").on_disable is OnDisable.LEAVE_MISSING
-    # 没写过的插件是 `None`，与「写了 restore_builtin」不是一回事。
-    assert config.plugins.entry("other").on_disable is None
+def test_entry_keys_are_exactly_config_and_secrets() -> None:
+    """未实现的策略键不能提前放行，否则用户会误以为配置已经生效。"""
+    assert ENTRY_KEYS == ("config", "secrets")
 
 
 def test_the_diagnostic_view_keeps_the_reference_literal() -> None:
@@ -116,8 +100,6 @@ def test_the_diagnostic_view_keeps_the_reference_literal() -> None:
     assert entries_to_json(config.plugins.entries)["acme"] == {
         "config": {},
         "secrets": {"api_key": "${OPENAI_API_KEY}"},
-        # 没表态时也印出来：缺席的键与值为 null 的键在 `/config` 里应当都读作「没表态」。
-        "on_disable": None,
     }
 
 

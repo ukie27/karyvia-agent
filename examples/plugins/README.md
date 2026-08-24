@@ -9,7 +9,7 @@
 | 目录 | 演示 |
 | --- | --- |
 | [`nucleamind-plugin-echo-tool`](./nucleamind-plugin-echo-tool) | 新增一项纯内存能力（TOOL） |
-| [`nucleamind-plugin-session-memory`](./nucleamind-plugin-session-memory) | 覆盖一项内建能力（SINGLETON 的 SESSION_STORE），以及 `on_disable` 语义 |
+| [`nucleamind-plugin-session-memory`](./nucleamind-plugin-session-memory) | 覆盖一项内建能力（SINGLETON 的 SESSION_STORE），以及 disable 优先语义 |
 
 两者都是完整独立发行包（`pyproject.toml` + `src/` + `tests/`），经 entry point 组
 `nucleamind.plugins` 被发现。**它们必须真的装进环境才会被发现**，仓库的测试套件

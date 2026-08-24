@@ -1605,24 +1605,13 @@ nm capabilities                                 # 报告中可见 provider 与 s
 覆盖内建能力时（例如插件提供 `session_store`），`ResolutionReport.shadowed` 中出现
 `(builtin:jsonl, plugin:session-pg)`，`nm capabilities` 明确打印，不静默替换（`8.3` 第 4 条）。
 
-禁用后是否恢复内建实现由 `plugins.<id>.on_disable`（`restore_builtin` / `leave_missing`）
-显式决定，Kernel 不隐式回退（`BAS-004`、`8.3` 第 5 条）。
+`plugins.disable` 压过 `plugins.enabled`。命中禁用列表的外部插件在读取 manifest 前就被
+跳过，因此不会导入代码、注册能力、声明覆盖或启动后台资源。若它此前覆盖了内建能力，
+覆盖关系在本次启动中不存在，未被单独禁用的内建实现按正常能力解析结果生效。
 
-`D30` 落地时把「显式」定成了硬的：**这个键没有默认值**。被禁用的插件在 manifest 里声明过
-`overrides` 而配置里没写 `on_disable` 时，启动以 `CONFIG_INVALID` 失败并指向
-`/plugins/<id>/on_disable`。理由是两个方向都会替用户做一个关于他数据的决定——不做判定时
-内建**自动**复活（被禁用的插件不注册，覆盖关系于是不存在），那正是 `BAS-004` 禁止的隐式
-恢复。没声明过覆盖的插件不要求表态，否则这个键会变成噪声。
-
-`leave_missing` 的实现是 registry 的**按能力抑制**（`resolve(suppressed=...)`）而不是声明
-过滤：被抑制的能力照常注册、照常留在 `ResolutionReport.disabled` 段里，只是不生效——
-`nm capabilities` 因此答得出「它为什么不在」，而一项从未注册过的能力在报告里连一行都没有。
-判定只在 `runtime/plugin_disable.py::suppressed_capabilities()` 一处，启动路径与
-`nm capabilities` 的只读路径调的是同一个。
-
-代价是**被 `plugins.disable` 关掉、但仍列在 `plugins.enabled` 里的插件要读一次 manifest**
-（只读声明，绝不 import `setup`）——不读就不知道它覆盖过什么。§7.1 的「未启用即零导入
-开销」没有松动：`plugins.enabled` 仍是「会不会被读」的唯一闸门。
+这条语义不需要 `on_disable` 或 Registry 的按能力抑制：禁用插件本身就是完整意图。若用户
+希望连内建实现也关闭，应把对应内建提供方明确加入 `plugins.disable`；必需能力缺失时启动
+按既有规则以 `CAPABILITY_MISSING` 失败。
 
 ### 10.5 卸载与数据
 
@@ -1891,7 +1880,7 @@ A0 是 M-A 全部完成判据的前提：「与重构前一致」这个标准依
 
 示例插件选择：**`nucleamind-plugin-echo-tool`（新增一个工具）+
 `nucleamind-plugin-session-memory`（覆盖内建 session store 为内存实现）**。
-后者专门用于验证覆盖路径与 `on_disable` 语义，风险低且能覆盖 SINGLETON arity。
+后者专门用于验证覆盖路径与 disable 优先语义，风险低且能覆盖 SINGLETON arity。
 
 完成判据（对应 §16.2）：
 

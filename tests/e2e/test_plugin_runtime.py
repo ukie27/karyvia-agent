@@ -241,96 +241,47 @@ def test_the_override_relation_is_printed_with_both_providers(
     assert shadowed.index("session_store:jsonl") < shadowed.index("session_store:memory")
 
 
-# ---------------------------------------- ④ 禁用后能力消失，恢复内建与否由 on_disable 决
+# --------------------------------------------- ④ disable 优先，默认能力自然恢复
 
 
-def _disabled(choice: str | None) -> dict[str, object]:
-    """启用又禁用同一个插件的那份配置。`choice` 为 `None` 表示不写 `on_disable`。"""
-    entry: dict[str, object] = {} if choice is None else {"on_disable": choice}
-    return {"enabled": [MEMORY_PLUGIN], "disable": [MEMORY_PLUGIN], MEMORY_PLUGIN: entry}
+def _disabled() -> dict[str, object]:
+    """启用和禁用同时存在时，禁用是最终意图。"""
+    return {"enabled": [MEMORY_PLUGIN], "disable": [MEMORY_PLUGIN]}
 
 
-def test_disabling_an_overriding_plugin_without_a_choice_is_refused(
-    instance_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """§16.2 第 4 条、`BAS-004`。禁用一个覆盖者之后**内建不得隐式复活**。
-
-    今天不做判定的话，被禁用的插件根本不注册、覆盖关系不存在，内建就自动回来了——那正是
-    `BAS-004` 禁止的隐式恢复。错误指向**那一个要写的键**，不是「配置有问题」。
-    """
-    monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
-    write_config(instance_dir, _disabled(None))
-
-    with pytest.raises(NucleaError) as caught:
-        asyncio.run(bootstrap(instance_dir=instance_dir))
-
-    assert caught.value.code is ErrorCode.CONFIG_INVALID
-    rendered = render(caught.value)
-    assert f"/plugins/{MEMORY_PLUGIN}/on_disable" in rendered
-    assert "session_store:jsonl" in rendered
-
-
-def test_restore_builtin_brings_the_jsonl_store_back(
+def test_disabling_an_overriding_plugin_brings_the_jsonl_store_back(
     instance_dir: Path, recorder: Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`restore_builtin`：用户明确说「退回去」，会话重新落盘。"""
+    """禁用覆盖者后，它不参与注册，内建会话存储正常生效。"""
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
-    write_config(instance_dir, _disabled("restore_builtin"))
+    write_config(instance_dir, _disabled())
     recorder.script(say("记住了。"))
 
     assert asyncio.run(run_prompt(instance_dir, "记住这句话")) == 0
 
     sessions = sorted((instance_dir / "sessions").glob("*.jsonl"))
-    assert sessions, "restore_builtin 之后会话应当重新落盘"
+    assert sessions, "覆盖插件被禁用后会话应当重新落盘"
     assert "记住这句话" in sessions[0].read_text(encoding="utf-8")
 
 
-def test_leave_missing_keeps_the_capability_gone(
+def test_disabled_overrider_is_absent_from_the_capability_report(
     instance_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`leave_missing`：那项能力保持缺失，实例以 `CAPABILITY_MISSING` 拒绝启动。
-
-    这**不是**事故——用户要的就是「现在没有会话存储了」，而 `SES-003` 不允许把没有历史
-    伪装成有历史。诊断指出缺的是哪一项。
-    """
+    """被禁用插件不注册能力，报告中只保留重新生效的内建实现。"""
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
-    write_config(instance_dir, _disabled("leave_missing"))
-
-    with pytest.raises(NucleaError) as caught:
-        asyncio.run(bootstrap(instance_dir=instance_dir))
-
-    assert caught.value.code is ErrorCode.CAPABILITY_MISSING
-    assert "SESSION_STORE" in render(caught.value)
-
-
-def test_leave_missing_shows_up_as_disabled_not_as_absent(
-    instance_dir: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """能力表里要**看得见它为什么不在**。
-
-    抑制作用在解析而不是注册上，因此内建照常注册、照常出现在报告里，只是标着「已禁用」。
-    一项从未注册过的能力在报告里连一行都没有，用户无从判断是没装还是被关了。
-    """
-    from nucleamind.runtime.plugin_disable import LEAVE_MISSING_REASON
-
-    monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
-    write_config(instance_dir, _disabled("leave_missing"))
+    write_config(instance_dir, _disabled())
 
     report = asyncio.run(inspect_capabilities(instance_dir=instance_dir)).report
     assert report is not None
-    disabled = {ref.name: reason for ref, reason in report.disabled}
-    assert disabled == {"jsonl": LEAVE_MISSING_REASON}
-    assert not [ref for ref in report.active if ref.kind.value == "session_store"]
+    sessions = [ref for ref in report.active if ref.kind.value == "session_store"]
+    assert [(ref.name, str(ref.provider)) for ref in sessions] == [("jsonl", "builtin")]
+    assert not report.disabled
 
 
-def test_a_disabled_plugin_without_overrides_needs_no_choice(
+def test_a_disabled_plugin_without_overrides_is_not_loaded(
     instance_dir: Path, recorder: Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`on_disable` 只在真的发生过覆盖时才要求表态。
-
-    `echo-tool` 只是新增一项工具，禁用它就是少一项工具——没有「要不要回来」这个问题，
-    为它也要求一次表态只会让这个键变成噪声。
-    """
+    """普通插件也遵循同一条规则：禁用后不加载、不注册能力。"""
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
     write_config(instance_dir, {"enabled": [ECHO_PLUGIN], "disable": [ECHO_PLUGIN]})
     recorder.script(say("好。"))
@@ -499,7 +450,7 @@ def test_history_written_before_the_override_is_still_readable_after_restoring(
 ) -> None:
     """§16.2 第 8 条：被覆盖能力的关键行为有回归。
 
-    三段：内建写一句 → 插件接管（那句不该出现在插件的内存里）→ `restore_builtin` 之后
+    三段：内建写一句 → 插件接管（那句不该出现在插件的内存里）→ 禁用插件之后
     原来那句仍然读得到。会话历史是用户资产，一次覆盖不该把它弄丢。
     """
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
@@ -517,7 +468,7 @@ def test_history_written_before_the_override_is_still_readable_after_restoring(
     # 插件接管期间那份 JSONL 一个字节都没动过。
     assert session.read_text(encoding="utf-8") == before
 
-    write_config(instance_dir, _disabled("restore_builtin"))
+    write_config(instance_dir, _disabled())
     recorder.script(say("第三句好了。"))
     assert asyncio.run(run_prompt(instance_dir, "第三句")) == 0
     after = session.read_text(encoding="utf-8")

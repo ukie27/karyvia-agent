@@ -24,7 +24,6 @@ from .capability import (
 from .resolution import (
     Resolution,
     ResolutionReport,
-    SuppressedCapabilities,
     resolve,
     resolve_into,
 )
@@ -38,7 +37,6 @@ __all__ = [
     "RegistrationBatch",
     "Resolution",
     "ResolutionReport",
-    "SuppressedCapabilities",
     "base_priority_for",
     "resolve",
     "resolve_into",

@@ -44,7 +44,6 @@ from .capability import CapabilityRegistry, Registration
 __all__ = [
     "Resolution",
     "ResolutionReport",
-    "SuppressedCapabilities",
     "resolve",
     "resolve_into",
 ]
@@ -52,11 +51,6 @@ __all__ = [
 #: 覆盖目标的定位键：`(kind, 目标提供方, 目标能力名)`。kind 取自**声明覆盖的那一方**，
 #: 因为覆盖目标串里不带 kind（技术方案 §7.2：重复编码只会多出一处可以对不上的信息）。
 _TargetKey = tuple[CapabilityKind, ProviderId, str]
-
-#: 「按能力禁用」的输入形状：定位键 -> 原因。与按提供方禁用共用 `_TargetKey`，因为要指认
-#: 的是同一个东西——一项具体能力。`D30` 引入，用于 `on_disable=leave_missing`
-#: （`BAS-004`）：被禁用的覆盖者留下的空缺不该由内建**隐式**补上。
-SuppressedCapabilities = Mapping[_TargetKey, str]
 
 #: 唯一性分组键：`(kind 值, 分组名)`。SINGLETON 的分组名恒为空串，见模块 docstring。
 _SlotKey = tuple[str, str]
@@ -198,19 +192,13 @@ class Resolution:
 def _partition_disabled(
     registrations: Sequence[Registration],
     disabled: Mapping[ProviderId, str],
-    suppressed: SuppressedCapabilities,
 ) -> tuple[list[tuple[int, Registration]], list[tuple[CapabilityRef, str]]]:
-    """按提供方与按能力切出被禁用的登记。返回 `(存活项, 禁用记录)`。
-
-    两种粒度合在一处判定，因为它们的后果完全相同——被切掉的登记既不生效也不参与冲突
-    判定，但都留在报告的 `disabled` 段里。提供方级先判：一个整体被关掉的提供方，再逐条
-    说明它的哪一项能力「另外还被抑制了一次」只会让诊断更难读。
-    """
+    """按提供方切出被禁用的登记。返回 `(存活项, 禁用记录)`。"""
     live: list[tuple[int, Registration]] = []
     disabled_out: list[tuple[CapabilityRef, str]] = []
     for index, registration in enumerate(registrations):
         ref = registration.ref
-        reason = disabled.get(ref.provider) or suppressed.get((ref.kind, ref.provider, ref.name))
+        reason = disabled.get(ref.provider)
         if reason is None:
             live.append((index, registration))
         else:
@@ -322,21 +310,14 @@ def resolve(
     registrations: Sequence[Registration],
     *,
     disabled: Mapping[ProviderId, str] | None = None,
-    suppressed: SuppressedCapabilities | None = None,
 ) -> Resolution:
     """从登记集合算出生效集合与报告。纯函数，不改动任何入参。
 
-    `disabled` 是「按提供方禁用」的输入（provider -> 原因），由配置层在 `D10` 填充。
-    `suppressed` 是「按能力禁用」的输入（`(kind, provider, name)` -> 原因），由 `D30` 的
-    `on_disable=leave_missing` 填充。被禁用的登记既不生效也不参与冲突判定，但会出现在
-    报告的 `disabled` 段里——「装了但没启用」和「没装」对排查是两回事。
-
-    **按能力禁用不是给覆盖开的后门**：它只能让一项能力消失，不能让某一方赢。谁覆盖谁
-    仍然只由 manifest 的 `overrides` 决定（`EDG-102`）。
+    `disabled` 是「按提供方禁用」的输入（provider -> 原因）。被禁用的登记既不生效也不
+    参与冲突判定，但会出现在报告的 `disabled` 段里——「装了但没启用」和「没装」对排查
+    是两回事。
     """
-    live, disabled_out = _partition_disabled(
-        registrations, dict(disabled or {}), dict(suppressed or {})
-    )
+    live, disabled_out = _partition_disabled(registrations, dict(disabled or {}))
     excluded, shadowed, override_failures = _apply_overrides(live)
     remaining = [(index, item) for index, item in live if index not in excluded]
     active, arity_failures = _apply_arity(remaining)
@@ -355,7 +336,6 @@ def resolve_into(
     registry: CapabilityRegistry,
     *,
     disabled: Mapping[ProviderId, str] | None = None,
-    suppressed: SuppressedCapabilities | None = None,
 ) -> ResolutionReport:
     """解析注册表并**冻结**它，返回报告。这是启动期的正常入口。
 
@@ -365,6 +345,6 @@ def resolve_into(
 
     **异常约定**：registry 已冻结抛 `KERNEL_INVARIANT_VIOLATED`（由 `freeze()` 抛出）。
     """
-    resolution = resolve(registry.registrations, disabled=disabled, suppressed=suppressed)
+    resolution = resolve(registry.registrations, disabled=disabled)
     registry.freeze(resolution.active)
     return resolution.report

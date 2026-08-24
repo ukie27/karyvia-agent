@@ -74,7 +74,7 @@ from .fields import (
     suggest,
 )
 from .merge import pointer_of
-from .plugin_blocks import OnDisable, PluginEntry
+from .plugin_blocks import PluginEntry
 
 if TYPE_CHECKING:
     from ...contracts import JsonValue
@@ -91,7 +91,6 @@ __all__ = [
     "MemorySection",
     "ModelSection",
     "NucleaConfig",
-    "OnDisable",
     "PluginEntry",
     "PluginsSection",
     "RetrySection",

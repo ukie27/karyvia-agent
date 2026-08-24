@@ -170,67 +170,6 @@ def test_disabled_provider_counts_as_missing_target() -> None:
     assert targets([ref for ref, _ in resolution.report.disabled]) == ["builtin:fs.read"]
 
 
-def test_a_suppressed_capability_is_disabled_without_touching_its_siblings() -> None:
-    """按能力抑制（`D30` 的 `on_disable=leave_missing`）：只让**那一项**消失。
-
-    按提供方禁用会把内建的一切一起关掉，而 `leave_missing` 要的是「被顶掉的那一项保持
-    缺失」。两种粒度的后果相同（既不生效也不参与冲突判定，但都留在 `disabled` 段里），
-    作用范围不同。
-    """
-    resolution = resolve(
-        [
-            make(CapabilityKind.TOOL, "fs.read", Builtin()),
-            make(CapabilityKind.TOOL, "fs.write", Builtin()),
-        ],
-        suppressed={(CapabilityKind.TOOL, Builtin(), "fs.read"): "覆盖它的插件已被禁用"},
-    )
-
-    assert targets(resolution.report.active) == ["builtin:fs.write"]
-    assert resolution.report.disabled == (
-        (resolution.report.disabled[0][0], "覆盖它的插件已被禁用"),
-    )
-    assert targets([ref for ref, _ in resolution.report.disabled]) == ["builtin:fs.read"]
-
-
-def test_suppression_cannot_hand_the_slot_to_someone_else() -> None:
-    """按能力抑制**不是给覆盖开的后门**：它只能让能力消失，不能让某一方赢。
-
-    抑制掉一个 SINGLETON 槽位里的一方之后，剩下那一方仍然只在自己合法时生效——这里两方
-    都没声明覆盖，抑制掉内建之后插件那一份成为唯一实现，因此它生效；而如果抑制的是插件
-    那一份，冲突同样消失。**关键是没有任何一步把「谁覆盖谁」从 `overrides` 手里拿走。**
-    """
-    registrations = [
-        make(CapabilityKind.SESSION_STORE, "jsonl", Builtin()),
-        make(CapabilityKind.SESSION_STORE, "memory", ACME),
-    ]
-    # 不抑制：SINGLETON 两份实现且无人声明覆盖 —— 双方都不生效。
-    assert codes(resolve(registrations).report) == [
-        ErrorCode.PLUGIN_REGISTRATION_CONFLICT.value
-    ]
-    # 抑制掉内建那一份：冲突消失，插件那一份生效。
-    resolution = resolve(
-        registrations,
-        suppressed={(CapabilityKind.SESSION_STORE, Builtin(), "jsonl"): "已抑制"},
-    )
-    assert resolution.report.ok
-    assert targets(resolution.report.active) == ["plugin:acme:memory"]
-
-
-def test_provider_level_disable_wins_over_capability_level() -> None:
-    """两种粒度都命中时只记一条原因，而且是提供方级那一条。
-
-    一个整体被关掉的提供方，再逐条说明它的哪一项能力「另外还被抑制了一次」只会让诊断
-    更难读。
-    """
-    resolution = resolve(
-        [make(CapabilityKind.TOOL, "fs.read", Builtin())],
-        disabled={Builtin(): "整个提供方被禁用"},
-        suppressed={(CapabilityKind.TOOL, Builtin(), "fs.read"): "按能力抑制"},
-    )
-
-    assert [reason for _, reason in resolution.report.disabled] == ["整个提供方被禁用"]
-
-
 # ------------------------------------------------------------- 第 3 行：覆盖冲突
 
 

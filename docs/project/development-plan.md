@@ -1101,7 +1101,7 @@ docs/ 插件开发入门文档
 
 **要点**（技术方案 §13 M4）
 
-`session-memory` 专门用于验证 SINGLETON arity 的覆盖路径与 `on_disable` 语义，
+`session-memory` 专门用于验证 SINGLETON arity 的覆盖路径与 disable 优先语义，
 风险低且覆盖面关键。
 
 **验收** —— 逐条对应需求 §16.2 的八个里程碑条件：
@@ -1111,7 +1111,7 @@ docs/ 插件开发入门文档
 | 1 | 不修改 engine / orchestrator 即可加载外部插件 |
 | 2 | 插件注册的工具参与真实 turn |
 | 3 | 覆盖内建 session store，`nm capabilities` 显示 shadowed 关系 |
-| 4 | 禁用后能力消失；恢复内建与否由 `on_disable` 显式配置决定 |
+| 4 | 禁用覆盖插件后插件能力退出，未被单独禁用的内建能力重新生效 |
 | 5 | 配置错误 / SDK 不兼容 / 运行失败三类各有稳定错误码与诊断输出 |
 | 6 | 示例插件不 import `nucleamind.kernel.*` |
 | 7 | 内建与插件 session store 通过同一套 `SessionStoreContract` |

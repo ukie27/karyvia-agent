@@ -30,7 +30,6 @@ from nucleamind.contracts import (
 from nucleamind.kernel.config import InstanceLayout, NucleaConfig
 from nucleamind.kernel.observability import EventBus
 from nucleamind.kernel.plugins import LoadOutcome, PluginLifecycle, PluginPhase
-from nucleamind.kernel.registry import SuppressedCapabilities
 from nucleamind.sdk import CapabilityDecl, PluginContext, PluginManifest
 
 from .inventory import PluginInventory
@@ -174,7 +173,6 @@ async def wire_all(
     *,
     builtin_cli_only: bool = False,
     external_ids: Collection[str] = (),
-    suppressed: SuppressedCapabilities | None = None,
 ) -> Wiring:
     """让内建与外部插件经同一 Host、配置和能力筛选路径完成注册。
 
@@ -221,7 +219,6 @@ async def wire_all(
         context_for=context_for,
         provider_for=provider_for,
         keep=keep_with_cli,
-        suppressed=suppressed,
     )
     _raise_builtin_failure(manifests, wiring.outcomes)
     return wiring

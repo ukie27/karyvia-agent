@@ -46,7 +46,6 @@ from .plugin_bootstrap import (
     wire_all,
 )
 from .plugin_context import PluginRuntime
-from .plugin_disable import suppressed_capabilities
 from .plugin_home import GlobalPluginHome
 from .plugin_plan import discover_plugins
 from .selection import require_sessions
@@ -199,9 +198,6 @@ async def inspect_capabilities(
             env,
             resources.contexts,
             external_ids=[manifest.id for manifest in plan.manifests],
-            # `on_disable=leave_missing` 抑制掉的能力在这里同样要缺席，否则
-            # 诊断与真实启动必须应用同一份能力抑制规则，否则报告会展示不可用的能力。
-            suppressed=suppressed_capabilities(inventory, loaded.config),
         )
     finally:
         await resources.rollback(timeout_ms=loaded.config.plugins.stop_timeout_ms)

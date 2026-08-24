@@ -40,7 +40,6 @@ from nucleamind.kernel.registry import (
     CapabilityRegistry,
     RegistrationBatch,
     ResolutionReport,
-    SuppressedCapabilities,
     resolve_into,
 )
 from nucleamind.sdk import CapabilityDecl, NucleaAPI, PluginContext, PluginManifest
@@ -133,7 +132,6 @@ async def wire_capabilities(
     provider_for: Callable[[PluginManifest], ProviderId] = builtin_provider,
     resolve_setup: Callable[[str], SetupFn] = import_setup,
     disabled: Mapping[ProviderId, str] | None = None,
-    suppressed: SuppressedCapabilities | None = None,
     keep: CapabilityFilter | None = None,
 ) -> Wiring:
     """注册全部 manifest 声明的能力 → 解析覆盖 → 冻结，返回装配产物。
@@ -147,11 +145,6 @@ async def wire_capabilities(
 
     `keep` 按配置裁掉本次不生效的能力声明（`TOL-006`，见 `to_load_request()`）。它对
     每一份 Manifest 一视同仁，不存在某个内建工具专用的裁剪路径。
-
-    `suppressed` 按**能力**抑制（`on_disable=leave_missing`，见
-    `runtime/plugin_disable.py`）。与 `keep` 的区别是它作用在解析而不是注册上：那项能力
-    照常注册、照常出现在报告里，只是标着「被禁用」而不生效。这是刻意的——`nm capabilities`
-    要答得出「它为什么不在」，而一项从未注册过的能力在报告里连一行都没有。
 
     **异常约定**：提供方加载失败记进 `Wiring.outcomes`；覆盖冲突不抛，进
     `report.failures` 由调用方处置。
@@ -181,5 +174,5 @@ async def wire_capabilities(
     outcomes = await load_into(
         registry, requests, host_for=host_for, resolve_setup=resolve_setup
     )
-    report = resolve_into(registry, disabled=disabled, suppressed=suppressed)
+    report = resolve_into(registry, disabled=disabled)
     return Wiring(registry=registry, report=report, outcomes=outcomes)

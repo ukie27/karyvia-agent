@@ -15,9 +15,8 @@
 连 manifest 都不读，因此不产生任何导入开销（`NFR-401`、`DST-002`）。可观察的后果是
 它们的 `version` 是空串——那不是漏填，正是这条设计的证据。
 
-**已启用但被 `plugins.disable` 关掉的候选是例外**（`D30`）：它的 manifest 仍然被读一次，
-只为知道它曾经覆盖过什么（`BAS-004`，见 `_disabled()`）。闸门没有变——`plugins.enabled`
-仍然是「会不会被读」的唯一入口，`disable` 只决定「读了之后跑不跑」。
+`plugins.disable` 压过 `plugins.enabled`：被禁用的候选不读取 manifest，因此插件代码、
+能力声明和覆盖声明都不会进入本次启动。
 """
 
 from __future__ import annotations
@@ -224,38 +223,6 @@ def _validate(candidate: PluginCandidate, manifest: PluginManifest) -> None:
         )
 
 
-def _disabled(
-    candidate: PluginCandidate, failures: list[PluginFailure], *, enabled: set[str]
-) -> SkippedPlugin:
-    """一个被 `plugins.disable` 关掉的候选。**已启用的那些仍然读一次 manifest**（`D30`）。
-
-    读它只为一件事：知道它**曾经覆盖过**什么。`BAS-004` 不允许「禁用覆盖者之后内建
-    悄悄复活」，而那条隐式回退之所以看起来自然，正是因为不读 manifest 就没人知道发生过
-    覆盖。判定在 `runtime/plugin_disable.py`，本函数只负责把 manifest 交出去。
-
-    **只读已启用的那些**，因此 §7.1 的「未启用即零导入开销」一个字都没松动：
-    `plugins.enabled` 仍然是「会不会被读」的唯一闸门，`disable` 只决定「读了之后跑不跑」。
-    一个只写在 `disable` 里、从来没被启用过的候选不可能覆盖过任何东西，读它没有意义。
-
-    **读不出来不是启动失败**：一份坏掉的 manifest 记进 `failures`（`/plugins` 会印出来），
-    插件仍然按禁用处理。它的代价是这一个插件的 `on_disable` 判定做不了——如实记着，
-    比为了一个已经被关掉的插件让实例起不来更合理。
-    """
-    manifest: PluginManifest | None = None
-    if candidate.plugin_id in enabled:
-        try:
-            manifest = _as_manifest(candidate, read_candidate(candidate))
-            _validate(candidate, manifest)
-        except NucleaError as error:
-            failures.append(
-                PluginFailure(
-                    error=error, plugin_id=candidate.plugin_id, origin=candidate.origin
-                )
-            )
-            manifest = None
-    return SkippedPlugin(candidate=candidate, reason=SkipReason.DISABLED, manifest=manifest)
-
-
 def build_inventory(
     *,
     enabled: Sequence[str] = (),
@@ -295,7 +262,7 @@ def build_inventory(
         # 顺序是「先筛后读」，这正是「未启用即零导入开销」的实现方式。`disable` 压过
         # `enabled`：两张表都写了它时，禁用是那个更晚、更明确的意图。
         if candidate.plugin_id in disabled_ids:
-            skipped.append(_disabled(candidate, failures, enabled=enabled_ids))
+            skipped.append(SkippedPlugin(candidate=candidate, reason=SkipReason.DISABLED))
             continue
         if candidate.plugin_id not in enabled_ids:
             skipped.append(SkippedPlugin(candidate=candidate, reason=SkipReason.NOT_ENABLED))

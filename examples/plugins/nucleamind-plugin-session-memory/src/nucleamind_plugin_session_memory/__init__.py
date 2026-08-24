@@ -9,11 +9,8 @@
 替换**必须**在 manifest 里显式声明 `overrides`（`EDG-102`：覆盖永不由加载顺序决定）。
 装上一个插件就悄悄换掉用户的会话历史后端，是这套设计明确要堵的路。
 
-**禁用它之后会发生什么由配置决定**（`BAS-004`、技术方案 §10.4）：把 `session-memory` 写进
-`plugins.disable` 时，`plugins.session-memory.on_disable` 必须显式写成
-`restore_builtin`（内建 JSONL 存储回来）或 `leave_missing`（会话存储保持缺失，实例以
-`CAPABILITY_MISSING` 拒绝启动）。不写就是配置错误——Kernel 不替用户决定他的对话历史
-落在哪里。
+把 `session-memory` 写进 `plugins.disable` 后，Runtime 不加载本插件，它的覆盖声明也不
+参与本次启动；未被单独禁用的内建 JSONL 存储正常生效。
 
 **只 import `nucleamind.contracts` 与 `nucleamind.sdk`**（依赖规则 `R4`）。
 """

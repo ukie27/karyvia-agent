@@ -353,42 +353,8 @@ def _disable(layout: InstanceLayout, args: Sequence[str]) -> int:
         return 3
     write_document(layout.config_path, edit.document)
     sys.stdout.write(f"{plugin_id}: 已写入 plugins.disable。\n")
-    sys.stdout.write(_on_disable_hint(layout, plugin_id))
     sys.stdout.write(_RESTART_HINT + "\n")
     return 0
-
-
-def _on_disable_hint(layout: InstanceLayout, plugin_id: str) -> str:
-    """刚被禁用的插件覆盖过别的能力时，提前把 `on_disable` 那条要求说出来（`D30`）。
-
-    不说的话用户看到的是「已写入」，然后下一次启动以 `CONFIG_INVALID` 失败。判定**不在
-    这里重写**——它只有 `runtime/plugin_disable.py` 一处，这里只是把同一件事提前一步告诉
-    用户，因此写没写 `on_disable` 都印同一段话。
-
-    读不出清单时（配置在别处坏了、插件包已经卸了）**不提示也不失败**：这条命令的正事
-    已经做完了，为一句提示让它失败是本末倒置。
-    """
-    from ...plugin_disable import override_targets
-
-    try:
-        inventory = inspect_plugins(instance_dir=layout.root).inventory
-    except NucleaError:
-        return ""
-    overridden: list[str] = []
-    for item in inventory.skipped:
-        if item.candidate.plugin_id != plugin_id:
-            continue
-        manifest = item.manifest
-        if manifest is None:
-            continue
-        overridden.extend(target.target for target in override_targets(manifest))
-    if not overridden:
-        return ""
-    return (
-        f"它覆盖过 {'、'.join(overridden)}，因此还要说明那项能力怎么办：\n"
-        f'  在 config.json 的 plugins.{plugin_id} 里写 "on_disable"——\n'
-        "  restore_builtin（被顶掉的实现重新生效）或 leave_missing（保持缺失）。\n"
-    )
 
 
 # ----------------------------------------------------------------------- purge

@@ -81,7 +81,6 @@ from .plugin_bootstrap import (
     wire_all,
 )
 from .plugin_context import PluginRuntime, RuntimePluginContext
-from .plugin_disable import suppressed_capabilities
 from .plugin_home import GlobalPluginHome
 from .plugin_plan import discover_plugins
 from .selection import (
@@ -107,7 +106,6 @@ __all__ = [
     "require_sessions",
     "select_manifests",
     "select_recall",
-    "suppressed_capabilities",
     "wire_all",
 ]
 
@@ -238,10 +236,6 @@ async def _build_instance(
         inventory, config, layout, loaded.workspace_root, bus, selected
     )
     external_ids = [manifest.id for manifest in plan.manifests]
-    # 被禁用的覆盖者留下的空缺：`BAS-004` 不允许内建在这里**隐式**复活，因此用户必须
-    # 对每一条 `on_disable` 表态。判定在配置层与注册之间——它是配置错误，不该等到
-    # 一次白跑的 `setup()` 之后才报出来。
-    suppressed = suppressed_capabilities(inventory, config)
     # 内建在前、外部插件按拓扑序在后。顺序只保证「被依赖者先 setup」，覆盖由 manifest 的
     # `overrides` 决定（`EDG-102`）。
     all_manifests = (*selected, *plan.manifests)
@@ -259,7 +253,6 @@ async def _build_instance(
         env,
         resources.contexts,
         external_ids=external_ids,
-        suppressed=suppressed,
     )
     if cli_entry_from(wiring.registry) is None and any(
         decl.kind is CapabilityKind.CLI_ENTRY
@@ -285,7 +278,6 @@ async def _build_instance(
             resources.contexts,
             builtin_cli_only=True,
             external_ids=external_ids,
-            suppressed=suppressed,
         )
     for outcome in wiring.outcomes:
         bus.publish(

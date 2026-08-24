@@ -220,27 +220,22 @@ DECL = CapabilityDecl(
    两边都带提供方标识。
 3. **覆盖目标不存在不会降级成新增注册**，而是 `CAPABILITY_OVERRIDE_TARGET_MISSING`。
 
-### 被禁用之后：`on_disable`
+### 被禁用之后
 
-覆盖了别人的插件被写进 `plugins.disable` 时，用户**必须**说清被顶掉的那一项怎么办：
+插件被写进 `plugins.disable` 后，Runtime 不读取其 manifest、不执行 `setup()`，也不注册
+它的任何能力：
 
 ```json
 {
   "plugins": {
-    "disable": ["my-plugin"],
-    "my-plugin": { "on_disable": "restore_builtin" }
+    "enabled": ["my-plugin"],
+    "disable": ["my-plugin"]
   }
 }
 ```
 
-| 取值 | 结果 |
-| --- | --- |
-| `restore_builtin` | 被顶掉的实现重新生效 |
-| `leave_missing` | 那项能力保持缺失；是必需能力时实例以 `CAPABILITY_MISSING` 拒绝启动 |
-| 不写 | 配置错误，指向 `/plugins/<id>/on_disable` |
-
-不写就报错看起来严格，但它兑现的是「内建默认能力被禁用或覆盖后，Kernel 不得隐式恢复」。
-用户可能正是因为不想要那份内建实现才装的你的插件。
+`disable` 压过 `enabled`。如果该插件原本覆盖了内建能力，覆盖关系随插件一起退出本次启动，
+未被单独禁用的内建实现会正常生效。这里没有额外的恢复策略键；禁用插件本身就是完整意图。
 
 ## 7.5 能力名要连上外部服务才知道：命名空间声明
 

@@ -180,8 +180,7 @@ MANIFEST: Final = PluginManifest(
     version="0.1.0",
     sdk_range=">=4.0.0,<5.0.0",
     setup="nucleamind_plugin_anthropic:setup",
-    # **不写 `overrides`**：本插件与内建 `openai` 并存而不是取代它，因此 `D30` 的
-    # `on_disable` 表态要求不适用（那条只对声明过覆盖的插件生效）。
+    # **不写 `overrides`**：本插件与内建 `openai` 并存而不是取代它。
     # **也不写 `priority`**：默认值 100 会被原样采纳，而内建基准是 0（`D16` 记的坑）。
     capabilities=(CapabilityDecl(kind=CapabilityKind.MODEL, name=CAPABILITY_NAME),),
     config_schema=CONFIG_SCHEMA,

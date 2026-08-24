@@ -258,7 +258,7 @@ nm config show --origins
 
 ## 7. 插件的配置块
 
-`plugins` 小节里除四个保留键之外的每个键都是插件 id，它下面最多三个键：
+`plugins` 小节里除三个保留键之外的每个键都是插件 id，它下面最多两个键：
 
 ```json
 {
@@ -268,9 +268,6 @@ nm config show --origins
     "model-openai": {
       "config":  { "base_url": "https://api.openai.com/v1", "auth": "bearer" },
       "secrets": { "api_key": "${OPENAI_API_KEY}" }
-    },
-    "session-pg": {
-      "on_disable": "restore_builtin"
     }
   }
 }
@@ -280,17 +277,11 @@ nm config show --origins
 | --- | --- |
 | `config` | 交给插件的配置。逐字段的校验用插件 manifest 自带的 `config_schema` |
 | `secrets` | 凭据。值**只能是 `${VAR}` 形态的字符串**，明文由 `ctx.secret()` 在调用时从环境变量取 |
-| `on_disable` | 只对**声明过 `overrides` 的插件**有意义，取值 `"restore_builtin"` / `"leave_missing"` |
 
 **`secrets` 与 `config` 分开是结构性保证**：凭据不在插件自己的配置块里，因此
 `ctx.config` 交给插件的那份东西里根本没有可泄漏的内容。`model-openai` 的 `config_schema`
 里也就没有 `api_key` 这个键。
 
-**`on_disable` 必须显式表态**：禁用一个覆盖了内建能力的插件时，不写这个键即
-`CONFIG_INVALID` 并指向那一个键。默认值是刻意没有的——不做判定的话，被禁用的插件根本不
-注册、覆盖关系不存在，内建就自动复活了，而那是被禁止的隐式恢复。
-没声明过覆盖的插件不要求表态，否则这个键会变成噪声。
-
-- `restore_builtin`：内建重新生效。
-- `leave_missing`：那条能力照常注册但**被抑制**，因此 `nm capabilities` 答得出
-  「它为什么不在」——一项从未注册过的能力在报告里连一行都没有。
+`plugins.disable` 压过 `plugins.enabled`。一个外部插件同时出现在两张表中时，Runtime
+不会读取或加载它，它声明的覆盖关系也不会进入本次启动；原本未被单独禁用的内建能力因此
+正常生效。要重新启用插件，使用 `nm plugins enable <id>`，它会从 `disable` 中移除该 id。

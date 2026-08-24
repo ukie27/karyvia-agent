@@ -271,7 +271,6 @@ def test_global_uninstall_clears_every_known_instance(tmp_path: Path) -> None:
                 "disable": ["alpha"],
                 "alpha": {
                     "config": {},
-                    "on_disable": "restore_builtin",
                 },
             },
         )
@@ -401,14 +400,10 @@ def test_capabilities_prints_the_shadowed_relation(
     assert "生效能力" in out
 
 
-def test_disabling_an_overriding_plugin_says_a_choice_is_needed(
+def test_disabling_an_overriding_plugin_needs_no_extra_choice(
     instance: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`D30`：禁用一个覆盖者之后还欠一个 `on_disable`，提前说出来。
-
-    不说的话用户看到的是「已写入」然后下一次启动以 `CONFIG_INVALID` 失败。判定仍然只有
-    `runtime/plugin_disable.py` 一处，这里只是提前一步告诉他。
-    """
+    """禁用本身就是完整意图，不需要再配置覆盖能力如何处理。"""
     monkeypatch.setenv("NM_TEST_KEY", "sk-0123456789abcdef")
     package = instance / "ext" / "shadow"
     package.mkdir(parents=True)
@@ -420,29 +415,8 @@ def test_disabling_an_overriding_plugin_says_a_choice_is_needed(
     assert app(_args(instance, "plugins", "disable", "shadow")) == 0
 
     out = capsys.readouterr().out
-    assert "on_disable" in out
-    assert "session_store:jsonl ← builtin" in out
-    assert "restore_builtin" in out and "leave_missing" in out
-
-
-def test_disabling_a_plugin_without_overrides_says_nothing_extra(
-    instance: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    """没覆盖过任何东西时不提——这个键对它没有意义，提了就是噪声。"""
-    package = instance / "ext" / "shadow"
-    package.mkdir(parents=True)
-    (package / "plugin.toml").write_text(
-        "\n".join(
-            line for line in _OVERRIDE_MANIFEST.splitlines() if not line.startswith("overrides")
-        ),
-        encoding="utf-8",
-    )
-    _register_manifest(package / "plugin.toml")
-    assert app(_args(instance, "plugins", "enable", "shadow")) == 0
-    capsys.readouterr()
-
-    assert app(_args(instance, "plugins", "disable", "shadow")) == 0
-    assert "on_disable" not in capsys.readouterr().out
+    assert "已写入 plugins.disable" in out
+    assert "on_disable" not in out
 
 
 def test_capabilities_json_round_trips(

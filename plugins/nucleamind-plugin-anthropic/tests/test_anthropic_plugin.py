@@ -404,7 +404,7 @@ class TestManifest:
         decl = MANIFEST.capabilities[0]
         assert decl.kind is CapabilityKind.MODEL
         assert decl.name == CAPABILITY_NAME
-        # 与内建 `openai` 并存而不是取代它，因此 `D30` 的 `on_disable` 表态要求不适用。
+        # 与内建 `openai` 并存而不是取代它。
         assert decl.overrides is None
 
     def test_priority_is_not_declared(self) -> None:

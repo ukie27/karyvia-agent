@@ -24,7 +24,6 @@ api_key`）也是它。代价是保留键与插件 id 共用一个命名空间�
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Final, Mapping
 
@@ -39,11 +38,9 @@ __all__ = [
     "CONFIG_KEY",
     "ENTRY_KEYS",
     "NO_PLUGIN_ENTRIES",
-    "ON_DISABLE_KEY",
     "PLUGINS_SECTION",
     "RESERVED_PLUGIN_KEYS",
     "SECRETS_KEY",
-    "OnDisable",
     "PluginEntry",
     "entries_to_json",
     "validate_plugin_entries",
@@ -63,32 +60,8 @@ RESERVED_PLUGIN_KEYS: Final = ("enabled", "disable", "stop_timeout_ms")
 CONFIG_KEY: Final = "config"
 SECRETS_KEY: Final = "secrets"
 
-#: 覆盖者被禁用时的显式策略（§10.4、`BAS-004`）。未实现的键不得提前放行，否则用户会
-#: 误以为配置已经生效。
-ON_DISABLE_KEY: Final = "on_disable"
-
 #: 一个插件条目允许的键。
-ENTRY_KEYS: Final = (CONFIG_KEY, SECRETS_KEY, ON_DISABLE_KEY)
-
-
-class OnDisable(StrEnum):
-    """一个被禁用的插件**曾经覆盖过**的能力该怎么办（技术方案 §10.4、`BAS-004`）。
-
-    只在被禁用的插件在 manifest 里声明了 `overrides` 时才有意义，其余情况下这个键写不写
-    都一样——它回答的问题「那项被顶掉的实现要不要回来」在没有覆盖时根本不存在。
-
-    **没有默认值是刻意的**：`BAS-004` 写死「内建默认能力被禁用或覆盖后，Kernel 不得回退到
-    内建实现，也不得因缺少内建实现而隐式恢复」。而禁用一个覆盖者之后内建**自动**复活恰恰
-    是那条隐式回退——它之所以看起来自然，只是因为被禁用的插件根本没被注册，覆盖关系于是
-    不存在了。因此判定不在这里，而在 `runtime/plugin_disable.py`：声明过覆盖却没写这个键
-    时**拒绝启动**，让用户自己说一句。
-    """
-
-    #: 被顶掉的那份实现重新生效（用户明确说「我要退回去」）。
-    RESTORE_BUILTIN = "restore_builtin"
-    #: 那项能力保持缺失。必需能力因此会在 §10.1 步骤 8 以 `CAPABILITY_MISSING` 报出来，
-    #: 那是一条正确的诊断而不是事故：用户要的就是「这项能力现在没有了」。
-    LEAVE_MISSING = "leave_missing"
+ENTRY_KEYS: Final = (CONFIG_KEY, SECRETS_KEY)
 
 
 #: 空块的共享实例。`field(default_factory=dict)` 会让类型退化成 `dict[Unknown, Unknown]`，
@@ -106,13 +79,10 @@ class PluginEntry:
     加载期解析等于把明文提前搬进进程里一份，而 `EDG-502` 要的是「缺哪个变量」这条诊断
     在真正取用时给出。
 
-    `on_disable` 为 `None` 表示**用户没写**，与「写了 restore_builtin」是两回事：
-    前者在需要表态时是一条配置错误，后者是一个决定（见 `OnDisable`）。
     """
 
     config: Mapping[str, JsonValue] = _EMPTY_CONFIG
     secrets: Mapping[str, str] = _EMPTY_SECRETS
-    on_disable: OnDisable | None = None
 
 
 #: 「一个插件条目都没配」的共享空表，`PluginsSection.entries` 的默认值。放在这里而不是
@@ -140,27 +110,6 @@ def _validate_secrets(
             continue
         values[name] = value
     return values
-
-
-def _validate_on_disable(
-    plugin_id: str, raw: JsonValue, issues: list[NucleaError]
-) -> OnDisable | None:
-    """取值只能是 `OnDisable` 的两个成员之一。
-
-    写错时**不回落到任何一个**：这个键存在的全部意义就是让用户表态，把 `"restore"`
-    这种拼错静默当成 `restore_builtin` 会让表态变回猜测。
-    """
-    choices = [member.value for member in OnDisable]
-    if isinstance(raw, str) and raw in choices:
-        return OnDisable(raw)
-    issues.append(
-        issue(
-            ErrorCode.CONFIG_INVALID,
-            f"on_disable 只能是 {'、'.join(choices)} 之一。",
-            pointer_of([PLUGINS_SECTION, plugin_id, ON_DISABLE_KEY]),
-        )
-    )
-    return None
 
 
 def _validate_entry(
@@ -201,12 +150,7 @@ def _validate_entry(
         config = {str(key): value for key, value in raw_config.items()}
 
     secrets = _validate_secrets(plugin_id, raw["secrets"], issues) if "secrets" in raw else {}
-    on_disable = (
-        _validate_on_disable(plugin_id, raw[ON_DISABLE_KEY], issues)
-        if ON_DISABLE_KEY in raw
-        else None
-    )
-    return PluginEntry(config=config, secrets=secrets, on_disable=on_disable)
+    return PluginEntry(config=config, secrets=secrets)
 
 
 def entries_to_json(
@@ -217,14 +161,11 @@ def entries_to_json(
     `secrets` 原样交出 `${VAR}` 字面量——那里从来就没有明文，`/config` 的脱敏因此是
     结构性成立的。按 id 排序，让 `nm config show` 的输出可比对。
 
-    `on_disable` 没写时交出 `None` 而不是省掉这个键：`/config` 是用来回答「现在生效的是
-    什么」的，一个缺席的键与一个值为 null 的键在那份输出里应当都读作「没表态」。
     """
     return {
         plugin_id: {
             "config": dict(entry.config),
             "secrets": dict(entry.secrets),
-            ON_DISABLE_KEY: None if entry.on_disable is None else entry.on_disable.value,
         }
         for plugin_id, entry in sorted(entries.items())
     }
