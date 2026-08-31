@@ -13,20 +13,23 @@
 from __future__ import annotations
 
 import asyncio
+from typing import Generic, TypeVar
 
-from nucleamind.contracts import CancelReason, ErrorCode, NucleaError, TurnId
+from nucleamind.contracts import CancelReason, TurnId
 
 from .cancel import CancelToken
 
 __all__ = ["TurnTracker"]
 
+_T = TypeVar("_T")
 
-class TurnTracker:
+
+class TurnTracker(Generic[_T]):
     """记录准入提交和实际运行的 Turn，并协调有界停止。"""
 
     def __init__(self) -> None:
         self._accepting = True
-        self._submissions: set[asyncio.Task[object]] = set()
+        self._submissions: set[asyncio.Future[_T]] = set()
         self._live: dict[TurnId, CancelToken] = {}
         self._idle = asyncio.Event()
         self._idle.set()
@@ -39,19 +42,19 @@ class TurnTracker:
     def live_turns(self) -> tuple[TurnId, ...]:
         return tuple(self._live)
 
-    def enter_submission(self) -> asyncio.Task[object]:
-        """登记一次已通过停机门槛的 `handle()` 调用。"""
-        task = asyncio.current_task()
-        if task is None:
-            raise NucleaError(
-                ErrorCode.KERNEL_INVARIANT_VIOLATED,
-                "Turn 必须运行在受管理的 asyncio Task 中。",
-            )
+    def completed(self, result: _T) -> asyncio.Future[_T]:
+        """返回一个不创建额外 Task 的已完成结果。"""
+        future: asyncio.Future[_T] = asyncio.get_running_loop().create_future()
+        future.set_result(result)
+        return future
+
+    def track_submission(self, task: asyncio.Future[_T]) -> None:
+        """登记 Orchestrator 创建的提交任务，并在完成时自动摘除。"""
         self._submissions.add(task)
         self._idle.clear()
-        return task
+        task.add_done_callback(self._submission_done)
 
-    def leave_submission(self, task: asyncio.Task[object]) -> None:
+    def _submission_done(self, task: asyncio.Future[_T]) -> None:
         self._submissions.discard(task)
         if not self._submissions:
             self._idle.set()

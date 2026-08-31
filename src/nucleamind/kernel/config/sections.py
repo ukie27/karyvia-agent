@@ -26,7 +26,6 @@ from typing import TYPE_CHECKING, Mapping
 from . import plugin_blocks as blocks
 from .defaults import (
     DEFAULT_CHANNEL_CONCURRENCY,
-    DEFAULT_CHANNEL_QUEUE_MAX_SIZE,
     DEFAULT_COMMAND_PREFIX,
     DEFAULT_COMPACTOR_TIMEOUT_MS,
     DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS,
@@ -118,11 +117,8 @@ class RoutingSection:
     queue_max_size: int = DEFAULT_QUEUE_MAX_SIZE
     dedup_capacity: int = DEFAULT_DEDUP_CAPACITY
     dedup_ttl_ms: int = DEFAULT_DEDUP_TTL_MS
-    #: 一条 Channel 上同时活跃的 conversation 上限。它是**饱和护栏**而不是
-    #: 调优旋钮，因此没有「不限」哨兵。
+    #: 单条 Channel 的总在途消息上限；不参与 Session 的三种并发策略。
     channel_concurrency: int = DEFAULT_CHANNEL_CONCURRENCY
-    #: 单个 conversation 在 Channel 泵里的排队上限；超出即拒绝并回音（`EDG-202`）。
-    channel_queue_max_size: int = DEFAULT_CHANNEL_QUEUE_MAX_SIZE
 
 
 @dataclass(frozen=True, slots=True)

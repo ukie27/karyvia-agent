@@ -1,5 +1,4 @@
-"""Turn 编排：准入、Context 组装、事件发布与持久化。
-职责：Turn 准入、执行组装与事件/持久化收口，并作为 Turn 事件的唯一发布点。
+"""职责：Turn 准入、执行组装与事件/持久化收口，也是 Turn 事件的唯一发布点。
 不负责：模型—工具循环、Hook、Context 裁剪、工具执行与排队策略。
 准入顺序是去重 → Session 并发 → 分流。MERGE 每批一个 Turn；命令 Turn 有事件但不写历史。
 """
@@ -8,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import Sequence
+from collections.abc import Awaitable, Sequence
 from dataclasses import replace
 
 from nucleamind.contracts import (
@@ -29,7 +28,7 @@ from nucleamind.contracts import (
     TurnId,
     TurnOutcome,
 )
-from nucleamind.kernel.routing import SubmitStatus
+from nucleamind.kernel.routing import SubmitOutcome, SubmitStatus
 
 from .cancel import CancelToken, Checkpoint
 from .compaction import compact_once
@@ -68,7 +67,7 @@ class TurnOrchestrator:
 
     def __init__(self, deps: OrchestratorDeps) -> None:
         self._deps = deps
-        self._turns = TurnTracker()
+        self._turns = TurnTracker[TurnReceipt]()
 
     @property
     def live_turns(self) -> tuple[TurnId, ...]:
@@ -76,10 +75,7 @@ class TurnOrchestrator:
         return self._turns.live_turns
 
     def cancel(self, turn_id: TurnId, reason: CancelReason = CancelReason.USER) -> bool:
-        """请求取消一个在跑的 turn（§10.3 的入口）。返回它是否还在跑。
-
-        幂等：`CancelToken.request()` 第一次的原因胜出（`EDG-206`）。
-        """
+        """请求取消在跑的 turn；幂等，第一次原因胜出。"""
         return self._turns.cancel(turn_id, reason)
 
     def begin_shutdown(self) -> None:
@@ -92,20 +88,23 @@ class TurnOrchestrator:
 
     async def handle(self, message: InboundMessage) -> TurnReceipt:
         """处理入站消息；业务异常折进回执，`BaseException` 穿透。"""
-        if not self._turns.accepting:
-            return self._reject_stopping(message)
-        submission = self._turns.enter_submission()
-        try:
-            return await self._handle_admitted(message)
-        finally:
-            self._turns.leave_submission(submission)
+        return await self.submit(message)
 
-    async def _handle_admitted(self, message: InboundMessage) -> TurnReceipt:
-        """处理已越过停机准入门槛的消息；其等待调度的时间也受停止预算约束。"""
+    def submit(self, message: InboundMessage) -> asyncio.Future[TurnReceipt]:
+        """同步完成准入登记，返回受停机管理的处理任务。
+        Session 票据在返回前已经登记，并发等待不会改变 FIFO。
+        """
+        if not self._turns.accepting:
+            return self._turns.completed(self._reject_stopping(message))
+        submission = self._admit(message)
+        self._turns.track_submission(submission)
+        return submission
+
+    def _admit(self, message: InboundMessage) -> asyncio.Future[TurnReceipt]:
+        """按去重 → Session 调度同步登记，并返回最终回执。"""
         deps = self._deps
         key = message.session_key(deps.scope)
         turn_id = TurnId(uuid.uuid4().hex)
-
         hit = deps.dedup.remember(message.channel_id, message.message_id, turn_id)
         if hit is not None:
             deps.bus.publish(
@@ -116,23 +115,42 @@ class TurnOrchestrator:
                     "duplicate_of": hit.turn_id,
                 },
             )
-            return TurnReceipt(turn_id=hit.turn_id, admitted=False, duplicate_of=hit.turn_id)
+            return self._turns.completed(
+                TurnReceipt(turn_id=hit.turn_id, admitted=False, duplicate_of=hit.turn_id)
+            )
 
         async def run(batch: tuple[InboundMessage, ...]) -> TurnReceipt:
             return await self._run(batch, key, turn_id)
 
-        submitted = await deps.scheduler.submit(key, message, run, turn_id=turn_id)
+        submitted = deps.scheduler.submit(key, message, run, turn_id=turn_id)
+        return asyncio.create_task(
+            self._finish_submission(message, turn_id, submitted),
+            name=f"turn-submission:{message.message_id}",
+        )
+
+    async def _finish_submission(
+        self,
+        message: InboundMessage,
+        turn_id: TurnId,
+        submission: Awaitable[SubmitOutcome[TurnReceipt]],
+    ) -> TurnReceipt:
+        """把调度结果收窄成回执，并清理未执行消息的去重占位。"""
+        submitted = await submission
         if submitted.status is SubmitStatus.REJECTED or submitted.result is None:
+            self._deps.dedup.discard(message.channel_id, message.message_id, turn_id)
             error = submitted.error or NucleaError(
                 ErrorCode.KERNEL_INVARIANT_VIOLATED, "调度器既没有结果也没有拒绝原因。"
             )
-            deps.bus.publish(
+            self._deps.bus.publish(
                 EventName.TURN_REJECTED,
                 payload={"reason": "session_busy", "message_id": message.message_id},
                 error=error,
             )
             return TurnReceipt(turn_id=turn_id, admitted=False, error=error)
-        return submitted.result
+        receipt = submitted.result
+        if not receipt.admitted:
+            self._deps.dedup.discard(message.channel_id, message.message_id, turn_id)
+        return receipt
 
     def _reject_stopping(self, message: InboundMessage) -> TurnReceipt:
         """拒绝停机后到达或在 Session 队列中尚未开始的消息。"""
@@ -148,8 +166,6 @@ class TurnOrchestrator:
         )
         return TurnReceipt(turn_id=turn_id, admitted=False, error=error)
 
-    # ------------------------------------------------------------------ 一次 turn
-
     async def _run(
         self, batch: Sequence[InboundMessage], key: SessionKey, turn_id: TurnId
     ) -> TurnReceipt:
@@ -157,6 +173,8 @@ class TurnOrchestrator:
         if not self._turns.accepting:
             return self._reject_stopping(batch[0])
         deps = self._deps
+        for message in batch:
+            deps.dedup.rebind(message.channel_id, message.message_id, turn_id)
         correlation = Correlation(instance_id=deps.instance_id, session_key=key, turn_id=turn_id)
         started_at = deps.clock()
         state = TurnState(
@@ -348,8 +366,6 @@ class TurnOrchestrator:
                 )
         return None
 
-    # ------------------------------------------------------------------ engine
-
     async def _drive(
         self, request: ModelRequest, state: TurnState, token: CancelToken
     ) -> TerminalEvent:
@@ -393,14 +409,12 @@ class TurnOrchestrator:
                         "iteration": event.iteration,
                         "stop_reason": event.response.stop_reason.value,
                         "tool_calls": len(event.response.tool_calls),
-                        # 用量的唯一公开出口（`TurnOutcome` / `TurnReceipt` 都不带它）。
-                        # 复数键名让脱敏的整词规则原样放行（`D02`）。
+                        # 用量的唯一公开出口；复数键名让脱敏整词规则原样放行。
                         "input_tokens": event.response.usage.input_tokens,
                         "output_tokens": event.response.usage.output_tokens,
                     },
                 )
-                # 这一轮的正文已由响应对象权威记过一次，分片账本清零；剩下的就是
-                # 「最后一次完整响应之后又流出来的半句」，取消时靠它落库（`KER-007`）。
+                # 清零已完整记录的正文，只让响应之后的半句在取消时落库。
                 state.pending.clear()
                 state.transcript.declare(event.response.tool_calls)
                 if event.response.tool_calls:
@@ -444,10 +458,7 @@ class TurnOrchestrator:
         token: CancelToken,
         terminal: TurnStoppedByLimit,
     ) -> None:
-        """预算用尽后发一次不带工具、不流式、不重试的收尾请求。
-
-        终态已确定为 `STOPPED_BY_LIMIT`；收尾失败只记诊断，不改变结论。
-        """
+        """预算用尽后发一次无工具收尾；失败只记诊断，不改变终态。"""
         try:
             response = await self._deps.model.complete(
                 replace(request, tools=(), stream=False), token

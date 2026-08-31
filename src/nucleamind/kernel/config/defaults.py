@@ -1,13 +1,13 @@
 """配置默认值里那些**镜像自别处**的字面量（技术方案 §6.7）。
 
-职责：把 turn 六项预算、routing 七项、hooks/context 三项超时、插件停止预算与模型请求
+职责：把 turn 六项预算、routing 六项、hooks/context 三项超时、插件停止预算与模型请求
 重试四项的默认值集中成一处常量，供 `schema.SECTION_SPECS` 引用。
 不负责：定义有哪些字段（`schema.py` 的那张表）、校验（`fields.py`）、读取任何来源
 （`sources.py`）；本模块只有字面量，没有逻辑。
 
 **这些常量是各自真实归属地的副本，不是第二个真相来源**：真正的定义在
 `kernel/turn/limits.py`、`kernel/routing/`、`kernel/turn/{hooks,context_builder,retry}.py` 与
-`kernel/plugins/lifecycle.py`，每一组都有一条逐项对照的测试盯着。
+`kernel/plugins/lifecycle.py`、`runtime/instance.py`，每一组都有一条逐项对照的测试盯着。
 
 **为什么不 import 那些模块**：`kernel.turn` / `kernel.routing` / `kernel.plugins` 的
 `__init__` 会把 engine、调度器、registry 与 asyncio 一起拖上配置路径，而 `nm config show`
@@ -24,7 +24,6 @@ from typing import Final
 
 __all__ = [
     "DEFAULT_CHANNEL_CONCURRENCY",
-    "DEFAULT_CHANNEL_QUEUE_MAX_SIZE",
     "DEFAULT_COMMAND_PREFIX",
     "DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS",
     "DEFAULT_COMPACTOR_TIMEOUT_MS",
@@ -60,19 +59,15 @@ DEFAULT_TOOL_TIMEOUT_MS: Final = 120_000
 DEFAULT_TOOL_RESULT_MAX_BYTES: Final = 65_536
 DEFAULT_TURN_TIMEOUT_MS: Final = 900_000
 
-#: 路由七项。**与 `kernel/routing/` 的同名 `DEFAULT_*` 必须逐一相等**，由
-#: `test_routing_defaults_match_the_routing_package` 盯着。
+#: 路由六项。前五项与 `kernel/routing/`、Channel 总量上限与 `runtime/instance.py` 的
+#: 同名 `DEFAULT_*` 相等，由配置测试逐一对照。
 DEFAULT_COMMAND_PREFIX: Final = "/"
 DEFAULT_SESSION_CONCURRENCY: Final = "queue"
 DEFAULT_QUEUE_MAX_SIZE: Final = 32
 DEFAULT_DEDUP_CAPACITY: Final = 4096
 DEFAULT_DEDUP_TTL_MS: Final = 600_000
-#: Channel 泵的扇出两项。`DEFAULT_CHANNEL_QUEUE_MAX_SIZE` 与
-#: `DEFAULT_QUEUE_MAX_SIZE` **恰好相等不是巧合**：lane 队列接替（而不是叠加）
-#: `SessionScheduler` 的界成为 Channel 流量的唯一上限，取同一个数是为了让用户可见的
-#: 积压容量与串行泵时代一个字没变。
+#: 单条 Channel 的总在途消息上限。它只防止 Runtime 产生无界任务，不参与 Session 调度。
 DEFAULT_CHANNEL_CONCURRENCY: Final = 64
-DEFAULT_CHANNEL_QUEUE_MAX_SIZE: Final = 32
 
 #: `session_concurrency` 的合法取值，与 `routing.ConcurrencyPolicy` 的三个取值同名。
 SESSION_CONCURRENCY_CHOICES: Final = ("queue", "merge", "reject")

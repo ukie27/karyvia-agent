@@ -9,17 +9,15 @@ Channel、跑 CLI 入口、按相反顺序停止一切并释放实例锁。
 `channel.receive()` 来、经 `orchestrator.handle()`、出站经 `deliver` 路由回
 `channel.deliver()`。CLI 与未来任何平台走的是同一段代码，没有第二条路径（`MSG-007`）。
 
-**泵按 conversation 扇出**：机制在 `kernel/routing/fanout.py`，这里只负责接线。
-同一 conversation 内严格按到达顺序串行（`EDG-202` 因此逐字成立——在一条 Channel 上
-`conversation_id ↔ SessionKey` 是双射），跨 conversation 并发。在此之前一条 Channel
-同时只跑一条 turn，一个用户的慢 turn 会卡住同一个 bot 上所有人。
+**泵只负责流量，不调度 Session**：每条消息按接收顺序同步登记到 Orchestrator，再并发等待
+结果；同一 Session 的 `queue` / `merge` / `reject` 只由 `SessionScheduler` 决定。泵只保留
+每条 Channel 的总在途上限，避免平台突发产生无界任务。
 
 **被拒的 turn 也要有回音**：去重命中或队列拒绝时 `TurnReceipt.admitted=False`，
 orchestrator 不会发终态出站消息（那条 turn 从未开始）。泵因此自己合成一条
 `stream_state=FAILED` 的出站消息——否则 CLI 会永远等一个不会到来的终态。
-合成的仍是 `OutboundMessage`，不是绕过契约的旁路。**扇出层的拒绝走同一条合成路径**，
-只是那条消息连 orchestrator 都没进过，因此发的是 `instance.input_dropped` 而不是
-turn 事件。
+合成的仍是 `OutboundMessage`，不是绕过契约的旁路。总在途上限的拒绝走同一条合成路径；
+它没有进入 Orchestrator，因此发的是 `instance.input_dropped` 而不是 turn 事件。
 """
 
 from __future__ import annotations
@@ -61,11 +59,6 @@ from nucleamind.kernel.plugins import (
     units_for,
 )
 from nucleamind.kernel.registry import CapabilityRegistry, ResolutionReport
-from nucleamind.kernel.routing import (
-    DEFAULT_CHANNEL_CONCURRENCY,
-    DEFAULT_CHANNEL_QUEUE_MAX_SIZE,
-    ConversationFanout,
-)
 from nucleamind.kernel.turn import (
     OrchestratorDeps,
     ToolExecutor,
@@ -77,12 +70,23 @@ from .plugin_context import PluginRuntime, RuntimePluginContext
 
 #: `TurnReceipt` 从这里再导出一次：`embed/` 只能 import `contracts/` 与 `runtime/`（`R5`），
 #: 而一次 `submit()` 的返回值类型在 `kernel/turn/`。转发比让门面用 `object` 诚实得多。
-__all__ = ["AgentInstance", "Closer", "TurnReceipt", "delivery_error", "outbound_router"]
+__all__ = [
+    "DEFAULT_CHANNEL_CONCURRENCY",
+    "AgentInstance",
+    "Closer",
+    "TurnReceipt",
+    "delivery_error",
+    "outbound_router",
+]
 
 #: 停止时要跑的一件收尾事。用 callable 而不是一张「谁要关」的类型表：
 #: 模型的 `aclose()`、sink 的 `close()` 与锁的 `release()` 没有共同接口，
 #: 为它们发明一个只会多出一层。
 Closer = Callable[[], Awaitable[None]]
+
+#: 单条 Channel 同时尚未收口的消息数。它是 Runtime 入站流量的总量护栏，不参与
+#: Session 的 queue / merge / reject 策略。
+DEFAULT_CHANNEL_CONCURRENCY = 64
 
 #: 在途 Turn 收到业务取消后正常持久化与发终态的等待预算。字段可在构造时注入，未来若需要
 #: 配置化，组装根只需贯通数值，不必改停止算法。
@@ -125,14 +129,13 @@ class AgentInstance:
     #: 单个插件的停止预算（配置 `plugins.stop_timeout_ms`，`EDG-104`）。
     stop_timeout_ms: int = DEFAULT_STOP_TIMEOUT_MS
     turn_shutdown_grace_ms: int = DEFAULT_TURN_SHUTDOWN_GRACE_MS
-    #: Channel 泵的扇出上界，来自配置 `routing.channel_*`。
+    #: 单条 Channel 的总在途消息上限，来自配置 `routing.channel_concurrency`。
     channel_concurrency: int = DEFAULT_CHANNEL_CONCURRENCY
-    channel_queue_max_size: int = DEFAULT_CHANNEL_QUEUE_MAX_SIZE
     runtime: PluginRuntime = field(default_factory=PluginRuntime)
     lock: InstanceLock | None = None
     closers: tuple[Closer, ...] = ()
     _pumps: list[asyncio.Task[None]] = field(default_factory=list, init=False)
-    _fanouts: list[ConversationFanout] = field(default_factory=list, init=False)
+    _channel_tasks: dict[str, set[asyncio.Task[None]]] = field(default_factory=dict, init=False)
     _active_channels: list[Channel] = field(default_factory=list, init=False)
     _phase: _InstancePhase = field(default=_InstancePhase.CREATED, init=False)
     _lifecycle_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
@@ -182,11 +185,10 @@ class AgentInstance:
                             raise error from exc
                         continue
                     self._active_channels.append(channel)
-                    fanout = self._fanout_for(channel)
-                    self._fanouts.append(fanout)
+                    self._channel_tasks[channel_id] = set()
                     self._pumps.append(
                         asyncio.create_task(
-                            fanout.run(channel.receive()), name=f"pump:{channel_id}"
+                            self._run_channel(channel_id, channel), name=f"pump:{channel_id}"
                         )
                     )
                 await self.deps.hooks.dispatch(HookContext(HookName.INSTANCE_READY))
@@ -238,18 +240,17 @@ class AgentInstance:
         if self._pumps:
             await asyncio.gather(*self._pumps, return_exceptions=True)
         self._pumps.clear()
-        # 泵已停止，不会再往 lane 放消息。排队但尚未开始的输入不应在停机后产生新 Turn。
-        for fanout in self._fanouts:
-            fanout.discard_pending()
         forced = await self.orchestrator.finish_shutdown(
             timeout_ms=self.turn_shutdown_grace_ms
         )
-        for fanout in self._fanouts:
-            if forced is not None:
-                fanout.force_cancel()
-            else:
-                await fanout.drain(cancel=False)
-        self._fanouts.clear()
+        channel_tasks = [task for tasks in self._channel_tasks.values() for task in tasks]
+        if forced is not None:
+            for task in channel_tasks:
+                task.cancel()
+                task.add_done_callback(_consume_task_result)
+        elif channel_tasks:
+            await asyncio.gather(*channel_tasks, return_exceptions=True)
+        self._channel_tasks.clear()
 
         # 实例级 shutdown 观察者看到的是「不再有 Turn 使用插件资源」的时刻。
         await self._safe(self.deps.hooks.dispatch(HookContext(HookName.INSTANCE_SHUTDOWN)))
@@ -426,37 +427,53 @@ class AgentInstance:
             },
         )
 
-    def _fanout_for(self, channel: Channel) -> ConversationFanout:
-        """给一条 Channel 建扇出。
+    async def _run_channel(self, channel_id: str, channel: Channel) -> None:
+        """按接收顺序登记消息；Session 调度与结果等待彼此分离。"""
+        tasks = self._channel_tasks[channel_id]
+        async for message in channel.receive():
+            if len(tasks) >= self.channel_concurrency:
+                error = NucleaError(
+                    ErrorCode.INPUT_SESSION_BUSY,
+                    "这条 Channel 的在途消息已达上限，请稍后重试。",
+                    detail={"reason": "channel_saturated", "limit": self.channel_concurrency},
+                )
+                await self._dropped(channel, message, error)
+                continue
+            try:
+                submission = self.orchestrator.submit(message)
+            except Exception as exc:  # noqa: BLE001 - 一条坏消息不能终止整条 Channel
+                self._pump_failure(exc)
+                continue
+            task = asyncio.create_task(
+                self._settle_channel_message(channel, message, submission),
+                name=f"channel-input:{channel_id}:{message.message_id}",
+            )
+            tasks.add(task)
+            task.add_done_callback(tasks.discard)
 
-        `handle` 做的事与串行泵时代的循环体**逐字相同**——那是这次改动没有顺手改别的
-        东西的证据；变的只是「谁在什么时候调它」。
-        """
-
-        async def handle(message: InboundMessage) -> None:
-            receipt = await self.orchestrator.handle(message)
-            if not receipt.admitted:
-                await self._echo(channel, _rejection(message, receipt))
-
-        async def dropped(message: InboundMessage, error: NucleaError) -> None:
-            await self._dropped(channel, message, error)
-
-        return ConversationFanout(
-            handle,
-            on_failure=self._pump_failure,
-            on_dropped=dropped,
-            concurrency=self.channel_concurrency,
-            queue_max_size=self.channel_queue_max_size,
-        )
+    async def _settle_channel_message(
+        self,
+        channel: Channel,
+        message: InboundMessage,
+        submission: asyncio.Future[TurnReceipt],
+    ) -> None:
+        """等待一条已登记消息，并为未准入结果回音。"""
+        try:
+            receipt = await submission
+        except Exception as exc:  # noqa: BLE001 - 失败隔离与旧泵一致
+            self._pump_failure(exc)
+            return
+        if not receipt.admitted:
+            await self._echo(channel, _rejection(message, receipt))
 
     def _pump_failure(self, exc: Exception) -> None:
-        """一条消息在 lane 里炸掉。只记不抛——泵与 lane 都不能因为一条消息而死掉。"""
+        """一条消息处理失败。只记不抛，不能带走整条 Channel 泵。"""
         self.bus.publish(EventName.PLUGIN_FAILED, error=_as_nuclea(exc))
 
     async def _dropped(
         self, channel: Channel, message: InboundMessage, error: NucleaError
     ) -> None:
-        """一条消息在**进 orchestrator 之前**就被扇出拒了（lane 队列或并发上界满）。
+        """一条消息在**进 orchestrator 之前**被 Channel 总在途上限拒绝。
 
         给它铸一个 `turn_id` 再走 `_rejection()`：`orchestrator.handle()` 被 scheduler
         拒绝时做的正是同一件事，用户拿到的因此仍是 `[未受理：…]` + `FAILED`，两条背压
@@ -586,6 +603,12 @@ def _as_nuclea(exc: Exception) -> NucleaError:
         "实例运行期出现未预期异常。",
         detail={"exception": type(exc).__name__},
     )
+
+
+def _consume_task_result(task: asyncio.Task[None]) -> None:
+    """强制停止后取走后台任务结果，避免稍后产生无人认领异常。"""
+    if not task.cancelled():
+        task.exception()
 
 
 def _rejection(message: InboundMessage, receipt: TurnReceipt) -> OutboundMessage:

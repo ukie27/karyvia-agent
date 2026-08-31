@@ -107,6 +107,20 @@ class DedupCache:
             self._entries.popitem(last=False)
         return None
 
+    def rebind(self, channel_id: str, message_id: str, turn_id: TurnId) -> None:
+        """把已登记消息绑定到实际执行它的 Turn；MERGE 批次会用到。"""
+        key = (channel_id, message_id)
+        found = self._entries.get(key)
+        if found is not None:
+            self._entries[key] = (turn_id, found[1])
+
+    def discard(self, channel_id: str, message_id: str, turn_id: TurnId) -> None:
+        """移除一次未执行的准入占位，不误删后来登记的同名消息。"""
+        key = (channel_id, message_id)
+        found = self._entries.get(key)
+        if found is not None and found[0] == turn_id:
+            del self._entries[key]
+
     def _evict_expired(self, now: float) -> None:
         """清掉已过期的记录。
 

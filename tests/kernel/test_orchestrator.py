@@ -220,21 +220,25 @@ async def test_a_full_queue_is_rejected_with_a_diagnosable_error() -> None:
     assert second.admitted is False
     assert second.error is not None
     assert second.error.code is ErrorCode.INPUT_SESSION_BUSY
+    retry = await harness.send(inbound(message_id="m2"))
+    assert retry.admitted is True
 
 
 async def test_merged_messages_share_one_turn_and_are_recorded_in_the_payload() -> None:
     harness = build(ScriptedProvider([], default=text_response("好")))
     harness.deps.scheduler._policy = ConcurrencyPolicy.MERGE  # noqa: SLF001
     gate = asyncio.Event()
+    entered = asyncio.Event()
 
     async def slow(request, cancel):  # noqa: ANN001, ANN202
+        entered.set()
         await gate.wait()
         return text_response("好")
 
     harness.provider.complete = slow  # type: ignore[method-assign]
 
     first = asyncio.ensure_future(harness.send(inbound("第一句", message_id="m1")))
-    await asyncio.sleep(0)
+    await entered.wait()
     second = asyncio.ensure_future(harness.send(inbound("第二句", message_id="m2")))
     third = asyncio.ensure_future(harness.send(inbound("第三句", message_id="m3")))
     await asyncio.sleep(0)
@@ -246,6 +250,8 @@ async def test_merged_messages_share_one_turn_and_are_recorded_in_the_payload() 
     assert len(started) == 2  # 第一条自己一批，后两条合并成第二批
     assert started[1].payload["merged_from"] == ["m3"]
     assert {receipt.turn_id for receipt in receipts[1:]} == {receipts[1].turn_id}
+    duplicate = await harness.send(inbound("第三句", message_id="m3"))
+    assert duplicate.duplicate_of == receipts[1].turn_id
 
 
 # ------------------------------------------------------------------ C 分流

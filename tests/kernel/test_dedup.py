@@ -74,6 +74,28 @@ def test_same_message_id_on_another_channel_is_not_a_duplicate() -> None:
     assert cache.remember("chat", "1", turn("t2")) is None
 
 
+def test_rebind_points_a_merged_message_at_the_executing_turn() -> None:
+    cache = DedupCache()
+    cache.remember("chat", "m1", turn("candidate"))
+
+    cache.rebind("chat", "m1", turn("executed"))
+
+    hit = cache.remember("chat", "m1", turn("duplicate"))
+    assert hit is not None
+    assert hit.turn_id == turn("executed")
+
+
+def test_discard_only_removes_the_matching_unexecuted_candidate() -> None:
+    cache = DedupCache()
+    cache.remember("chat", "m1", turn("candidate"))
+
+    cache.discard("chat", "m1", turn("another"))
+    assert cache.remember("chat", "m1", turn("duplicate")) is not None
+
+    cache.discard("chat", "m1", turn("candidate"))
+    assert cache.remember("chat", "m1", turn("retry")) is None
+
+
 # --------------------------------------------------------------------------- 边界
 
 

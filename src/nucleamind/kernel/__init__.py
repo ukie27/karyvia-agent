@@ -10,7 +10,7 @@
 - `turn/`：取消、预算、Context、Engine 与 Orchestrator；
 - `config/`：实例布局、分层配置、Secret 引用与实例锁；
 - `observability/`：事件总线、脱敏、sink 与诊断查询；
-- `routing/`：输入去重、Session 并发、命令分流与 Channel fanout；
+- `routing/`：输入去重、Session 并发与命令分流；
 - `plugins/`：发现、加载、Host 与生命周期。
 
 这些子包可以互相复用 Kernel 机制，但不得反向依赖 SDK、Builtin 或 Runtime。

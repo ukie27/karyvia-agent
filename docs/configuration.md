@@ -147,12 +147,16 @@ nm config show --origins
 | `queue_max_size` | 正整数 | `32` | 单个 session 的等待上限；超出即拒绝并回音，不静默丢弃 |
 | `dedup_capacity` | 正整数 | `4096` | 去重缓存记多少条 message_id |
 | `dedup_ttl_ms` | 正整数 | `600000` | 去重记录的存活时间 |
-| `channel_concurrency` | 正整数 | `64` | 一条 Channel 上同时活跃的 conversation 上限。**饱和护栏而不是调优旋钮**，因此没有「不限」哨兵 |
-| `channel_queue_max_size` | 正整数 | `32` | 单个 conversation 在 Channel 泵里的排队上限；超出即拒绝并回音 |
+| `channel_concurrency` | 正整数 | `64` | 单条 Channel 的总在途消息上限；只限制 Runtime 任务总量，不改变 Session 并发策略 |
 
 `session_concurrency` 的三个取值：`queue` 排队（严格 FIFO）、`merge` 把等待中的消息并成
 下一批、`reject` 直接拒绝并回音。三者的差别**只在「拿不到槽位时怎么办」**——
 「同一 session 同时至多一个 turn」这条不变量三种策略都成立。
+Channel、Embed 与直接 API 提交共用这套策略；单个 Session 的等待上限只有
+`queue_max_size` 一处。
+
+旧配置 `channel_queue_max_size` 已移除；请删除该字段，并用 `queue_max_size` 设置单个
+Session 的等待上限。保留旧字段会按未知配置拒绝启动，避免配置被静默忽略。
 
 ### `plugins` —— 实例级插件启用与加载
 

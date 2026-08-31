@@ -57,7 +57,7 @@ contracts/
 kernel/
   registry/         注册批次、冲突解析、有效能力视图
   turn/             单个 turn 的执行与编排机制
-  routing/          入站去重、Session 排队、命令分流、fanout
+  routing/          入站去重、Session 排队与命令分流
   plugins/          发现、加载计划、Host、生命周期
   config/           纯配置加载、校验、布局、Secret 引用
   observability/    EventBus、脱敏载荷、健康状态与 sinks
@@ -193,7 +193,7 @@ producer ── bus.publish(name, correlation, payload, error)
                    │
                    ├─ redact/scrub + payload bound
                    ├─ allocate sequence
-                   └─ synchronous fanout
+                   └─ synchronous subscribers
                          ├─ ordinary subscriber
                          ├─ JsonlFileSink
                          └─ unhealthy subscriber auto-unsubscribe

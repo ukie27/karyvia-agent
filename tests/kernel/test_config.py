@@ -387,25 +387,20 @@ class TestSchema:
         assert routing.dedup_ttl_ms == 600_000
 
     def test_routing_defaults_match_the_routing_package(self) -> None:
-        """schema 重写了路由的默认值以避开 routing 包的导入开销，两处因此必须逐一相等。
+        """配置镜像 routing 与 Runtime 的机制默认值，两侧必须逐一相等。
 
         与 `test_turn_defaults_match_the_limits_module` 同理：这条测试就是那份重复的挡板。
         """
         from nucleamind.kernel import routing as routing_package
         from nucleamind.kernel.routing import session_lock
+        from nucleamind.runtime.instance import DEFAULT_CHANNEL_CONCURRENCY
 
         routing = validate_config({}).routing
         assert routing.command_prefix == routing_package.DEFAULT_COMMAND_PREFIX
         assert routing.queue_max_size == routing_package.DEFAULT_QUEUE_MAX_SIZE
         assert routing.dedup_capacity == routing_package.DEFAULT_DEDUP_CAPACITY
         assert routing.dedup_ttl_ms == routing_package.DEFAULT_DEDUP_TTL_MS
-        assert routing.channel_concurrency == routing_package.DEFAULT_CHANNEL_CONCURRENCY
-        assert (
-            routing.channel_queue_max_size == routing_package.DEFAULT_CHANNEL_QUEUE_MAX_SIZE
-        )
-        # lane 队列接替（而不是叠加）scheduler 的界成为 Channel 流量的唯一上限，
-        # 两者取同一个数是刻意的（`D33`）——积压容量与串行泵时代一个字没变。
-        assert routing.channel_queue_max_size == routing.queue_max_size
+        assert routing.channel_concurrency == DEFAULT_CHANNEL_CONCURRENCY
         # 策略字面量与枚举取值同名，否则配置里写的 `queue` 会转不成 `ConcurrencyPolicy`。
         assert set(SESSION_CONCURRENCY_CHOICES) == {
             policy.value for policy in session_lock.ConcurrencyPolicy
@@ -535,6 +530,14 @@ class TestSchema:
         issue = caught.value.detail["errors"][0]
         assert issue["code"] == ErrorCode.CONFIG_UNKNOWN_FIELD.value
         assert "dedup_capacity" in issue["reason"]
+
+    def test_removed_channel_queue_limit_is_rejected(self) -> None:
+        """删除重复策略后，旧字段必须显式失败，不能变成无效配置。"""
+        with pytest.raises(NucleaError) as caught:
+            validate_config({"routing": {"channel_queue_max_size": 10}})
+        issue = caught.value.detail["errors"][0]
+        assert issue["pointer"] == "/routing/channel_queue_max_size"
+        assert issue["code"] == ErrorCode.CONFIG_UNKNOWN_FIELD.value
 
 
 class TestLoadConfig:

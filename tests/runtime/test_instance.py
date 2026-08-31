@@ -355,7 +355,7 @@ def test_ctrl_c_with_nothing_running_is_a_quit() -> None:
     assert orchestrator.cancelled == []
 
 
-# ---------------------------------------------------------- 泵的按 conversation 扇出（`D33`）
+# ---------------------------------------------------------- Channel 泵与统一 Session 调度
 
 
 def multi_channel(instance: AgentInstance) -> ScriptedChannel:
@@ -388,11 +388,7 @@ async def _wait_for(predicate: Callable[[], bool], *, timeout: float = 3.0) -> N
 async def test_two_conversations_on_one_channel_do_not_block_each_other(
     tmp_path: Path,
 ) -> None:
-    """`D33` 的收益断言：一个用户的慢 turn 不再卡住同一个 bot 上所有人。
-
-    在扇出之前，泵的 `await` 在 `async for` 里面——第二条消息要等第一条整条 turn 跑完才
-    被取走，这条用例会超时。
-    """
+    """一个用户的慢 turn 不会卡住同一个 Channel 上的其它 Session。"""
     write_config(tmp_path)
     SCRIPT[:] = [text_response("答案"), text_response("答案")]
     instance = await _boot(tmp_path, manifests=manifests_with_multi_channel())
@@ -445,10 +441,10 @@ async def test_two_conversations_on_one_channel_do_not_block_each_other(
 async def test_the_same_conversation_still_enters_the_scheduler_in_arrival_order(
     tmp_path: Path,
 ) -> None:
-    """`EDG-202` 的逐字断言：同 conversation 严格 FIFO、单写者。
+    """`EDG-202` 的逐字断言：同 Session 严格 FIFO、单写者。
 
     事件流里第二条 turn 的 `turn.started` 一定在第一条的终态之后——这就是「同一时刻至多
-    一个写者」在事件层面的形状。扇出没有放松它，只是让**别的** conversation 不必等。
+    一个写者」在事件层面的形状。
     """
     write_config(tmp_path)
     SCRIPT[:] = [text_response("一"), text_response("二")]
@@ -472,18 +468,18 @@ async def test_the_same_conversation_still_enters_the_scheduler_in_arrival_order
     assert starts[0] < completions[0] < starts[1] < completions[1]
 
 
-async def test_a_full_lane_echoes_session_busy_and_publishes_input_dropped(
+async def test_a_full_session_queue_is_rejected_by_the_scheduler(
     tmp_path: Path,
 ) -> None:
-    """背压要**明确拒绝**而不是静默丢弃，而且回音与 scheduler 拒绝时长得一样。"""
-    write_config(tmp_path, routing={"channel_queue_max_size": 1})
+    """Channel 也只使用 `queue_max_size`，拒绝必须来自 Orchestrator。"""
+    write_config(tmp_path, routing={"queue_max_size": 1})
     SCRIPT[:] = [text_response("好") for _ in range(6)]
     instance = await _boot(tmp_path, manifests=manifests_with_multi_channel())
-    dropped: list[str] = []
+    rejected: list[str] = []
 
     def watch(event: object) -> None:
-        if event.name is EventName.INSTANCE_INPUT_DROPPED:  # type: ignore[attr-defined]
-            dropped.append(event.name.value)  # type: ignore[attr-defined]
+        if event.name is EventName.TURN_REJECTED:  # type: ignore[attr-defined]
+            rejected.append(event.name.value)  # type: ignore[attr-defined]
 
     instance.bus.subscribe(watch)
     try:
@@ -501,17 +497,84 @@ async def test_a_full_lane_echoes_session_busy_and_publishes_input_dropped(
 
         for index in range(5):
             channel.push(inbound("busy", str(index), message_id=f"m{index}"))
-        await _wait_for(lambda: bool(dropped))
-        rejected = [m for m in channel.delivered if m.stream_state is StreamState.FAILED]
-        assert rejected, "被拒的消息必须有回音"
-        assert "未受理" in rejected[0].content
+        await _wait_for(lambda: bool(rejected))
+        failures = [m for m in channel.delivered if m.stream_state is StreamState.FAILED]
+        assert failures, "被拒的消息必须有回音"
+        assert "未受理" in failures[0].content
+        assert not any(
+            event.name is EventName.INSTANCE_INPUT_DROPPED
+            for event in instance.diagnostics.events.events()
+        )
         blocked.set()
     finally:
         await instance.stop()
 
 
-async def test_stop_drains_every_lane(tmp_path: Path) -> None:
-    """停止之后不能留下任何在跑的 lane——否则一次正常退出会挂着后台任务。"""
+async def test_channel_merge_reaches_the_scheduler(tmp_path: Path) -> None:
+    """同一 Channel 的突发消息必须能被合并成一个真实 Turn。"""
+    write_config(tmp_path, routing={"session_concurrency": "merge"})
+    SCRIPT[:] = [text_response("合并完成")]
+    instance = await _boot(tmp_path, manifests=manifests_with_multi_channel())
+    try:
+        await instance.start()
+        channel = multi_channel(instance)
+        for index in range(3):
+            channel.push(inbound("same", str(index), message_id=f"merge-{index}"))
+        await _wait_for(lambda: _answered(channel, "same"))
+        started = [
+            event
+            for event in instance.diagnostics.events.events()
+            if event.name is EventName.TURN_STARTED
+        ]
+        assert len(started) == 1
+        assert started[0].payload["merged_from"] == ["merge-1", "merge-2"]
+    finally:
+        await instance.stop()
+
+
+async def test_channel_reject_reaches_the_scheduler(tmp_path: Path) -> None:
+    """`reject` 在 Channel 路径中立即拒绝同 Session 的第二条消息。"""
+    write_config(tmp_path, routing={"session_concurrency": "reject"})
+    SCRIPT[:] = [text_response("好")]
+    instance = await _boot(tmp_path, manifests=manifests_with_multi_channel())
+    try:
+        await instance.start()
+        channel = multi_channel(instance)
+        channel.push(inbound("same", "一", message_id="reject-1"))
+        channel.push(inbound("same", "二", message_id="reject-2"))
+        await _wait_for(
+            lambda: any(m.stream_state is StreamState.FAILED for m in channel.delivered)
+        )
+        assert any(
+            event.name is EventName.TURN_REJECTED
+            for event in instance.diagnostics.events.events()
+        )
+    finally:
+        await instance.stop()
+
+
+async def test_channel_in_flight_limit_publishes_input_dropped(tmp_path: Path) -> None:
+    """总在途护栏只保护 Runtime 任务数量，不冒充 Session 拒绝。"""
+    write_config(tmp_path, routing={"channel_concurrency": 1})
+    SCRIPT[:] = [text_response("好")]
+    instance = await _boot(tmp_path, manifests=manifests_with_multi_channel())
+    try:
+        await instance.start()
+        channel = multi_channel(instance)
+        channel.push(inbound("a", "一", message_id="limit-1"))
+        channel.push(inbound("b", "二", message_id="limit-2"))
+        await _wait_for(
+            lambda: any(
+                event.name is EventName.INSTANCE_INPUT_DROPPED
+                for event in instance.diagnostics.events.events()
+            )
+        )
+    finally:
+        await instance.stop()
+
+
+async def test_stop_drains_every_channel_submission(tmp_path: Path) -> None:
+    """停止之后不能留下 Channel 提交任务。"""
     write_config(tmp_path)
     SCRIPT[:] = [text_response("好") for _ in range(4)]
     instance = await _boot(tmp_path, manifests=manifests_with_multi_channel())
@@ -520,7 +583,7 @@ async def test_stop_drains_every_lane(tmp_path: Path) -> None:
     for index in range(3):
         channel.push(inbound(f"c{index}", "在吗", message_id=f"s{index}"))
     await instance.stop()
-    assert all(fanout.lanes() == 0 for fanout in instance._fanouts) or not instance._fanouts  # noqa: SLF001
+    assert instance._channel_tasks == {}  # noqa: SLF001 - 停机所有权的最终状态
 
 
 # --------------------------------------------- 投递失败：`channel.delivery_failed`（`D43`）

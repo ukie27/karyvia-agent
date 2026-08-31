@@ -63,8 +63,8 @@ def test_event_names_are_unique() -> None:
 #: 没改，证明不了它经过评审。增删事件名必须同时改这张表，那就是评审闸门。
 #: `turn.stopped_by_limit` 由 `D12` 按 `NFR-104` 补入（`D09` 的 `TurnStoppedByLimit`
 #: 原本没有落点，用 `turn.completed` 承载会让两种终态不可区分）。
-#: `instance.input_dropped` 由 `D33` 补入：Channel 泵按 conversation 扇出之后，一条消息
-#: 可能在**进 orchestrator 之前**就被 lane 队列或并发上界拒掉。它刻意不是 `turn.rejected`
+#: Channel 泵可能在**进 orchestrator 之前**因总在途上界拒绝一条消息。它刻意不是
+#: `turn.rejected`
 #: ——那条消息从未进过 orchestrator，而 turn 事件只有那一个发布点。
 #: `channel.delivery_failed` 由 `D43` 补入，用来消解 `Channel.deliver` 的 docstring 与
 #: `EDG-204` 之间那条真实存在的矛盾（前者要求投递失败抛，后者要求 turn 仍走到终态，

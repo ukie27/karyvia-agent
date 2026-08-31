@@ -52,7 +52,7 @@
 | Compactor | `register_context_compactor` | `kernel/turn/compaction.py` |
 | Hook | `api.on` | `kernel/turn/hooks.py` |
 | Model | `register_model_provider` | Runtime selection → Engine deps |
-| Channel | `register_channel` | Runtime instance/channel fanout |
+| Channel | `register_channel` | Runtime instance/input pump |
 | Memory | `register_memory_provider` | `kernel/turn/memory.py` |
 | Session Store | `register_session_store` | Orchestrator/Runtime instance |
 | CLI Entry | `register_cli_entry` | Runtime CLI bootstrap |

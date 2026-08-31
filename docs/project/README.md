@@ -26,7 +26,7 @@ NucleaMind 已经具备一套可运行、受架构守卫约束的 Agent Kernel �
 - `kernel/turn/`：取消、预算、Context、压缩、Memory 召回、模型重试、自动续写、工具调用、
   Transcript 和 Orchestrator。
 - `kernel/config/`：实例布局、四层配置、schema、Secret 引用和实例锁；自身不写文件。
-- `kernel/routing/`：去重、Session 单写者调度、分流和 Channel fanout。
+- `kernel/routing/`：去重、Session 单写者调度和命令分流。
 - `kernel/plugins/`：发现、两阶段加载、事务注册、依赖排序和生命周期。
 - `kernel/observability/`：同步事件总线、脱敏、健康状态和 sinks。
 - `runtime/`：唯一组装根、插件装配策略、启动资源事务、生产 `PluginContext`、资源门面、

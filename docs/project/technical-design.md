@@ -1589,7 +1589,7 @@ Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中
 ```
 
 实例停止复用同一条业务取消路径：先关闭 Turn 新准入并对全部 live Turn 请求
-`CancelReason.SHUTDOWN`，再停止 Channel/pump、丢弃尚未开始的 lane 消息，并在实例级宽限期
+`CancelReason.SHUTDOWN`，再停止 Channel/pump，并在实例级宽限期
 内等待所有已准入提交收口。只有宽限耗尽才取消承载提交的 asyncio Task。Turn 排干后才分发
 `instance_shutdown` Observer 并逆序释放插件资源，避免在途 Turn 使用已经关闭的 Provider。
 

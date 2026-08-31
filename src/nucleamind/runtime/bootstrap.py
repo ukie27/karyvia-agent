@@ -475,7 +475,6 @@ def _assemble(
         lifecycles=lifecycles,
         stop_timeout_ms=config.plugins.stop_timeout_ms,
         channel_concurrency=config.routing.channel_concurrency,
-        channel_queue_max_size=config.routing.channel_queue_max_size,
         runtime=runtime,
         lock=lock,
         closers=tuple(closers),

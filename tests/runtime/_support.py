@@ -133,10 +133,9 @@ def register_test_manifest(path: Path) -> None:
     )
 
 
-# --------------------------------------------------------------- 多会话 Channel（`D33`）
+# --------------------------------------------------------------- 多会话 Channel
 
-#: 这条假 Channel 的 `channel_id`。内建 CLI 只有一个 conversation，验不了按 conversation
-#: 扇出——那正是本 Channel 存在的理由。
+#: 这条假 Channel 的 `channel_id`。内建 CLI 只有一个 conversation，验不了跨 Session 并发。
 MULTI_CHANNEL_ID: str = "multi"
 
 

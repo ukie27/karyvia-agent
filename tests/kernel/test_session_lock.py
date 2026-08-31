@@ -117,6 +117,17 @@ async def test_queue_preserves_strict_fifo_under_concurrency() -> None:
     assert all(outcome.status is SubmitStatus.EXECUTED for outcome in outcomes)
 
 
+async def test_queue_order_is_fixed_before_awaitables_are_scheduled() -> None:
+    """FIFO 取决于 `submit()` 调用顺序，不取决于协程任务先跑到哪一个。"""
+    scheduler: SessionScheduler[tuple[str, ...]] = SessionScheduler(queue_max_size=64)
+    recorder = Recorder()
+    submissions = [scheduler.submit(KEY, message(index), recorder) for index in range(5)]
+
+    await asyncio.gather(*(asyncio.ensure_future(item) for item in reversed(submissions)))
+
+    assert recorder.executed_contents == [str(index) for index in range(5)]
+
+
 async def test_queue_never_runs_two_writers_at_once() -> None:
     scheduler: SessionScheduler[tuple[str, ...]] = SessionScheduler(queue_max_size=64)
     gate = asyncio.Event()
@@ -214,11 +225,11 @@ async def test_merge_collapses_the_backlog_into_one_batch() -> None:
 
     outcomes = await submit_all(scheduler, recorder, gate, 8)
 
-    assert recorder.batches == [("0",), ("1", "2", "3", "4", "5", "6", "7")]
+    assert recorder.batches == [("0", "1", "2", "3", "4", "5", "6", "7")]
     assert recorder.concurrent_peak == 1
     statuses = [outcome.status for outcome in outcomes]
-    assert statuses.count(SubmitStatus.EXECUTED) == 2
-    assert statuses.count(SubmitStatus.MERGED) == 6
+    assert statuses.count(SubmitStatus.EXECUTED) == 1
+    assert statuses.count(SubmitStatus.MERGED) == 7
 
 
 async def test_merged_submitters_receive_the_absorbing_batch_result() -> None:
@@ -233,8 +244,8 @@ async def test_merged_submitters_receive_the_absorbing_batch_result() -> None:
     merged = [item for item in outcomes if item.status is SubmitStatus.MERGED]
 
     assert merged
-    assert all(item.result == ("1", "2", "3") for item in merged)
-    assert all(len(item.batch) == 3 for item in merged)
+    assert all(item.result == ("0", "1", "2", "3") for item in merged)
+    assert all(len(item.batch) == 4 for item in merged)
 
 
 async def test_merge_reports_failure_to_everyone_in_the_batch() -> None:
@@ -252,10 +263,13 @@ async def test_merge_reports_failure_to_everyone_in_the_batch() -> None:
             return ()
         raise RuntimeError("boom")
 
+    first = asyncio.ensure_future(scheduler.submit(KEY, message(0), run))
+    await started.wait()
     tasks = [
-        asyncio.ensure_future(scheduler.submit(KEY, message(index), run)) for index in range(3)
+        first,
+        asyncio.ensure_future(scheduler.submit(KEY, message(1), run)),
+        asyncio.ensure_future(scheduler.submit(KEY, message(2), run)),
     ]
-    await asyncio.sleep(0)
     gate.set()
     results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -279,6 +293,27 @@ async def test_a_failing_run_leaves_the_session_usable() -> None:
         await scheduler.submit(KEY, message(1), boom)
 
     assert (await scheduler.submit(KEY, message(2), fine)).result == "ok"
+
+
+async def test_cancelling_a_waiter_does_not_poison_the_session() -> None:
+    """同步登记后，等待方取消必须移除票据并保留后续可用性。"""
+    scheduler: SessionScheduler[str] = SessionScheduler()
+    gate = asyncio.Event()
+
+    async def run(batch: tuple[InboundMessage, ...]) -> str:
+        await gate.wait()
+        return batch[0].content
+
+    first = asyncio.ensure_future(scheduler.submit(KEY, message(1), run))
+    waiting = asyncio.ensure_future(scheduler.submit(KEY, message(2), run))
+    await asyncio.sleep(0)
+    waiting.cancel()
+    await asyncio.gather(waiting, return_exceptions=True)
+
+    assert scheduler.waiting(KEY) == 0
+    gate.set()
+    assert (await first).result == "1"
+    assert (await scheduler.submit(KEY, message(3), run)).result == "3"
 
 
 async def test_different_sessions_do_not_block_each_other() -> None:

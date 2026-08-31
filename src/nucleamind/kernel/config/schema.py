@@ -33,7 +33,6 @@ from ...contracts import ErrorCode, NucleaError
 from . import plugin_blocks as blocks
 from .defaults import (
     DEFAULT_CHANNEL_CONCURRENCY,
-    DEFAULT_CHANNEL_QUEUE_MAX_SIZE,
     DEFAULT_COMMAND_PREFIX,
     DEFAULT_COMPACTOR_TIMEOUT_MS,
     DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS,
@@ -137,9 +136,6 @@ SECTION_SPECS: Final[Mapping[str, Mapping[str, FieldSpec]]] = {
         "dedup_capacity": FieldSpec(FieldKind.POSITIVE_INT, DEFAULT_DEDUP_CAPACITY),
         "dedup_ttl_ms": FieldSpec(FieldKind.POSITIVE_INT, DEFAULT_DEDUP_TTL_MS),
         "channel_concurrency": FieldSpec(FieldKind.POSITIVE_INT, DEFAULT_CHANNEL_CONCURRENCY),
-        "channel_queue_max_size": FieldSpec(
-            FieldKind.POSITIVE_INT, DEFAULT_CHANNEL_QUEUE_MAX_SIZE
-        ),
     },
     "plugins": {
         "enabled": FieldSpec(FieldKind.STR_LIST, ()),
@@ -346,9 +342,6 @@ def validate_config(data: Mapping[str, JsonValue]) -> NucleaConfig:
             dedup_ttl_ms=int_at(routing, "dedup_ttl_ms", DEFAULT_DEDUP_TTL_MS),
             channel_concurrency=int_at(
                 routing, "channel_concurrency", DEFAULT_CHANNEL_CONCURRENCY
-            ),
-            channel_queue_max_size=int_at(
-                routing, "channel_queue_max_size", DEFAULT_CHANNEL_QUEUE_MAX_SIZE
             ),
         ),
         hooks=HooksSection(

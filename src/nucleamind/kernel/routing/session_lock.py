@@ -181,18 +181,21 @@ class SessionScheduler(Generic[_T]):
         slot = self._slots.get(key)
         return len(slot.waiters) if slot is not None else 0
 
-    async def submit(
+    def submit(
         self,
         key: SessionKey,
         message: InboundMessage,
         run: Callable[[tuple[InboundMessage, ...]], Awaitable[_T]],
         *,
         turn_id: TurnId | None = None,
-    ) -> SubmitOutcome[_T]:
-        """把一条消息交给调度器，按策略执行、合并或拒绝。
+    ) -> Awaitable[SubmitOutcome[_T]]:
+        """同步登记一条消息，返回它的异步处理结果。
 
         `run` 拿到的是**一批**消息：`QUEUE` / `REJECT` 下恒为一条，`MERGE` 下可能是多条，
         顺序即到达顺序。给它元组而不是单条，是为了让编排层的签名不随策略变化。
+
+        登记阶段没有 `await`：调用顺序就是 FIFO 票据顺序。Channel 因此可以连续登记消息后
+        再并发等待结果，无需在外层再建一套 per-session lane。
 
         **异常约定**：`run` 抛出的异常原样上抛给提交方（以及被合并进这一批的提交方），
         调度器只保证槽位一定被释放。拒绝不是异常，走 `SubmitOutcome.REJECTED`。
@@ -205,7 +208,9 @@ class SessionScheduler(Generic[_T]):
         rejection = self._rejection_for(slot)
         if rejection is not None:
             self._discard_if_idle(key, slot)
-            return SubmitOutcome(status=SubmitStatus.REJECTED, error=rejection)
+            future: asyncio.Future[SubmitOutcome[_T]] = asyncio.get_running_loop().create_future()
+            future.set_result(SubmitOutcome(status=SubmitStatus.REJECTED, error=rejection))
+            return future
 
         ticket: _Ticket[_T] = _Ticket(message)
         slot.waiters.append(ticket)
@@ -215,8 +220,36 @@ class SessionScheduler(Generic[_T]):
         if slot.holder is None and slot.waiters[0] is ticket:
             slot.waiters.popleft()
             slot.holder = ticket
+            wait_handle = None
         else:
-            merged = await ticket.wait_handle()
+            wait_handle = ticket.wait_handle()
+
+        return self._complete_submission(
+            key,
+            slot,
+            ticket,
+            run,
+            turn_id=turn_id,
+            wait_handle=wait_handle,
+        )
+
+    async def _complete_submission(
+        self,
+        key: SessionKey,
+        slot: SessionSlot[_T],
+        ticket: _Ticket[_T],
+        run: Callable[[tuple[InboundMessage, ...]], Awaitable[_T]],
+        *,
+        turn_id: TurnId | None,
+        wait_handle: asyncio.Future[_Merged[_T] | None] | None,
+    ) -> SubmitOutcome[_T]:
+        """等待票据取得槽位，并在调用方任务内执行这一批。"""
+        if wait_handle is not None:
+            try:
+                merged = await wait_handle
+            except BaseException:
+                self._abandon(key, slot, ticket)
+                raise
             if merged is not None:
                 return SubmitOutcome(
                     status=SubmitStatus.MERGED, result=merged.result, batch=merged.batch
@@ -299,6 +332,21 @@ class SessionScheduler(Generic[_T]):
         if slot.waiters:
             self._hand_over(slot)
             return
+        self._discard_if_idle(key, slot)
+
+    def _abandon(
+        self, key: SessionKey, slot: SessionSlot[_T], ticket: _Ticket[_T]
+    ) -> None:
+        """等待方被取消时移除票据，避免留下永远不会继续执行的 holder。"""
+        if slot.holder is ticket:
+            self._release(key, slot)
+            return
+        try:
+            slot.waiters.remove(ticket)
+        except ValueError:
+            return  # 票据已被某个 MERGE 批次吸收，消息会随该批正常处理。
+        if self._policy is ConcurrencyPolicy.MERGE:
+            slot.pending = [item for item in slot.pending if item is not ticket.message]
         self._discard_if_idle(key, slot)
 
     def _hand_over(self, slot: SessionSlot[_T]) -> None:

@@ -44,7 +44,6 @@ def config_to_json(config: NucleaConfig) -> dict[str, JsonValue]:
             "dedup_capacity": config.routing.dedup_capacity,
             "dedup_ttl_ms": config.routing.dedup_ttl_ms,
             "channel_concurrency": config.routing.channel_concurrency,
-            "channel_queue_max_size": config.routing.channel_queue_max_size,
         },
         "hooks": {
             "observer_timeout_ms": config.hooks.observer_timeout_ms,

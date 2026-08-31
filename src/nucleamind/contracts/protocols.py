@@ -481,10 +481,9 @@ class Channel(Protocol):
         `message.is_complete_answer` 为假时必须附加明确标记，不得渲染成完整回答
         （`EDG-304`）。
 
-        **它可能被并发调用**：Channel 泵按 conversation 扇出之后，不同
-        conversation 的 turn 会同时跑到这一步。**同一 conversation 内不会并发**——
-        lane 与 `SessionScheduler` 双重串行保证了这一点，因此按 conversation 分片的
-        缓冲（流式 edit-in-place 那类）不需要加锁。
+        **它可能被并发调用**：不同 Session 的 turn 会同时跑到这一步。**同一 Session 内
+        不会并发**——`SessionScheduler` 是唯一单写者边界，因此按 conversation 分片的缓冲
+        （流式 edit-in-place 那类）不需要加锁。
 
         **异常约定**：投递失败抛 `EXTERNAL_CHANNEL` 并如实标注 `retryable`。
         **抛出是安全的**：出站路由点捕获它、发一条 `channel.delivery_failed`，turn 照样
