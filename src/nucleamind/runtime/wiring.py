@@ -140,7 +140,7 @@ async def wire_capabilities(
     让测试对象悄悄进入生产路径。生产实现位于 `runtime/plugin_context.py`。
 
     **`context_for` 按 manifest 而不是按 `ProviderId` 索引**：全部内建共用
-    一个 `Builtin()`，按提供方索引会让七份内建拿到同一个配置块与同一个状态目录——
+    一个 `Builtin()`，按提供方索引会让九份内建拿到同一个配置块与同一个状态目录——
     `session-jsonl` 会读到 `model-openai` 的配置。manifest 才是「这是谁」的唯一答案。
 
     `keep` 按配置裁掉本次不生效的能力声明（`TOL-006`，见 `to_load_request()`）。它对

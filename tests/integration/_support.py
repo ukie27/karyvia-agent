@@ -77,6 +77,7 @@ from nucleamind.kernel.turn import (
     RegisteredHook,
     RegisteredTool,
     ToolExecutor,
+    TurnCompactionPolicy,
     TurnLimits,
     TurnOrchestrator,
     TurnReceipt,
@@ -89,6 +90,7 @@ from nucleamind.sdk.testing import (
     FakeModelProvider,
     FakePluginContext,
     InMemorySessionStore,
+    StaticTurnContextCompactor,
 )
 
 __all__ = [
@@ -146,13 +148,14 @@ def fragment(
     kind: FragmentKind = FragmentKind.SYSTEM,
     trust: TrustLevel = TrustLevel.SYSTEM,
     priority: int = 0,
+    estimated_tokens: int = 8,
 ) -> ContextFragment:
     return ContextFragment(
         source=source,
         kind=kind,
         content=content,
         priority=priority,
-        estimated_tokens=8,
+        estimated_tokens=estimated_tokens,
         scope=FragmentScope.SESSION,
         trust=trust,
     )
@@ -168,11 +171,17 @@ class EchoTool:
     时间窗确定得多。
     """
 
-    def __init__(self, before: Callable[[], Awaitable[None]] | None = None) -> None:
+    def __init__(
+        self,
+        before: Callable[[], Awaitable[None]] | None = None,
+        *,
+        result_content: str | None = None,
+    ) -> None:
         #: 执行正文之前跑的协程。公开可写，取消用例在装配之后才知道该取消谁。
         self.before = before
         #: 收到过的全部调用，按顺序。「哪个工具真的跑了」直接读它。
         self.calls: list[ToolInvocation] = []
+        self.result_content = result_content
 
     async def execute(self, invocation: ToolInvocation, cancel: CancelSignal) -> ToolResult:
         del cancel
@@ -183,7 +192,7 @@ class EchoTool:
         return ToolResult(
             call_id=invocation.call.call_id,
             ok=True,
-            content=f"读到了 {path}",
+            content=self.result_content or f"读到了 {path}",
             truncated=False,
             side_effect=SideEffect.NONE,
         )
@@ -393,6 +402,9 @@ def wire(
         dedup=DedupCache(),
         limits=limits or TurnLimits(),
         model_id=FAKE_MODEL_ID,
+        turn_compactor=TurnCompactionPolicy(
+            StaticTurnContextCompactor(), "basic", Builtin()
+        ),
         # 模型看得见的工具集与调度用的工具集同源——`ToolExecutor.specs` 是唯一来源。
         tool_specs=executor.specs,
         context_providers=context_providers_from(registry),

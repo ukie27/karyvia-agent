@@ -61,6 +61,7 @@ from nucleamind.kernel.turn import (
     HookRouter,
     OrchestratorDeps,
     ToolExecutor,
+    TurnCompactionPolicy,
     TurnOrchestrator,
     TurnReceipt,
     bindings_from,
@@ -89,6 +90,7 @@ from .selection import (
     select_compactor,
     select_model,
     select_recall,
+    select_turn_compactor,
 )
 from .startup import StartupResources
 from .wiring import Wiring
@@ -303,6 +305,7 @@ async def _build_instance(
         sessions=sessions,
         model=model,
         model_id=model_id,
+        turn_compactor=select_turn_compactor(registry, config),
         model_info=model_info,
         cli=cli.value,
         contexts=tuple(resources.contexts),
@@ -376,6 +379,7 @@ def _assemble(
     sessions: SessionStore,
     model: ModelProvider,
     model_id: str,
+    turn_compactor: TurnCompactionPolicy,
     model_info: ModelInfo | None,
     cli: CliEntry,
     contexts: tuple[RuntimePluginContext, ...],
@@ -428,6 +432,7 @@ def _assemble(
         ),
         limits=loaded.limits,
         model_id=model_id,
+        turn_compactor=turn_compactor,
         # 模型看得见的工具集与调度用的工具集同源——`ToolExecutor.specs` 是唯一来源。
         tool_specs=executor.specs,
         context_providers=context_providers_from(registry),

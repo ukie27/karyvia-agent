@@ -1,8 +1,9 @@
 """能力接口：Kernel 与能力实现之间唯一的行为契约（技术方案 §5.1、需求 §9.3 `SDK-001`）。
 
-职责：声明 10 个能力 Protocol（`ModelProvider` / `ToolHandler` / `ContextProvider` /
-`SessionStore` / `MemoryProvider` / `Channel` / `CommandHandler` / `HookHandler` /
-`CliEntry`）与三个支撑用的只读/动作面（`CancelSignal` / `InstanceView` / `TurnControl`），
+职责：声明 11 个能力 Protocol（`ModelProvider` / `ToolHandler` / `ContextProvider` /
+`ContextCompactor` / `TurnContextCompactor` / `SessionStore` / `MemoryProvider` / `Channel` /
+`CommandHandler` / `HookHandler` / `CliEntry`）与四个支撑用的只读/动作面（`CancelSignal` /
+`CompactionModel` / `InstanceView` / `TurnControl`），
 并在每个方法的 docstring 上固定写明**异常约定**与**取消语义**。
 不负责：提供任何实现、决定调用顺序与重试、执行超时——实现在 `builtins/` 与 `plugins/`，
 调度在 `kernel/`；本模块只有签名，函数体一律是 docstring + `...`。
@@ -26,11 +27,16 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from .capability import HookContext, HookOutcome
 from .command import CommandInvocation, CommandResult, CommandSpec
-from .compaction import CompactionRequest, CompactionResult
+from .compaction import (
+    CompactionRequest,
+    CompactionResult,
+    TurnCompactionRequest,
+    TurnCompactionResult,
+)
 from .context import ContextFragment, FragmentScope
 from .ids import Correlation, SessionKey, TurnId
 from .message import InboundMessage, OutboundMessage
-from .model import ModelChunk, ModelInfo, ModelRequest, ModelResponse
+from .model import ModelChunk, ModelInfo, ModelMessage, ModelRequest, ModelResponse
 from .session import CancelReason, SessionMessage, SessionSnapshot
 from .tool import ToolInvocation, ToolResult
 
@@ -44,6 +50,7 @@ __all__ = [
     "CommandHandler",
     "ContextProvider",
     "ContextCompactor",
+    "CompactionModel",
     "HookHandler",
     "InstanceView",
     "MemoryProvider",
@@ -51,6 +58,7 @@ __all__ = [
     "SessionStore",
     "ToolHandler",
     "TurnControl",
+    "TurnContextCompactor",
 ]
 
 
@@ -301,6 +309,48 @@ class ContextCompactor(Protocol):
         视为插件失败。
         **取消语义**：在模型调用等外部操作前检查 `cancel`；收到取消后尽快停止并抛
         `CANCELLED` 类错误。Kernel 不会取消已经开始的 Session 持久化。
+        """
+        ...
+
+
+@runtime_checkable
+class CompactionModel(Protocol):
+    """Turn Compactor 按次获得的当前模型窄门面。"""
+
+    @property
+    def info(self) -> ModelInfo:
+        """当前选中模型的能力声明。"""
+        ...
+
+    async def complete(
+        self,
+        messages: Sequence[ModelMessage],
+        cancel: CancelSignal,
+        *,
+        max_output_tokens: int | None = None,
+    ) -> ModelResponse:
+        """使用当前模型完成一次无工具、非流式压缩辅助请求。
+
+        **异常约定**：沿用当前 Model Provider 的 `NucleaError`；非法输出上限抛
+        `CONFIG_INVALID`。**取消语义**：透传 `cancel`，不会进入 Turn 压缩包装层。
+        """
+        ...
+
+
+@runtime_checkable
+class TurnContextCompactor(Protocol):
+    """模型—工具迭代期间的临时上下文压缩策略。"""
+
+    async def compact(
+        self,
+        request: TurnCompactionRequest,
+        model: CompactionModel,
+        cancel: CancelSignal,
+    ) -> TurnCompactionResult:
+        """返回要替换的连续单元前缀与非空摘要。
+
+        **异常约定**：预期失败抛 `NucleaError`；宿主不会改用另一种压缩策略。
+        **取消语义**：外部调用前检查 `cancel`，取消后尽快抛取消类 `NucleaError`。
         """
         ...
 

@@ -68,7 +68,14 @@ from .command import (  # noqa: E402
     CommandSpec,
     Disposition,
 )
-from .compaction import CompactionRequest, CompactionResult  # noqa: E402
+from .compaction import (  # noqa: E402
+    CompactionRequest,
+    CompactionResult,
+    TurnCompactionRequest,
+    TurnCompactionResult,
+    TurnContextUnit,
+    TurnContextUnitKind,
+)
 from .context import (  # noqa: E402
     UNTRUSTED_DATA_PREFIX,
     ContextFragment,
@@ -76,6 +83,7 @@ from .context import (  # noqa: E402
     FragmentScope,
     Sensitivity,
     TrustLevel,
+    wrap_untrusted,
 )
 from .errors import (  # noqa: E402
     CODE_CATEGORIES,
@@ -122,6 +130,7 @@ from .protocols import (  # noqa: E402
     Channel,
     CliEntry,
     CommandHandler,
+    CompactionModel,
     ContextCompactor,
     ContextProvider,
     HookHandler,
@@ -130,6 +139,7 @@ from .protocols import (  # noqa: E402
     ModelProvider,
     SessionStore,
     ToolHandler,
+    TurnContextCompactor,
     TurnControl,
 )
 from .session import (  # noqa: E402
@@ -179,6 +189,7 @@ __all__ = [
     "CommandSpec",
     "CompactionRequest",
     "CompactionResult",
+    "CompactionModel",
     "Concurrency",
     "ContextCompactor",
     "ContextFragment",
@@ -238,6 +249,11 @@ __all__ = [
     "ToolSpec",
     "TrustLevel",
     "TurnControl",
+    "TurnCompactionRequest",
+    "TurnCompactionResult",
+    "TurnContextCompactor",
+    "TurnContextUnit",
+    "TurnContextUnitKind",
     "TurnId",
     "TurnOutcome",
     "TurnStatus",
@@ -248,4 +264,5 @@ __all__ = [
     "redact",
     "scrub",
     "validate_identifier",
+    "wrap_untrusted",
 ]

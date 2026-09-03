@@ -53,6 +53,8 @@ def config_to_json(config: NucleaConfig) -> dict[str, JsonValue]:
             "provider_timeout_ms": config.context.provider_timeout_ms,
             "compactor": config.context.compactor,
             "compactor_timeout_ms": config.context.compactor_timeout_ms,
+            "turn_compactor": config.context.turn_compactor,
+            "turn_compactor_timeout_ms": config.context.turn_compactor_timeout_ms,
         },
         "memory": {
             "provider": config.memory.provider,

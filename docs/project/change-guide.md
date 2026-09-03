@@ -50,6 +50,7 @@
 | Command | `register_command` | `kernel/routing/dispatcher.py` |
 | Context | `register_context_provider` | `kernel/turn/context_builder.py` |
 | Compactor | `register_context_compactor` | `kernel/turn/compaction.py` |
+| Turn Compactor | `register_turn_compactor` | `kernel/turn/turn_compaction.py` |
 | Hook | `api.on` | `kernel/turn/hooks.py` |
 | Model | `register_model_provider` | Runtime selection → Engine deps |
 | Channel | `register_channel` | Runtime instance/input pump |
@@ -63,7 +64,7 @@
 ## 4. 新增一种 CapabilityKind
 
 这是 SDK 兼容新增，不是普通 Enum 修改。以 `COMPACTOR` 的加入方式为模板，用 `rg` 搜索现有
-十种 kind，至少贯通以下位置：
+十一种 kind，至少贯通以下位置：
 
 1. `contracts/capability.py`：Enum、arity 表、引用/解析约束。
 2. `contracts`：该能力的公开 Protocol、请求与结果契约。
@@ -152,6 +153,10 @@
 
 任何 Orchestrator 改动都要检查：事件单发布点、hook 次数、started/terminal 配对、Session
 锁持有范围、Transcript 保存失败、附件收集、Memory/Compactor 失败策略。
+
+Turn 内请求增长不通过增加 Engine 槽位处理：在 Orchestrator 的 model 装配边界包装
+`TurnCompactingModel`，策略由 `TURN_COMPACTOR` 插件提供。修改时必须同时验证完整
+`ModelRequest` 估算、工具往返不可拆分、摘要仅在当前 Turn 传递，以及 Session 不发生写入。
 
 ## 9. 修改持久化契约
 

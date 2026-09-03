@@ -177,7 +177,7 @@ async def test_the_cli_stays_usable_with_every_disableable_builtin_off(tmp_path:
 
 
 async def test_each_builtin_gets_its_own_config_block(tmp_path: Path) -> None:
-    """八份内建共用一个 `Builtin()` ProviderId，配置块**只能**按 manifest 索引。"""
+    """九份内建共用一个 `Builtin()` ProviderId，配置块**只能**按 manifest 索引。"""
     write_config(tmp_path)
     instance = await _boot(tmp_path)
     try:
@@ -265,12 +265,17 @@ async def test_a_secret_reference_reaches_the_plugin(tmp_path: Path) -> None:
 
 @pytest.mark.parametrize(
     ("missing", "kind"),
-    [("session-jsonl", "SESSION_STORE"), ("model-openai", "MODEL"), ("cli-entry", "CLI_ENTRY")],
+    [
+        ("session-jsonl", "SESSION_STORE"),
+        ("model-openai", "MODEL"),
+        ("context-compact-basic", "TURN_COMPACTOR"),
+        ("cli-entry", "CLI_ENTRY"),
+    ],
 )
 async def test_missing_required_capabilities_fail_the_start(
     tmp_path: Path, missing: str, kind: str
 ) -> None:
-    """§10.1 步骤 8：三项必需能力各须有一个生效实现，缺一即以 `CAPABILITY_MISSING` 终止。"""
+    """§10.1 步骤 8：四项必需能力各须有一个生效实现，缺一即以 `CAPABILITY_MISSING` 终止。"""
     write_config(tmp_path)
     with pytest.raises(NucleaError) as caught:
         await _boot(tmp_path, manifests=manifests_without(missing))

@@ -60,7 +60,7 @@ def manifest(plugin_id: str = "probe", *, priority: int | None = None) -> Plugin
 
 def context_for(source: PluginManifest) -> PluginContext:
     """`D23` 起按 **manifest** 索引：全部内建共用一个 `Builtin()`，按提供方索引会让
-    七份内建拿到同一个配置块。"""
+    九份内建拿到同一个配置块。"""
     return FakePluginContext(source.id)
 
 

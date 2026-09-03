@@ -121,7 +121,6 @@ from .memory import (
 )
 from .message_projection import render_message_content
 from .orchestration import (
-    EventTap,
     OrchestratorDeps,
     TurnReceipt,
     emit_outbound,
@@ -152,6 +151,12 @@ from .translation import (
     outcome_from,
     outcome_without_engine,
     tool_event_name,
+)
+from .turn_compaction import (
+    DEFAULT_TURN_COMPACTOR_TIMEOUT_MS,
+    TurnCompactingModel,
+    TurnCompactionPolicy,
+    project_units,
 )
 
 __all__ = [
@@ -184,11 +189,11 @@ __all__ = [
     "DEFAULT_TOOL_RESULT_MAX_BYTES",
     "DEFAULT_TOOL_TIMEOUT_MS",
     "DEFAULT_TURN_TIMEOUT_MS",
+    "DEFAULT_TURN_COMPACTOR_TIMEOUT_MS",
     "DroppedFragment",
     "EMPTY_TOOL_RESULT_TEXT",
     "ENGINE_HOOKS",
     "EngineDeps",
-    "EventTap",
     "FALLBACK_CONTEXT_MAX_TOKENS",
     "HISTORY_TRIM_PRIORITY",
     "HOOK_ACTIONS",
@@ -228,6 +233,8 @@ __all__ = [
     "Transcript",
     "TurnCancelled",
     "TurnCompleted",
+    "TurnCompactingModel",
+    "TurnCompactionPolicy",
     "TurnEvent",
     "TurnFailed",
     "TurnLimits",
@@ -253,6 +260,7 @@ __all__ = [
     "outcome_from",
     "outcome_without_engine",
     "partition_tool_batches",
+    "project_units",
     "replay_messages",
     "render_message_content",
     "retry_delay_ms",

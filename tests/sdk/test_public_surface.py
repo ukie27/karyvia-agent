@@ -67,13 +67,15 @@ SDK_TESTING_PUBLIC_NAMES: Final[tuple[str, ...]] = (
     "SessionStoreContract",
     "StaticContextCompactor",
     "StaticContextProvider",
+    "StaticTurnContextCompactor",
     "ToolContract",
+    "TurnContextCompactorContract",
     "make_correlation",
     "text_response",
     "tool_call_response",
 )
 
-#: 10 个注册方法与 `CapabilityKind` 的 10 个取值一一对应（技术方案 §7.5）。
+#: 11 个注册方法与 `CapabilityKind` 的 11 个取值一一对应（技术方案 §7.5）。
 #: 用字面量写死而不是从实现反推：从实现反推的测试只能证明代码没改，
 #: 证明不了它和技术方案一致。
 REGISTRATION_METHODS: Final[dict[CapabilityKind, str]] = {
@@ -81,6 +83,7 @@ REGISTRATION_METHODS: Final[dict[CapabilityKind, str]] = {
     CapabilityKind.COMMAND: "register_command",
     CapabilityKind.CONTEXT: "register_context_provider",
     CapabilityKind.COMPACTOR: "register_context_compactor",
+    CapabilityKind.TURN_COMPACTOR: "register_turn_compactor",
     CapabilityKind.MODEL: "register_model_provider",
     CapabilityKind.CHANNEL: "register_channel",
     CapabilityKind.MEMORY: "register_memory_provider",
@@ -160,14 +163,14 @@ def test_contract_types_are_not_re_exported() -> None:
 # -------------------------------------------------------------------------- NucleaAPI
 
 
-def test_registration_method_count_is_ten() -> None:
-    """`SDK-001`：注册方法恰好 10 个，与 `CapabilityKind` 一一对应。"""
-    assert len(REGISTRATION_METHODS) == 10
+def test_registration_method_count_is_eleven() -> None:
+    """`SDK-001`：注册方法恰好 11 个，与 `CapabilityKind` 一一对应。"""
+    assert len(REGISTRATION_METHODS) == 11
     assert set(REGISTRATION_METHODS) == set(CapabilityKind)
     assert set(REGISTRATION_METHODS) == set(CAPABILITY_ARITY)
 
 
-def test_nuclea_api_surface_is_exactly_ctx_plus_ten_methods() -> None:
+def test_nuclea_api_surface_is_exactly_ctx_plus_eleven_methods() -> None:
     assert _members(NucleaAPI) == frozenset({"ctx", *REGISTRATION_METHODS.values()})
 
 

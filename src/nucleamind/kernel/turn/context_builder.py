@@ -28,7 +28,6 @@
 from __future__ import annotations
 
 import asyncio
-import math
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -63,6 +62,7 @@ from .deps import HookDispatcher
 from .limits import TurnLimits
 from .memory import MemoryRecall
 from .message_projection import render_message_content
+from .request_size import estimate_tokens
 
 __all__ = [
     "DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS",
@@ -84,12 +84,6 @@ DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS: Final = 3_000
 #: 应当在插件片段（基准 100）之后才被丢；但它不该比内建片段更晚被丢——同优先级时先丢
 #: 片段、再丢历史，因为片段下一轮还能重新产出，历史丢了就是丢了。
 HISTORY_TRIM_PRIORITY: Final = 0
-
-#: 粗估 token 的字符比。Provider 自报 `estimated_tokens`（`CTX-003` 明确不要求精确），
-#: 只有会话历史与当前输入需要 Kernel 自己估——这里给一个确定的、与语言无关的比值，
-#: 宁可高估：低估会让请求真的超出模型窗口，而高估只是多裁一点。
-_CHARS_PER_TOKEN: Final = 3
-
 
 @dataclass(frozen=True, slots=True)
 class RegisteredContextProvider:
@@ -134,12 +128,6 @@ class AssembledContext:
     estimated_tokens: int
     budget: int
     history_dropped: int = 0
-
-
-def estimate_tokens(text: str) -> int:
-    """粗估一段文本的 token 数。空串为 0，其余至少 1。"""
-    return math.ceil(len(text) / _CHARS_PER_TOKEN) if text else 0
-
 
 def context_providers_from(registry: CapabilityRegistry) -> tuple[ContextProviderBinding, ...]:
     """从已冻结的 registry 取出全部生效的 Context Provider，按 `(priority, provider, name)` 排序。

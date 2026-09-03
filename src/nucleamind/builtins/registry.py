@@ -29,6 +29,7 @@ __all__ = [
     "CLI_ENTRY",
     "COMMANDS_CORE",
     "CONTEXT_BASIC",
+    "CONTEXT_COMPACT_BASIC",
     "MODEL_OPENAI",
     "SESSION_JSONL",
     "TOOLS_FS",
@@ -96,6 +97,17 @@ CONTEXT_BASIC: Final = PluginManifest(
         },
         "additionalProperties": False,
     },
+)
+
+#: 默认 Turn 内上下文压缩策略。它是必需能力的默认提供方，但不享有 Kernel 私有兜底路径。
+CONTEXT_COMPACT_BASIC: Final = PluginManifest(
+    id="context-compact-basic",
+    version="0.1.0",
+    sdk_range=">=4.1.0,<5.0.0",
+    setup="nucleamind.builtins.context_compact_basic:setup",
+    capabilities=(
+        CapabilityDecl(kind=CapabilityKind.TURN_COMPACTOR, name="basic"),
+    ),
 )
 
 #: `D19` 内建 Model Provider（技术方案 §8.1、§15 第 5 项）。
@@ -460,6 +472,7 @@ CLI_ENTRY: Final = PluginManifest(
 BUILTIN_MANIFESTS: Final[tuple[PluginManifest, ...]] = (
     SESSION_JSONL,
     CONTEXT_BASIC,
+    CONTEXT_COMPACT_BASIC,
     MODEL_OPENAI,
     TOOLS_FS,
     TOOLS_FILE,

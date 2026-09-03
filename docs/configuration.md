@@ -190,11 +190,20 @@ Session 的等待上限。保留旧字段会按未知配置拒绝启动，避免
 | `provider_timeout_ms` | 正整数 | `3000` | 单个 Context Provider 的独立超时。超时后记录故障并跳过 |
 | `compactor` | 字符串或 `null` | `null` | `COMPACTOR` 能力的名字。`null` = 只做确定性请求级裁剪、不改写 Session；**写了却不存在是启动失败** |
 | `compactor_timeout_ms` | 正整数 | `3000` | 单次 Context Compactor 调用预算。超时或非法结果会记录插件失败，并沿用首次裁剪结果 |
+| `turn_compactor` | 字符串 | `"basic"` | `TURN_COMPACTOR` 能力的名字。该能力必选；写了却不存在或禁用唯一提供方都会使启动失败 |
+| `turn_compactor_timeout_ms` | 正整数 | `120000` | 每次 Turn 内临时压缩的超时上限；超时终止当前 Turn，不切换另一策略 |
 
 注意 `context_max_tokens` **不在这里**：它是 turn 的六项预算之一。
 安装或注册 Context Compactor **不会自动启用**；必须显式设置 `context.compactor`。
 压缩只在本轮历史确实被预算裁掉时尝试一次，摘要正文和压缩水位由插件决定，Kernel 负责
 校验、持久化、重载与失败回退。
+
+`turn_compactor` 是另一条能力边界。它在 Engine 每轮最终 `ModelRequest` 即将发送前检查
+完整请求（包括消息、工具 schema、工具参数和 provider blocks）。超限时，策略只能用
+摘要替换可压缩单元的连续前缀，工具调用与它的全部结果永远是同一单元。这种摘要
+仅存在于当前 Turn 的模型请求投影，不会调用 `SessionStore.compact()`、改写 Transcript
+或丢失真实工具结果。内建 `basic` 默认启用；策略运行失败、返回非法结果或压缩后仍超限时，
+当前 Turn 明确失败，Kernel 不再执行隐式裁剪或回落到内建策略。
 
 ### `memory` —— 长期记忆召回
 

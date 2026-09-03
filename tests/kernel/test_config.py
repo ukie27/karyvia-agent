@@ -415,7 +415,7 @@ class TestSchema:
         与上面两条同理：`schema.py` 不能 import `kernel.turn`（会把 engine 与 asyncio 拖上
         配置路径），代价就是这张对照表。
         """
-        from nucleamind.kernel.turn import compaction, context_builder, hooks
+        from nucleamind.kernel.turn import compaction, context_builder, hooks, turn_compaction
 
         config = validate_config({})
         assert config.hooks.observer_timeout_ms == hooks.DEFAULT_OBSERVER_TIMEOUT_MS
@@ -427,6 +427,11 @@ class TestSchema:
         assert (
             config.context.compactor_timeout_ms
             == compaction.DEFAULT_COMPACTOR_TIMEOUT_MS
+        )
+        assert config.context.turn_compactor == "basic"
+        assert (
+            config.context.turn_compactor_timeout_ms
+            == turn_compaction.DEFAULT_TURN_COMPACTOR_TIMEOUT_MS
         )
 
     def test_memory_defaults_match_the_turn_package(self) -> None:

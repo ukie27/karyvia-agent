@@ -35,8 +35,8 @@ NucleaMind 已经具备一套可运行、受架构守卫约束的 Agent Kernel �
 
 ### 默认与可选能力
 
-八个内建能力包：JSONL Session、基础 Context、OpenAI-compatible Model、文件读写工具、文件
-投递工具、Shell 工具、核心命令和 CLI 入口。`file.send` 只把 workspace 文件附加到当前回复，
+九个内建能力包：JSONL Session、基础 Context、Turn 内上下文压缩、OpenAI-compatible Model、
+文件读写工具、文件投递工具、Shell 工具、核心命令和 CLI 入口。`file.send` 只把 workspace 文件附加到当前回复，
 实际上传仍由 Channel 完成。
 
 七个官方独立插件：OpenAI API、Anthropic、Feishu、Web、MCP、Memory、Cron。
@@ -45,9 +45,9 @@ NucleaMind 已经具备一套可运行、受架构守卫约束的 Agent Kernel �
 ### 对外表面
 
 - 包版本：`0.3.0`（alpha）。
-- SDK 版本：`4.0.0`；4.0 删除 manifest 的 `critical` 字段。外部插件故障统一隔离并进入
+- SDK 版本：`4.1.0`；4.0 删除 manifest 的 `critical` 字段，4.1 新增 Turn Compactor 能力。外部插件故障统一隔离并进入
   诊断；宿主发布的内建基线装配错误仍直接拒绝启动。
-- `NucleaAPI` 与 `CapabilityKind` 当前一一覆盖十类能力。
+- `NucleaAPI` 与 `CapabilityKind` 当前一一覆盖十一类能力。
 - `nm init`、`nm run`、`nm serve`、`nm config show`、`nm session`、
   `nm plugins`、`nm capabilities` 已可用。
 

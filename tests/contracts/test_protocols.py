@@ -25,6 +25,7 @@ from nucleamind.contracts import (
     CommandInvocation,
     CommandResult,
     CommandSpec,
+    CompactionModel,
     CompactionRequest,
     CompactionResult,
     ContextCompactor,
@@ -41,6 +42,7 @@ from nucleamind.contracts import (
     MemoryProvider,
     ModelChunk,
     ModelInfo,
+    ModelMessage,
     ModelProvider,
     ModelRequest,
     ModelResponse,
@@ -53,6 +55,9 @@ from nucleamind.contracts import (
     ToolHandler,
     ToolInvocation,
     ToolResult,
+    TurnCompactionRequest,
+    TurnCompactionResult,
+    TurnContextCompactor,
     TurnControl,
     TurnId,
 )
@@ -61,12 +66,13 @@ from nucleamind.contracts.tool import SideEffect
 #: 公开表面快照：Protocol -> 成员名集合。新增或删除方法必须同步改这里（`NFR-104`）。
 #: `CancelSignal` / `InstanceView` / `TurnControl` 单列在 `SUPPORT_PROTOCOLS`：它们是
 #: 支撑类型（取消语义、实例只读视图、turn 控制面），**不是可注册能力**——
-#: `CAPABILITY_PROTOCOLS` 必须恒为 10，与 `CapabilityKind` 的 10 个取值一一对应。
+#: `CAPABILITY_PROTOCOLS` 必须恒为 11，与 `CapabilityKind` 的 11 个取值一一对应。
 CAPABILITY_PROTOCOLS: Final[dict[type, frozenset[str]]] = {
     ModelProvider: frozenset({"describe", "complete", "stream"}),
     ToolHandler: frozenset({"execute"}),
     ContextProvider: frozenset({"provide"}),
     ContextCompactor: frozenset({"compact"}),
+    TurnContextCompactor: frozenset({"compact"}),
     SessionStore: frozenset({"load", "append", "compact", "delete", "list_keys"}),
     MemoryProvider: frozenset({"remember", "recall", "forget"}),
     Channel: frozenset({"channel_id", "start", "stop", "receive", "deliver"}),
@@ -77,6 +83,7 @@ CAPABILITY_PROTOCOLS: Final[dict[type, frozenset[str]]] = {
 
 SUPPORT_PROTOCOLS: Final[dict[type, frozenset[str]]] = {
     CancelSignal: frozenset({"requested", "raise_if_requested"}),
+    CompactionModel: frozenset({"info", "complete"}),
     InstanceView: frozenset(
         {"commands", "capabilities", "plugins", "config_document", "session_snapshot"}
     ),
@@ -100,12 +107,12 @@ def _members(protocol: type) -> frozenset[str]:
 # --------------------------------------------------------------------------- 快照
 
 
-def test_capability_protocol_count_is_ten() -> None:
+def test_capability_protocol_count_is_eleven() -> None:
     """`SDK-001` 的扩展类型数；它与 `sdk.NucleaAPI` 的注册方法一一对应。
 
     `D04` 冻结了 8 个，`D05` 补上第 9 个 `CliEntry`，`D51` 新增第 10 个 Compactor。
     """
-    assert len(CAPABILITY_PROTOCOLS) == 10
+    assert len(CAPABILITY_PROTOCOLS) == 11
 
 
 @pytest.mark.parametrize(
@@ -117,9 +124,9 @@ def test_protocol_surface_matches_snapshot(protocol: type, expected: frozenset[s
     assert _members(protocol) == expected
 
 
-def test_total_capability_members_is_twenty_two() -> None:
+def test_total_capability_members_is_twenty_three() -> None:
     """整体规模也进快照：接口数量受控是 `NFR-104` 的原话。"""
-    assert sum(len(names) for names in CAPABILITY_PROTOCOLS.values()) == 22
+    assert sum(len(names) for names in CAPABILITY_PROTOCOLS.values()) == 23
 
 
 @pytest.mark.parametrize(
@@ -171,6 +178,7 @@ def test_every_method_documents_exceptions_and_cancellation() -> None:
         "CancelSignal.raise_if_requested",
         "CancelSignal.requested",
         "Channel.channel_id",
+        "CompactionModel.info",
     ]
 
 
@@ -223,6 +231,33 @@ class FakeContextCompactor:
         self, request: CompactionRequest, cancel: CancelSignal
     ) -> CompactionResult | None:
         return None
+
+
+class FakeCompactionModel:
+    @property
+    def info(self) -> ModelInfo:
+        return ModelInfo(model_id="fake", provider="fake")
+
+    async def complete(
+        self,
+        messages: Sequence[ModelMessage],
+        cancel: CancelSignal,
+        *,
+        max_output_tokens: int | None = None,
+    ) -> ModelResponse:
+        del messages, cancel, max_output_tokens
+        return ModelResponse("fake", StopReason.END_TURN, content="summary")
+
+
+class FakeTurnContextCompactor:
+    async def compact(
+        self,
+        request: TurnCompactionRequest,
+        model: CompactionModel,
+        cancel: CancelSignal,
+    ) -> TurnCompactionResult:
+        del request, model, cancel
+        return TurnCompactionResult(1, "summary")
 
 
 class FakeSessionStore:
@@ -323,6 +358,8 @@ FAKES: Final[list[tuple[type, object]]] = [
     (ToolHandler, FakeToolHandler()),
     (ContextProvider, FakeContextProvider()),
     (ContextCompactor, FakeContextCompactor()),
+    (CompactionModel, FakeCompactionModel()),
+    (TurnContextCompactor, FakeTurnContextCompactor()),
     (SessionStore, FakeSessionStore()),
     (MemoryProvider, FakeMemoryProvider()),
     (Channel, FakeChannel()),

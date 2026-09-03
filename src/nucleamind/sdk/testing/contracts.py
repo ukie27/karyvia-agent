@@ -1,6 +1,6 @@
 """契约测试基类：可替换性的证明（技术方案 §12.3、`NFR-702`）。
 
-职责：为 7 类能力提供可继承的契约测试基类——实现方（内建或插件）继承对应基类并提供
+职责：为 8 类能力提供可继承的契约测试基类——实现方（内建或插件）继承对应基类并提供
 构造夹具，即获得全部通用用例。
 不负责：测某个具体实现的独有行为、提供夹具本身（那在 `fakes.py`）、启动 Kernel。
 
@@ -27,9 +27,11 @@ class TestMyStore(SessionStoreContract):
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from nucleamind.contracts import (
+    CancelSignal,
     Channel,
     ChunkKind,
     CompactionRequest,
@@ -43,9 +45,11 @@ from nucleamind.contracts import (
     JsonValue,
     MemoryProvider,
     ModelCapability,
+    ModelInfo,
     ModelMessage,
     ModelProvider,
     ModelRequest,
+    ModelResponse,
     NucleaError,
     OutboundMessage,
     Role,
@@ -54,12 +58,18 @@ from nucleamind.contracts import (
     SessionSnapshot,
     SessionStore,
     SideEffect,
+    StopReason,
     StreamState,
     ToolCall,
     ToolHandler,
     ToolInvocation,
     ToolSpec,
     TrustLevel,
+    TurnCompactionRequest,
+    TurnCompactionResult,
+    TurnContextCompactor,
+    TurnContextUnit,
+    TurnContextUnitKind,
     TurnId,
 )
 
@@ -73,6 +83,7 @@ __all__ = [
     "ModelProviderContract",
     "SessionStoreContract",
     "ToolContract",
+    "TurnContextCompactorContract",
 ]
 
 #: 唯一一处「用例走到了不该到的地方」的失败信息。抽成常量是为了让 `TRY003`
@@ -279,6 +290,64 @@ class ContextCompactorContract(_ContractBase):
 
     async def test_an_empty_session_is_not_an_error(self) -> None:
         await self.make_compactor().compact(self.make_request(), ManualCancel())
+
+
+class TurnContextCompactorContract(_ContractBase):
+    """`TurnContextCompactor` 的最小可替换性契约。"""
+
+    def make_compactor(self) -> TurnContextCompactor:
+        self._required("make_compactor")
+        raise AssertionError  # pragma: no cover
+
+    def make_request(self) -> TurnCompactionRequest:
+        message = ModelMessage(role=Role.ASSISTANT, content="较早的临时上下文")
+        request = ModelRequest(
+            model_id="fake-model",
+            messages=(message, ModelMessage(role=Role.USER, content="继续")),
+            correlation=make_correlation(),
+        )
+        unit = TurnContextUnit(
+            unit_id="unit-1",
+            kind=TurnContextUnitKind.BASE,
+            messages=(message,),
+            estimated_tokens=16,
+        )
+        return TurnCompactionRequest(
+            request=request,
+            units=(unit,),
+            target_tokens=128,
+            estimated_tokens=48,
+            correlation=request.correlation,
+        )
+
+    async def test_compact_returns_a_non_empty_prefix_replacement(self) -> None:
+        result = await self.make_compactor().compact(
+            self.make_request(), _ContractCompactionModel(), ManualCancel()
+        )
+        assert isinstance(result, TurnCompactionResult)
+        assert result.through_units >= 1
+        assert result.summary.strip()
+
+
+class _ContractCompactionModel:
+    @property
+    def info(self) -> ModelInfo:
+        return ModelInfo(
+            model_id="fake-model",
+            provider="fake",
+            context_window_tokens=1024,
+            max_output_tokens=128,
+        )
+
+    async def complete(
+        self,
+        messages: Sequence[ModelMessage],
+        cancel: CancelSignal,
+        *,
+        max_output_tokens: int | None = None,
+    ) -> ModelResponse:
+        del messages, cancel, max_output_tokens
+        return ModelResponse("fake-model", StopReason.END_TURN, content="摘要")
 
 
 class ToolContract(_ContractBase):

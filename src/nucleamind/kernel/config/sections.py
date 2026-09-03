@@ -48,6 +48,8 @@ from .defaults import (
     DEFAULT_SESSION_CONCURRENCY,
     DEFAULT_TOOL_RESULT_MAX_BYTES,
     DEFAULT_TOOL_TIMEOUT_MS,
+    DEFAULT_TURN_COMPACTOR,
+    DEFAULT_TURN_COMPACTOR_TIMEOUT_MS,
     DEFAULT_TURN_TIMEOUT_MS,
 )
 from .plugin_blocks import PluginEntry
@@ -147,6 +149,10 @@ class ContextSection:
     compactor: str | None = None
     #: 单次 compactor 调用预算；超时回退到首次裁剪结果。
     compactor_timeout_ms: int = DEFAULT_COMPACTOR_TIMEOUT_MS
+    #: 每轮模型请求超限时使用的临时压缩能力；生产实例必须能解析到该名字。
+    turn_compactor: str = DEFAULT_TURN_COMPACTOR
+    #: 单次 Turn Compactor 调用的总预算，也约束它通过窄门面发出的模型调用。
+    turn_compactor_timeout_ms: int = DEFAULT_TURN_COMPACTOR_TIMEOUT_MS
 
 
 @dataclass(frozen=True, slots=True)

@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 
 from nucleamind.contracts import (
     AttachmentRef,
+    Builtin,
     CancelSignal,
     CommandParam,
     CommandResult,
@@ -53,10 +54,12 @@ from nucleamind.kernel.turn import (
     ContextProviderBinding,
     OrchestratorDeps,
     RetryPolicy,
+    TurnCompactionPolicy,
     TurnLimits,
     TurnOrchestrator,
     TurnReceipt,
 )
+from nucleamind.sdk.testing import StaticTurnContextCompactor
 
 from ._engine_support import ScriptedProvider
 
@@ -363,6 +366,9 @@ def build(
         # 它们变成 `模型脚本已耗尽`。要验重试的用例自己传一个策略（`D48`）。
         retry=retry or RetryPolicy(max_attempts=1),
         model_id="fake-model",
+        turn_compactor=TurnCompactionPolicy(
+            StaticTurnContextCompactor(), "basic", Builtin()
+        ),
         tool_specs=tuple(tool_specs),  # type: ignore[arg-type]
         context_providers=tuple(context_providers),
         compactor=compactor,

@@ -25,6 +25,7 @@ from nucleamind.contracts import (
     CancelReason,
     CancelSignal,
     CommandSpec,
+    CompactionModel,
     CompactionRequest,
     CompactionResult,
     ContextFragment,
@@ -46,6 +47,8 @@ from nucleamind.contracts import (
     ToolResult,
     ToolSpec,
     TrustLevel,
+    TurnCompactionRequest,
+    TurnCompactionResult,
     TurnId,
 )
 
@@ -61,6 +64,7 @@ __all__ = [
     "RecordingEventSubscriber",
     "StaticContextCompactor",
     "StaticContextProvider",
+    "StaticTurnContextCompactor",
 ]
 
 
@@ -160,6 +164,25 @@ class StaticContextCompactor:
     async def compact(
         self, request: CompactionRequest, cancel: CancelSignal
     ) -> CompactionResult | None:
+        cancel.raise_if_requested()
+        self.requests.append(request)
+        return self.result
+
+
+class StaticTurnContextCompactor:
+    """最小可脚本化 `TurnContextCompactor`：记录请求并返回固定结果。"""
+
+    def __init__(self, result: TurnCompactionResult | None = None) -> None:
+        self.result = result or TurnCompactionResult(through_units=1, summary="已压缩。")
+        self.requests: list[TurnCompactionRequest] = []
+
+    async def compact(
+        self,
+        request: TurnCompactionRequest,
+        model: CompactionModel,
+        cancel: CancelSignal,
+    ) -> TurnCompactionResult:
+        del model
         cancel.raise_if_requested()
         self.requests.append(request)
         return self.result

@@ -150,6 +150,31 @@ async def test_the_turn_is_persisted_and_the_next_turn_replays_it() -> None:
     )
 
 
+async def test_turn_compaction_does_not_rewrite_the_persisted_tool_result() -> None:
+    """Turn 摘要只是模型请求投影；Transcript 仍持久化真实工具结果。"""
+    large_result = "真实工具结果" * 300
+    skeleton = wire(
+        [tool_call_response(READ_CALL), text_response("完成。")],
+        tools=[tool("fs.read", EchoTool(result_content=large_result))],
+        context=[_basic_context()],
+        limits=TurnLimits(context_max_tokens=120),
+    )
+
+    receipt = await skeleton.send("查看 notes.md")
+
+    assert receipt.outcome is not None
+    assert receipt.outcome.status is TurnStatus.COMPLETED
+    second_request = skeleton.model.requests[1]
+    rendered = "\n".join(message.content for message in second_request.messages)
+    assert "已压缩" in rendered
+    assert large_result not in rendered
+
+    snapshot = await skeleton.sessions.load(SESSION_KEY)
+    tool_record = next(message for message in snapshot.messages if message.role is Role.TOOL)
+    assert tool_record.content == large_result
+    assert all("已压缩" not in message.content for message in snapshot.messages)
+
+
 async def test_a_command_turn_produces_a_full_event_stream_without_the_model() -> None:
     """`KER-010`：命令即使不进模型，turn 事件一个都不少。"""
     skeleton = wire([], commands=[command("help", handled("可用命令：/help"))])
@@ -476,6 +501,7 @@ async def test_context_is_trimmed_by_priority_while_the_system_segment_survives(
         kind=FragmentKind.RUNTIME,
         trust=TrustLevel.OPERATOR,
         priority=100,
+        estimated_tokens=50,
     )
     plugin_b = fragment(
         "插件 B 的小段资料。",
@@ -491,7 +517,8 @@ async def test_context_is_trimmed_by_priority_while_the_system_segment_survives(
             ("a", RegisteredContextProvider(provider=StaticContextProvider(plugin_a))),
             ("b", RegisteredContextProvider(provider=StaticContextProvider(plugin_b))),
         ],
-        limits=TurnLimits(context_max_tokens=20),
+        # 这里还要容纳 request/model/message 的固定结构开销；55 仍会按 priority 裁掉 A。
+        limits=TurnLimits(context_max_tokens=55),
     )
 
     await skeleton.send("你好")

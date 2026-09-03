@@ -30,6 +30,7 @@ __all__ = [
     "FragmentScope",
     "Sensitivity",
     "TrustLevel",
+    "wrap_untrusted",
 ]
 
 #: 单个片段的文本上限。超出应由 Provider 自己摘要，而不是指望组装器兜底裁剪。

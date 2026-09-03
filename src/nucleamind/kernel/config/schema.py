@@ -55,6 +55,8 @@ from .defaults import (
     DEFAULT_SESSION_CONCURRENCY,
     DEFAULT_TOOL_RESULT_MAX_BYTES,
     DEFAULT_TOOL_TIMEOUT_MS,
+    DEFAULT_TURN_COMPACTOR,
+    DEFAULT_TURN_COMPACTOR_TIMEOUT_MS,
     DEFAULT_TURN_TIMEOUT_MS,
     MEMORY_ON_FAILURE_CHOICES,
     SESSION_CONCURRENCY_CHOICES,
@@ -155,6 +157,10 @@ SECTION_SPECS: Final[Mapping[str, Mapping[str, FieldSpec]]] = {
         "compactor": FieldSpec(FieldKind.OPTIONAL_STR, None),
         "compactor_timeout_ms": FieldSpec(
             FieldKind.POSITIVE_INT, DEFAULT_COMPACTOR_TIMEOUT_MS
+        ),
+        "turn_compactor": FieldSpec(FieldKind.STR, DEFAULT_TURN_COMPACTOR),
+        "turn_compactor_timeout_ms": FieldSpec(
+            FieldKind.POSITIVE_INT, DEFAULT_TURN_COMPACTOR_TIMEOUT_MS
         ),
     },
     "memory": {
@@ -359,6 +365,14 @@ def validate_config(data: Mapping[str, JsonValue]) -> NucleaConfig:
             compactor=opt_str_at(sections["context"], "compactor"),
             compactor_timeout_ms=int_at(
                 sections["context"], "compactor_timeout_ms", DEFAULT_COMPACTOR_TIMEOUT_MS
+            ),
+            turn_compactor=str_at(
+                sections["context"], "turn_compactor", DEFAULT_TURN_COMPACTOR
+            ),
+            turn_compactor_timeout_ms=int_at(
+                sections["context"],
+                "turn_compactor_timeout_ms",
+                DEFAULT_TURN_COMPACTOR_TIMEOUT_MS,
             ),
         ),
         memory=MemorySection(

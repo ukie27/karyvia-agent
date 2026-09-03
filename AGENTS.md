@@ -173,7 +173,7 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 
 ## 7. Builtins、插件与 Runtime 的所有权
 
-八个内建子包只是默认插件：`session_jsonl`、`context_basic`、`model_openai`、`tools_fs`、
+九个内建子包只是默认插件：`session_jsonl`、`context_basic`、`context_compact_basic`、`model_openai`、`tools_fs`、
 `tools_file`、`tools_shell`、`commands_core`、`cli_entry`。它们与外部插件共用 manifest、Host、
 Registry、冲突解析和生命周期，不得 import Kernel 私有实现获得特权。
 

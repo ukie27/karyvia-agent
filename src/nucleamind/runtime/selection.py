@@ -1,7 +1,7 @@
 """§10.1 步骤 8：从已冻结的 registry 里按配置挑出必需能力。
 
-职责：模型供应商与模型标识、会话存储、长期记忆的召回——三项「配置指名一个、registry 里
-找它、找不到就以稳定错误码拒绝启动」。
+职责：模型供应商与模型标识、会话存储、长期记忆召回与压缩策略的能力选择：配置指名一个、
+registry 里找它，找不到就以稳定错误码拒绝启动。
 不负责：注册能力（`wiring.py`）、解析覆盖（`kernel/registry/`）、装 `OrchestratorDeps`
 （`bootstrap.py::_assemble`）、只读诊断（`inspect.py`）。
 
@@ -22,9 +22,11 @@ from nucleamind.kernel.plugins import (
     memory_providers_from,
     model_providers_from,
     session_store_from,
+    turn_context_compactors_from,
 )
 from nucleamind.kernel.registry import CapabilityRegistry
 from nucleamind.kernel.turn import CompactionPolicy, MemoryRecall, select_memory
+from nucleamind.kernel.turn.turn_compaction import TurnCompactionPolicy
 
 __all__ = [
     "missing_capability",
@@ -32,6 +34,7 @@ __all__ = [
     "select_compactor",
     "select_model",
     "select_recall",
+    "select_turn_compactor",
 ]
 
 
@@ -118,6 +121,36 @@ def select_compactor(
         name=chosen.name,
         owner=chosen.owner,
         timeout_ms=config.context.compactor_timeout_ms,
+    )
+
+
+def select_turn_compactor(
+    registry: CapabilityRegistry, config: NucleaConfig
+) -> TurnCompactionPolicy:
+    """选择必需的 Turn 内压缩策略；不存在时拒绝启动，不做静默回落。"""
+    wanted = config.context.turn_compactor
+    bindings = turn_context_compactors_from(registry)
+    if not bindings:
+        raise missing_capability(
+            "TURN_COMPACTOR",
+            "没有 Turn Context Compactor，模型—工具迭代无法安全控制请求大小。",
+        )
+    chosen = next((binding for binding in bindings if binding.name == wanted), None)
+    if chosen is None:
+        raise NucleaError(
+            ErrorCode.CAPABILITY_MISSING,
+            "配置里指定的 Turn Context Compactor 没有注册。",
+            detail={
+                "pointer": "/context/turn_compactor",
+                "wanted": wanted,
+                "available": [binding.name for binding in bindings],
+            },
+        )
+    return TurnCompactionPolicy(
+        compactor=chosen.value,
+        name=chosen.name,
+        owner=chosen.owner,
+        timeout_ms=config.context.turn_compactor_timeout_ms,
     )
 
 

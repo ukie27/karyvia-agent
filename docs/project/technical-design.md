@@ -246,14 +246,14 @@ src/nucleamind/
 │
 ├── sdk/                       # 第 3 层：插件唯一依赖面。只 import contracts
 │   ├── __init__.py            # __all__ 为规范性稳定清单
-│   ├── api.py                 # NucleaAPI Protocol（9 方法）
+│   ├── api.py                 # NucleaAPI Protocol（11 个能力注册方法 + ctx）
 │   ├── manifest.py            # PluginManifest / CapabilityDecl
 │   ├── version.py             # SDK_VERSION
 │   └── testing/               # 公开测试工具（插件开发者的验收手段）
 │       ├── fakes.py           # FakeModelProvider / InMemorySessionStore / RecordingHook
 │       ├── capabilities.py    # 参考实现：EchoTool / NullChannel / StaticContextProvider
 │       │                      # / FakeMemoryProvider / FakeCliEntry / FakePluginContext（D16）
-│       └── contracts.py       # 7 个契约测试基类
+│       └── contracts.py       # 8 个契约测试基类
 │
 ├── builtins/                  # 第 4 层：内建默认能力，与插件同等身份
 │   ├── registry.py            # BUILTIN_MANIFESTS 静态清单
@@ -261,6 +261,7 @@ src/nucleamind/
 │   ├── model_openai/          # 内建 Model Provider（OpenAI 兼容）
 │   ├── session_jsonl/         # 内建 Session 存储
 │   ├── context_basic/         # 内建 Context Provider
+│   ├── context_compact_basic/ # 内建 Turn Context Compactor
 │   ├── tools_fs/              # fs.read / write / edit / list / grep
 │   ├── tools_shell/           # shell.exec
 │   └── commands_core/         # 最小命令集
@@ -655,6 +656,8 @@ async def run_turn(
 ```text
 loop:
   checkpoint(cancel)                    # 检查点 2
+  request = before_model_request(request)
+  request = TurnCompactingModel.prepare(request)  # 完整请求超限时调用插件压缩
   chunks = model.stream(request)
   for chunk in chunks:
       checkpoint(cancel)                # 检查点 3
@@ -755,6 +758,14 @@ engine 的不变量（写进 docstring 并由测试守护）：
   插件决定摘要正文与水位，Kernel 负责超时、结果校验、`SessionStore.compact()`、重载、
   `session.compacted` 事件与失败回退。同一 turn 重组后不再触发第二次压缩。裁到只剩系统段
   与当前输入仍超预算时仍抛 `INPUT_TOO_LARGE`，压缩不用于掩盖当前请求本身过大。
+- **Turn 内临时压缩是独立的 `TURN_COMPACTOR` 能力**。Orchestrator 把 `RetryingModel`
+  包在状态化 `TurnCompactingModel` 内，Engine 仍只看到四槽 `EngineDeps`。每轮
+  `before_model_request` 改写完成后，包装器估算消息、工具 schema、参数和 provider blocks
+  构成的完整请求。超限时，Kernel 只把可压缩消息投影成单元，工具调用与其全部
+  结果不可拆分；选中的插件用非空摘要替换连续前缀。摘要按不可信 user 数据包装，
+  仅传递到当前 Turn 的后续迭代，不读写 Session 或 Transcript。插件故障、非法结果、
+  超时或压缩后仍超限均终止当前 Turn；Kernel 不内置第二套策略。Runtime 要求该能力必选，
+  并默认选中内建 `basic`。
 - **`MERGE` 下整批归一个 turn**。被合并的消息不产生自己的事件流，只在执行 turn 的
   `turn.started` 载荷里留 `merged_from`；提交方拿到的 `TurnReceipt` 就是执行 turn 的那一份。
 
@@ -1208,7 +1219,7 @@ class PluginContext(Protocol):
     def secret(self, name: str) -> SecretStr: ...   # 解析本插件配置的 Secret 引用
 ```
 
-`NucleaAPI` 是注册面，形态直接对应 Pi 的 `ExtensionAPI`；D51 后共有 10 个方法：
+`NucleaAPI` 是注册面，形态直接对应 Pi 的 `ExtensionAPI`；当前共有 11 个方法：
 
 ```python
 class NucleaAPI(Protocol):
@@ -1217,6 +1228,7 @@ class NucleaAPI(Protocol):
     def register_command(self, spec: CommandSpec, handler: CommandHandler) -> None: ...
     def register_context_provider(self, name: str, p: ContextProvider) -> None: ...
     def register_context_compactor(self, name: str, c: ContextCompactor) -> None: ...
+    def register_turn_compactor(self, name: str, c: TurnContextCompactor) -> None: ...
     def register_model_provider(self, name: str, p: ModelProvider) -> None: ...
     def register_channel(self, name: str, c: Channel) -> None: ...
     def register_memory_provider(self, name: str, m: MemoryProvider) -> None: ...
@@ -1258,7 +1270,8 @@ Protocol）：`kernel/` 与 `runtime/` 都要调用 CLI 能力，而 `R2` 禁止
 回答 §17.2 第 10 项。
 
 - `sdk/version.py` 导出 `SDK_VERSION`，语义化版本，与主程序版本独立演进。
-  **当前为 `4.0.0`**；4.0 删除 manifest 的 `critical` 字段与跨层关键性传播。外部插件
+  **当前为 `4.1.0`**；4.0 删除 manifest 的 `critical` 字段与跨层关键性传播，4.1 新增
+  `TURN_COMPACTOR`、`TurnContextCompactor` 及其当次 `CompactionModel` 窄门面。外部插件
   故障统一进入诊断；内建基线装配错误由 Runtime 按宿主身份拒绝，均不受插件字段控制。
 - 插件用 `sdk_range` 声明兼容范围，不满足即拒绝加载（`SDK-005`）。
 - minor 版本只允许新增；移除或语义变更必须 major，且提前一个 minor 打运行期
@@ -1284,6 +1297,7 @@ Protocol）：`kernel/` 与 `runtime/` 都要调用 CLI 能力，而 `R2` 禁止
 | Model Provider | `builtins/model_openai/` | OpenAI 兼容 Chat Completions（回答 §17.2 第 5 项） |
 | Session | `builtins/session_jsonl/` | 每 session 一个 JSONL + 一个 meta.json，追加写 + 原子替换 |
 | Context | `builtins/context_basic/` | 系统指令 + 历史 + 按 token 预算的尾部保留裁剪 |
+| Turn Compactor | `builtins/context_compact_basic/` | 从最旧单元开始替换连续前缀，生成有界、确定性摘要 |
 | 基础工具 | `builtins/tools_fs/`、`tools_shell/` | 6 个工具，复用 nanobot 已验证的路径守卫与沙箱 |
 | 命令 | `builtins/commands_core/` | `/help` `/config` `/session` `/plugins` `/capabilities` `/cancel` |
 
@@ -1297,8 +1311,8 @@ Protocol）：`kernel/` 与 `runtime/` 都要调用 CLI 能力，而 `R2` 禁止
   `BAS-005` 在这一项上破例，`/help` 还列不出自己。
 - **两个 Protocol 而不是一个七成员门面**：`InstanceView` 是只读可观测性，`TurnControl` 是
   控制动作；分开后职责和测试边界都更清楚。两者都进 `SUPPORT_PROTOCOLS`
-  （与 `CancelSignal` 同档）。D51 新增 `ContextCompactor` 后，
-  **`CapabilityKind` 与 `CAPABILITY_PROTOCOLS` 当前均为 10**。
+  （与 `CancelSignal` 同档）。新增 `TurnContextCompactor` 后，
+  **`CapabilityKind` 与 `CAPABILITY_PROTOCOLS` 当前均为 11**。
 - **`capabilities()` / `plugins()` 返回 JSON**：`ResolutionReport` 与 `PluginStatus` 在
   `kernel/` 里、契约层够不着，而两者本来就以 JSON 为发布形态（`NFR-502`，各有
   `to_json()`）。在契约层复刻它们的字段只会多出一份必然漂移的定义。
@@ -1533,7 +1547,11 @@ Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中
  9  before_model_request Interceptor
     （`D09` 起由 engine **每轮**分发；此处是 orchestrator 对第一轮的视角，D14 不得重复分发——
       否则第一轮触发两遍。engine 内部每轮迭代前分发一次，见 §6.2.1）
-10  engine.run_turn 开始迭代：
+10  TurnCompactingModel 估算 Hook 改写后的完整请求：
+      未超限 -> 直接调用模型
+      超限 -> 调用当前 TURN_COMPACTOR，用不可信摘要替换连续单元前缀
+      策略需要模型时，只能使用当次 CompactionModel（当前模型、无工具、非流式、不递归压缩）
+11  engine.run_turn 继续迭代：
       【检查点 2】-> model.stream()
       【检查点 3】每个分片：yield ModelDelta -> orchestrator 转 OutboundMessage(DELTA)
       响应含 tool_call "shell.exec"
@@ -1544,10 +1562,10 @@ Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中
       after_tool_call Interceptor
       ToolResult 截断至 tool_result_max_bytes 后并入消息
       下一轮迭代 -> 模型产出最终文本 -> TurnCompleted
-11  持久化 TurnRecord（原子写）；失败则 turn FAILED（SES-003）
-12  发布 turn.completed；turn_end Observer
-13  OutboundMessage(stream_state=COMPLETED) -> builtins/cli 渲染
-14  释放 session slot 锁，处理队列中的下一条消息
+12  持久化 TurnRecord（原子写）；失败则 turn FAILED（SES-003）
+13  发布 turn.completed；turn_end Observer
+14  OutboundMessage(stream_state=COMPLETED) -> builtins/cli 渲染
+15  释放 session slot 锁，处理队列中的下一条消息
 ```
 
 若 `before_model_request` 替换了工具集合，替换后的 `ModelRequest.tools` 同时决定该轮的模型
@@ -1863,7 +1881,7 @@ A0 是 M-A 全部完成判据的前提：「与重构前一致」这个标准依
 
 ### M3 内建能力基线（阶段一，P0）
 
-交付：`builtins/` 当前 8 项、`BUILTIN_MANIFESTS`、契约测试套件、首次运行体验。
+交付：`builtins/` 当前 9 项、`BUILTIN_MANIFESTS`、契约测试套件、首次运行体验。
 
 完成判据（对应 §16.1）：
 
@@ -1953,7 +1971,7 @@ a 步同样不再是「补基线测试」：`D32` 起就改成直接读旧实现
 | 遗留隔离区长期不清 | §4.3 | **已闭环**：债务棘轮压到 `D35` 清空，隔离区与棘轮一并删除 |
 | 重命名遗漏 | §4.5 | M-A 验收双防线：归一化后的测试结果逐项一致 + 新层旧名扫描无意外命中 |
 | 一次性重写失控 | `13.1` | M2 采用「基线测试 → 新实现 → 单点切换并删除旧实现」，每步有独立验收，回退使用 git |
-| SDK 表面膨胀 | `13.2` | `NucleaAPI` 冻结 10 个注册方法、Hook 冻结 9 个、`__all__` 快照测试 |
+| SDK 表面膨胀 | `13.2` | `NucleaAPI` 冻结 11 个注册方法、Hook 冻结 9 个、`__all__` 快照测试 |
 | 内建能力获得特权 | `13.10` | `builtins/` 禁止 import `kernel/`，架构测试断言 |
 | 内建工具集扩张 | `13.10`、`BAS-008` | 6 工具冻结清单 + 三条准入判定 + 评审门槛 |
 | 异步资源泄漏 | `13.3` | 所有插件任务经 `api.ctx.spawn_task()`；停止超时 + 孤儿任务表 |

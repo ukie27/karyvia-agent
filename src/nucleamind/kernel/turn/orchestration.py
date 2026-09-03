@@ -1,8 +1,7 @@
-"""编排的装配面与产物：`OrchestratorDeps`、`TurnReceipt`、`EventTap`（技术方案 §10.2）。
+"""编排的装配面与产物：`OrchestratorDeps`、`TurnReceipt`、`EventTap` 与 Engine 四槽依赖。
 
-职责：声明 orchestrator 需要哪些协作者、一次 `handle()` 交回什么、把
-`before_model_request` 的分发时刻翻译成 `model.request_started` 的包装器，以及把这些
-协作者装成 engine 的四个槽（`engine_deps()`）。
+职责：声明 orchestrator 需要哪些协作者、一次 `handle()` 交回什么，保留每轮
+`model.request_started` 的发布时机，并把协作者装成 engine 的四个槽（`engine_deps()`）。
 不负责：任何流程（`orchestrator.py`）、任何 IO。
 
 **与流程分成两个模块**有两个理由，都不是「文件太长」：`orchestrator.py` 的 ≤500 行是
@@ -18,6 +17,7 @@ from datetime import UTC, datetime
 from typing import Final
 
 from nucleamind.contracts import (
+    ErrorCode,
     EventName,
     HookContext,
     HookName,
@@ -25,7 +25,9 @@ from nucleamind.contracts import (
     InstanceId,
     JsonValue,
     ModelInfo,
+    ModelMessage,
     ModelProvider,
+    ModelRequest,
     NucleaError,
     OutboundMessage,
     SessionStore,
@@ -44,6 +46,7 @@ from .limits import BudgetLedger, TurnLimits
 from .memory import MemoryRecall
 from .retry import RetryingModel, RetryPolicy
 from .transcript import TurnState
+from .turn_compaction import TurnCompactingModel, TurnCompactionPolicy
 
 __all__ = [
     "DROPPED_ATTACHMENTS_KEY",
@@ -155,6 +158,7 @@ class OrchestratorDeps:
     dedup: DedupCache
     limits: TurnLimits
     model_id: str
+    turn_compactor: TurnCompactionPolicy
     tool_specs: tuple[ToolSpec, ...] = ()
     context_providers: tuple[ContextProviderBinding, ...] = ()
     model_info: ModelInfo | None = None
@@ -173,31 +177,47 @@ class OrchestratorDeps:
     clock: Callable[[], datetime] = utc_now
 
 
-def engine_deps(deps: OrchestratorDeps, ledger: BudgetLedger) -> EngineDeps:
+def engine_deps(
+    deps: OrchestratorDeps, ledger: BudgetLedger, request: ModelRequest
+) -> EngineDeps:
     """把编排层的协作者装成 engine 的四个槽。
 
-    **两个槽都是包装器**，而 engine 对此一无所知：`hooks` 外面套 `EventTap` 补
-    `model.request_started`，`model` 外面套 `RetryingModel` 做重发（`D48`）。这正是
-    `EngineDeps` 只有四个槽还能长出新行为的方式——把东西包进去，而不是再开一个槽。
+    `model` 先套 `RetryingModel`，再套 Turn 压缩包装器；Engine 对两者都无感知。
 
     `ledger` 交给重试是为了不睡过 turn 的死线、以及判断这条 turn 跑过工具没有；它与
     engine 用同一本账，因此两边看到的是同一份记账。
     """
+    retrying = RetryingModel(deps.model, deps.retry, deps.bus, ledger=ledger)
+    model_info = deps.model_info or deps.model.describe(deps.model_id)
+    protected_user = _current_user(request.messages)
     return EngineDeps(
-        model=RetryingModel(deps.model, deps.retry, deps.bus, ledger=ledger),
+        model=TurnCompactingModel(
+            retrying,
+            deps.turn_compactor,
+            deps.bus,
+            ledger,
+            budget=deps.limits.resolve_context_max_tokens(model_info),
+            protected_user=protected_user,
+            model_info=model_info,
+        ),
         tools=deps.tools,
         hooks=EventTap(deps.hooks, deps.bus),
         limits=deps.limits,
     )
 
 
-class EventTap:
-    """包住 `HookDispatcher`，在 `before_model_request` 分发时补一条 `model.request_started`。
+def _current_user(messages: tuple[ModelMessage, ...]) -> ModelMessage:
+    for message in reversed(messages):
+        if message.role.value == "user":
+            return message
+    raise NucleaError(
+        ErrorCode.KERNEL_INVARIANT_VIOLATED,
+        "进入 Engine 的请求缺少当前用户输入。",
+    )
 
-    engine 不发 `RuntimeEvent`，而「又要发一次模型请求」这件事只有它知道；它每轮分发这个
-    Hook，正好是 orchestrator 唯一能观察到该时刻的位置。做成包装器而不是让 engine 拿一个
-    bus，是为了不给 engine 开第二条对外通道——`EngineDeps` 只有四个槽的意义就在这里。
-    """
+
+class EventTap:
+    """Engine 每轮分发 `before_model_request` 时发布原有的模型请求事件。"""
 
     def __init__(self, inner: HookDispatcher, bus: EventBus) -> None:
         self._inner = inner
@@ -212,6 +232,7 @@ class EventTap:
                     "model_id": context.request.model_id,
                     "messages": len(context.request.messages),
                     "tools": len(context.request.tools),
+                    "purpose": "agent",
                 },
             )
         return await self._inner.dispatch(context)

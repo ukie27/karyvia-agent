@@ -487,7 +487,7 @@ async def test_trimmed_history_is_compacted_reloaded_and_reassembled_once() -> N
         store=store,
         context_providers=[binding(provider)],
         compactor=compaction_policy(compactor),
-        limits=TurnLimits(context_max_tokens=20),
+        limits=TurnLimits(context_max_tokens=40),
     )
 
     receipt = await harness.send()
@@ -517,7 +517,7 @@ async def test_second_assembly_never_triggers_another_compaction() -> None:
         ScriptedProvider([text_response("新回答")]),
         store=store,
         compactor=compaction_policy(compactor),
-        limits=TurnLimits(context_max_tokens=15),
+        limits=TurnLimits(context_max_tokens=35),
     )
 
     receipt = await harness.send()
@@ -529,13 +529,13 @@ async def test_second_assembly_never_triggers_another_compaction() -> None:
 
 
 async def test_compactor_failure_is_reported_but_turn_continues() -> None:
-    store = FakeSessionStore([old_message(1, Role.USER, "旧问题" * 30)])
+    store = FakeSessionStore([old_message(1, Role.USER, "旧问题" * 60)])
     compactor = ScriptedCompactor(error=RuntimeError("boom"))
     harness = build(
         ScriptedProvider([text_response("仍然回答")]),
         store=store,
         compactor=compaction_policy(compactor),
-        limits=TurnLimits(context_max_tokens=15),
+        limits=TurnLimits(context_max_tokens=60),
     )
 
     receipt = await harness.send()

@@ -1,7 +1,7 @@
-"""六个单值能力的注册载荷与取回函数（技术方案 §6.1）。
+"""七个单值能力的注册载荷与取回函数（技术方案 §6.1）。
 
-职责：为 `MODEL` / `SESSION_STORE` / `CHANNEL` / `MEMORY` / `CLI_ENTRY` / `COMPACTOR`
-六个 kind 定义注册载荷（`Registered*`）和从冻结 Registry 取回生效实现的函数（`*_from`），
+职责：为 `MODEL` / `SESSION_STORE` / `CHANNEL` / `MEMORY` / `CLI_ENTRY` / `COMPACTOR` /
+`TURN_COMPACTOR` 定义注册载荷（`Registered*`）和从冻结 Registry 取回生效实现的函数，
 并在取回时核对载荷形状。
 不负责：注册（`host.py`）、判定谁生效（`kernel/registry/resolution.py`）、使用这些实现
 （`runtime/` 与 `kernel/turn/`）。本模块不做 IO、不认识 manifest。
@@ -40,6 +40,7 @@ from nucleamind.contracts import (
     NucleaError,
     ProviderId,
     SessionStore,
+    TurnContextCompactor,
     provider_sort_key,
 )
 from nucleamind.kernel.registry import CapabilityRegistry, Registration
@@ -49,11 +50,13 @@ __all__ = [
     "ChannelBinding",
     "CliEntryBinding",
     "ContextCompactorBinding",
+    "TurnContextCompactorBinding",
     "MemoryProviderBinding",
     "ModelProviderBinding",
     "RegisteredChannel",
     "RegisteredCliEntry",
     "RegisteredContextCompactor",
+    "RegisteredTurnContextCompactor",
     "RegisteredMemoryProvider",
     "RegisteredModelProvider",
     "RegisteredSessionStore",
@@ -61,6 +64,7 @@ __all__ = [
     "channels_from",
     "cli_entry_from",
     "context_compactors_from",
+    "turn_context_compactors_from",
     "memory_providers_from",
     "model_providers_from",
     "session_store_from",
@@ -115,6 +119,13 @@ class RegisteredContextCompactor:
     compactor: ContextCompactor
 
 
+@dataclass(frozen=True, slots=True)
+class RegisteredTurnContextCompactor:
+    """`CapabilityKind.TURN_COMPACTOR` 的注册载荷形状。"""
+
+    compactor: TurnContextCompactor
+
+
 # -------------------------------------------------------------------------------- 绑定
 
 
@@ -151,6 +162,7 @@ ChannelBinding: TypeAlias = CapabilityBinding[Channel]
 MemoryProviderBinding: TypeAlias = CapabilityBinding[MemoryProvider]
 CliEntryBinding: TypeAlias = CapabilityBinding[CliEntry]
 ContextCompactorBinding: TypeAlias = CapabilityBinding[ContextCompactor]
+TurnContextCompactorBinding: TypeAlias = CapabilityBinding[TurnContextCompactor]
 
 
 # ------------------------------------------------------------------------------ 取回
@@ -252,6 +264,18 @@ def context_compactors_from(
         registry,
         CapabilityKind.COMPACTOR,
         RegisteredContextCompactor,
+        lambda item: item.compactor,
+    )
+
+
+def turn_context_compactors_from(
+    registry: CapabilityRegistry,
+) -> tuple[TurnContextCompactorBinding, ...]:
+    """取回全部生效的 Turn 内上下文压缩策略（MULTI_UNIQUE）。"""
+    return _bindings_of(
+        registry,
+        CapabilityKind.TURN_COMPACTOR,
+        RegisteredTurnContextCompactor,
         lambda item: item.compactor,
     )
 

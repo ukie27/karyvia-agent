@@ -99,6 +99,7 @@ class ErrorCode(StrEnum):
     TIMEOUT_HOOK = "timeout.hook"
     TIMEOUT_HTTP_REQUEST = "timeout.http_request"
     TIMEOUT_PLUGIN_STOP = "timeout.plugin_stop"
+    TIMEOUT_TURN_COMPACTION = "timeout.turn_compaction"
 
     # CANCELLED
     CANCELLED_BY_USER = "cancelled.by_user"
@@ -114,6 +115,7 @@ class ErrorCode(StrEnum):
     # PLUGIN_FAILURE
     PLUGIN_LOAD_FAILED = "plugin.load_failed"
     PLUGIN_HOOK_FAILED = "plugin.hook_failed"
+    PLUGIN_TURN_COMPACTION_FAILED = "plugin.turn_compaction_failed"
     PLUGIN_REGISTRATION_CONFLICT = "plugin.registration_conflict"
     CAPABILITY_OVERRIDE_CONFLICT = "capability.override_conflict"
 
@@ -170,6 +172,7 @@ CODE_CATEGORIES: Final[Mapping[ErrorCode, ErrorCategory]] = MappingProxyType(
         # 而这里是「它起来了、但没能在期限内停下」——后者留下的是仍在跑的后台任务，
         # 排查动作（看插件的 spawn_task 有没有吞掉 CancelledError）完全不同。
         ErrorCode.TIMEOUT_PLUGIN_STOP: ErrorCategory.TIMEOUT,
+        ErrorCode.TIMEOUT_TURN_COMPACTION: ErrorCategory.TIMEOUT,
         ErrorCode.CANCELLED_BY_USER: ErrorCategory.CANCELLED,
         ErrorCode.CANCELLED_BY_BUDGET: ErrorCategory.CANCELLED,
         # 实例关闭导致的取消：既不是用户按下 Ctrl-C，也不是撞上预算，
@@ -186,6 +189,7 @@ CODE_CATEGORIES: Final[Mapping[ErrorCode, ErrorCategory]] = MappingProxyType(
         ErrorCode.EXTERNAL_TOOL_SERVER: ErrorCategory.EXTERNAL_SERVICE,
         ErrorCode.PLUGIN_LOAD_FAILED: ErrorCategory.PLUGIN_FAILURE,
         ErrorCode.PLUGIN_HOOK_FAILED: ErrorCategory.PLUGIN_FAILURE,
+        ErrorCode.PLUGIN_TURN_COMPACTION_FAILED: ErrorCategory.PLUGIN_FAILURE,
         ErrorCode.PLUGIN_REGISTRATION_CONFLICT: ErrorCategory.PLUGIN_FAILURE,
         # 两个插件抢同一个覆盖目标，与 PLUGIN_REGISTRATION_CONFLICT 同类：
         # 都是「插件之间打架」，用户要做的是在配置里选一个。

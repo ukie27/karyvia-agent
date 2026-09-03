@@ -372,7 +372,7 @@ class TurnOrchestrator:
         """驱动 engine 并翻译事件流，返回终态事件。"""
         deps = self._deps
         state.ledger = BudgetLedger(deps.limits)
-        engine = engine_deps(deps, state.ledger)
+        engine = engine_deps(deps, state.ledger, request)
         watchdog = asyncio.ensure_future(self._watchdog(token, deps.limits.turn_timeout_ms))
         terminal: TurnEvent | None = None
         try:
