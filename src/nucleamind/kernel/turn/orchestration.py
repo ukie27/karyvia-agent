@@ -44,6 +44,7 @@ from .context_builder import DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS, ContextProvide
 from .deps import EngineDeps, HookDispatcher, ToolInvoker
 from .limits import BudgetLedger, TurnLimits
 from .memory import MemoryRecall
+from .request_size import TokenAccounting
 from .retry import RetryingModel, RetryPolicy
 from .transcript import TurnState
 from .turn_compaction import TurnCompactingModel, TurnCompactionPolicy
@@ -165,7 +166,7 @@ class OrchestratorDeps:
     stream: bool = True
     scope: str = "default"
     context_provider_timeout_ms: int = DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS
-    #: 显式选中的持久化上下文压缩策略。`None` 是默认，只做逐请求裁剪、不改写 Session。
+    #: 显式选中的持久化上下文压缩策略。`None` 表示不改写 Session；超限仍由 Turn 压缩处理。
     compactor: CompactionPolicy | None = None
     deliver: Callable[[OutboundMessage], Awaitable[None]] | None = None
     #: 长期记忆的召回（`D44`）。`None` = 没有 kernel 侧召回，这也是默认——配置里没写
@@ -174,6 +175,8 @@ class OrchestratorDeps:
     #: 模型请求的重试策略（`D48`）。默认值就是开箱行为：可重试的失败重发两次、空回复
     #: 当故障。见 `retry.py` 的模块 docstring。
     retry: RetryPolicy = field(default_factory=RetryPolicy)
+    #: 一个实例共享一份计量状态；Provider usage 为同 Session 的后续请求留下真实前缀锚点。
+    token_accounting: TokenAccounting = field(default_factory=TokenAccounting)
     clock: Callable[[], datetime] = utc_now
 
 
@@ -196,7 +199,8 @@ def engine_deps(
             deps.turn_compactor,
             deps.bus,
             ledger,
-            budget=deps.limits.resolve_context_max_tokens(model_info),
+            budget=deps.limits.resolve_context_budget(model_info),
+            accounting=deps.token_accounting,
             protected_user=protected_user,
             model_info=model_info,
         ),

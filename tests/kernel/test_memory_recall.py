@@ -32,7 +32,6 @@ from nucleamind.contracts import (
     TurnId,
 )
 from nucleamind.kernel.turn import CancelToken, MemoryRecall, assemble, select_memory
-from nucleamind.kernel.turn.limits import TurnLimits
 from nucleamind.kernel.turn.memory import MEMORY_RECALL_SCOPE
 
 NOW = datetime(2026, 8, 12, tzinfo=UTC)
@@ -131,8 +130,7 @@ async def test_an_empty_query_never_reaches_the_backend(query: str) -> None:
 async def test_priority_is_floored_but_never_lowered() -> None:
     """**这是本模块唯一会改写的字段**（`memory.py` 第 2 条）。
 
-    `HISTORY_TRIM_PRIORITY` 是 0 而组装器按 priority 逆序丢弃，因此 priority 0 的记忆片段
-    与会话历史在裁剪序里不可区分——而记忆下一轮还能重新召回，历史丢了就是丢了。
+    priority 是拦截器和诊断可见的来源元数据，不进入 Kernel 的 token 预算计算。
     """
     memory = FakeMemory(
         fragments={
@@ -263,7 +261,6 @@ async def assembled(memory: MemoryRecall | None, **kwargs: object) -> object:
         user_input="记得我的偏好吗",
         correlation=CORRELATION,
         cancel=CancelToken(),
-        limits=TurnLimits(),
         memory=memory,
         now=NOW,
         **kwargs,  # type: ignore[arg-type]

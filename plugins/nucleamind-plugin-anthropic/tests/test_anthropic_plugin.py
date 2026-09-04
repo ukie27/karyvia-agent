@@ -116,7 +116,7 @@ class TestFaultMapping:
             (403, ErrorCode.PERMISSION_DENIED, False),
             (404, ErrorCode.EXTERNAL_MODEL_PROVIDER, False),
             (408, ErrorCode.EXTERNAL_MODEL_PROVIDER, True),
-            (413, ErrorCode.INPUT_TOO_LARGE, False),
+            (413, ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW, False),
             (500, ErrorCode.EXTERNAL_MODEL_PROVIDER, True),
             (529, ErrorCode.EXTERNAL_MODEL_PROVIDER, True),
         ],
@@ -132,6 +132,13 @@ class TestFaultMapping:
         exhausted = error_for_status(429, body={"error": {"type": "credit_balance_too_low"}})
         assert limited.retryable is True
         assert exhausted.retryable is False
+
+    def test_structured_context_overflow_is_recoverable_by_the_kernel(self) -> None:
+        error = error_for_status(
+            400,
+            body={"error": {"type": "invalid_request_error", "code": "prompt_too_long"}},
+        )
+        assert error.code is ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW
 
     def test_unknown_429_defaults_to_retryable(self) -> None:
         assert error_for_status(429, body={}).retryable is True

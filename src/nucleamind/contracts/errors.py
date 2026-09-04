@@ -108,6 +108,7 @@ class ErrorCode(StrEnum):
 
     # EXTERNAL_SERVICE
     EXTERNAL_MODEL_PROVIDER = "external.model_provider"
+    EXTERNAL_MODEL_CONTEXT_OVERFLOW = "external.model_context_overflow"
     EXTERNAL_CHANNEL = "external.channel"
     EXTERNAL_HTTP_REQUEST = "external.http_request"
     EXTERNAL_TOOL_SERVER = "external.tool_server"
@@ -179,6 +180,7 @@ CODE_CATEGORIES: Final[Mapping[ErrorCode, ErrorCategory]] = MappingProxyType(
         # 混进上面两个码会让「谁停掉了这个 turn」在诊断里不可判定（`D08`）。
         ErrorCode.CANCELLED_BY_SHUTDOWN: ErrorCategory.CANCELLED,
         ErrorCode.EXTERNAL_MODEL_PROVIDER: ErrorCategory.EXTERNAL_SERVICE,
+        ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW: ErrorCategory.EXTERNAL_SERVICE,
         ErrorCode.EXTERNAL_CHANNEL: ErrorCategory.EXTERNAL_SERVICE,
         # 同上：插件经 `ctx.net` 打出去的请求失败了。复用 `EXTERNAL_MODEL_PROVIDER` 会把
         # 一次 webhook 故障记到模型供应商头上。

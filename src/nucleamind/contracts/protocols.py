@@ -280,9 +280,10 @@ class ContextProvider(Protocol):
     ) -> tuple[ContextFragment, ...]:
         """为本次 turn 贡献片段。返回空元组表示无贡献，这不是错误。
 
-        Provider 交出的是**片段**而不是最终文本：`trust`、`priority`、`sensitivity`
-        与预算约束因此无法被绕过（`CMD-004`、`CMD-005`）。裁剪与排序由组装器负责，
-        Provider 只需保证单个片段不超长并如实填写 `estimated_tokens`。
+        Provider 交出的是**片段**而不是最终文本：`trust` 与 `sensitivity`
+        因此无法被绕过（`CMD-004`、`CMD-005`）。过滤、放置与排序由组装器负责，
+        Provider 只需保证单个片段不超长；`estimated_tokens` 是 SDK 4.x 的诊断提示字段，
+        Kernel 会在最终渲染后统一重算请求预算。
 
         **异常约定**：可以抛 `NucleaError`。宿主记录原因并跳过本 Provider（`CTX-005`）。
         **取消语义**：在每个外部查询前检查 `cancel`；被取消时抛 `CANCELLED` 类错误，
@@ -302,11 +303,10 @@ class ContextCompactor(Protocol):
     ) -> CompactionResult | None:
         """返回压缩建议，或以 `None` 表示本轮不压缩。
 
-        Kernel 负责触发、校验、持久化与回退；实现只决定摘要内容和压缩水位。
+        Kernel 负责触发、校验与持久化；实现只决定摘要内容和压缩水位。
 
-        **异常约定**：可以抛 `NucleaError`；Kernel 将其记录为插件失败并沿用本轮已经完成的
-        确定性裁剪结果，不得让压缩策略故障阻断模型请求。返回的空摘要、倒退或越界水位同样
-        视为插件失败。
+        **异常约定**：可以抛 `NucleaError`，并会直接终止当前 Turn。普通异常由 Kernel
+        转成插件失败；空摘要、倒退或越界水位同样直接失败，不做确定性裁剪回退。
         **取消语义**：在模型调用等外部操作前检查 `cancel`；收到取消后尽快停止并抛
         `CANCELLED` 类错误。Kernel 不会取消已经开始的 Session 持久化。
         """

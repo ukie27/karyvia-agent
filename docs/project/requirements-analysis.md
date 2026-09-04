@@ -147,7 +147,7 @@ Kernel 自带以下默认实现，使实例在不安装任何插件时即可完�
 | CLI 入口 | 单次执行与交互式会话，支持中断 | 不可禁用；可被 Channel 插件补充，实现可被插件覆盖 |
 | Model Provider | 至少一种主流协议的最小适配 | 可被 Model Provider 插件覆盖或新增 |
 | Session | 基础持久化会话历史与恢复 | 通过 Session 接口整体替换 |
-| Context Provider | 系统指令、会话历史和基础裁剪 | 通过 Context 接口替换或追加 Provider |
+| Context Provider | 系统指令、会话历史投影和最终消息渲染 | 通过 Context 接口替换或追加 Provider |
 | Turn Compactor | 模型—工具迭代期间的临时请求压缩 | 通过 `TURN_COMPACTOR` 能力整体替换 |
 | 基础工具集 | 文件读、写、编辑、列目录、内容检索、Shell 执行 | 可整体或按工具禁用，可被同名插件覆盖 |
 | 命令处理 | 帮助、配置查看、会话与插件状态等最小命令集 | 插件可注册新命令 |
@@ -354,7 +354,7 @@ Kernel 单独存在时应可被嵌入和测试。面向用户的最小可用组�
 **职责**
 
 - 为一次 turn 提供系统指令、历史摘要、检索结果、记忆或其他上下文片段。
-- 在模型上下文预算内组合和裁剪内容。
+- 把片段渲染成结构化消息，并由 Kernel 对最终模型请求统一计量。
 - 在每次最终 `ModelRequest` 发送前检查完整请求，并在同一 Turn 工具往返使上下文增长
   时调用当前 Turn Compactor。
 
@@ -362,7 +362,7 @@ Kernel 单独存在时应可被嵌入和测试。面向用户的最小可用组�
 
 - `CTX-001`：每个上下文片段必须标明来源、优先级、估算大小和可见范围。
 - `CTX-002`：Context 组合顺序和冲突规则必须确定且可测试。
-- `CTX-003`：超出预算时应按策略裁剪或压缩，不得生成超过模型限制的请求。该检查
+- `CTX-003`：接近或超出预算时必须调用选中的压缩能力，不得生成超过模型限制的请求。该检查
   必须覆盖 Engine 的每次迭代和 Hook 改写后的最终请求，并计入消息以外的工具 schema、参数与
   provider blocks。
 - `CTX-004`：插件私有数据只有经显式 `ContextFragment` 才能进入模型上下文。
@@ -374,6 +374,11 @@ Kernel 单独存在时应可被嵌入和测试。面向用户的最小可用组�
   `SessionStore.compact()`，不改写 Transcript 中的真实工具调用与结果，不改变工具执行顺序。
 - `CTX-009`：Turn Compactor 可按次使用一个绑定当前已选模型、Correlation、取消和剩余
   时间的窄门面。该门面只发起无工具、非流式请求，且不得递归进入 Turn 压缩。
+- `CTX-010`：Context Builder、持久化压缩与 Turn 临时压缩必须共享同一份完整请求计量和
+  预算事实；片段自报估算不得直接决定丢弃或压缩。
+- `CTX-011`：Provider 返回实际输入 usage 时，Kernel 应将其作为相同 Session、相同请求形态
+  与相同消息前缀的计量锚点，只估算锚点后的新增内容；无法匹配锚点时恢复完整请求估算。
+  Provider 明确报告上下文超限且尚未产生实质输出时，Kernel 最多压缩并重试一次。
 
 ### 9.7 Session
 
@@ -562,8 +567,8 @@ Kernel 单独存在时应可被嵌入和测试。面向用户的最小可用组�
 | --- | --- | --- |
 | `source` | 是 | Provider 和数据来源 |
 | `content` | 是 | 提供给模型的内容 |
-| `priority` | 是 | 冲突和裁剪时的优先级 |
-| `estimated_size` | 是 | Token 或可比较的大小估算 |
+| `priority` | 是 | 来源侧的相对重要性元数据 |
+| `estimated_tokens` | 是 | SDK 4.x 的来源侧诊断提示；不作为 Kernel 预算真相 |
 | `scope` | 是 | Agent、用户、Session 或 Workspace 范围 |
 | `sensitivity` | 否 | 敏感级别和传播限制 |
 | `expires_at` | 否 | 内容失效时间 |
@@ -656,7 +661,7 @@ Provider 私有响应对象不得直接越过 Provider 边界。
 
 ### 11.3 Context、Memory 与模型
 
-- `EDG-301`：Context 超出模型窗口时必须有确定的裁剪或压缩策略。
+- `EDG-301`：Context 接近模型窗口时必须提前压缩；不存在绕过插件的确定性硬裁剪回退。
 - `EDG-302`：Memory 或某个 Context Provider 超时不能无限阻塞 turn。
 - `EDG-303`：模型返回未知 Tool、无效参数、重复 Tool Call 或空响应时必须受控终止或重试。
 - `EDG-304`：流式响应中途失败时，不得将部分输出错误地标记为完整答案。

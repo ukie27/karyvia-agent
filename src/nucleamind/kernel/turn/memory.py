@@ -18,10 +18,9 @@
    **实例级**长期记忆的接口，会话级与工作区级的记忆归 `ContextProvider`
    （`plugins/nucleamind-plugin-memory/` 的四条通路就是那么分的）。要改这个决定得先给三个
    方法加一个 key 参数，而那是 SDK 1.0 之后的破坏性变更（§7.6）。
-2. **priority 有下界，这是本模块唯一会改写的字段。** `HISTORY_TRIM_PRIORITY` 是 0 而组装器
-   按 priority **逆序**丢弃，因此 priority 0 的记忆片段与会话历史在裁剪序里不可区分。
-   记忆下一轮还能重新召回，历史丢了就是丢了——「记忆排在历史之前被丢」是 kernel 自己的
-   裁剪不变量，不是对 Provider 语义的覆写。**其余字段一个都不动**，包括 `trust`：
+2. **priority 有下界，这是本模块唯一会改写的字段。** 它保留记忆片段的相对重要性元数据，
+   供 `context_assemble` 拦截器与诊断读取，但不参与 Kernel 的 token 预算判断。
+   **其余字段一个都不动**，包括 `trust`：
    声明 `SYSTEM` 的记忆会进系统指令位置，那与一个 Context Provider 声明 `SYSTEM` 是同一件
    事、同一份 manifest 担保。（`plugins/nucleamind-plugin-memory/` 在**写入**侧就把 trust
    钉死成 `UNTRUSTED`，那是它的判断，不是这里替它做的。）
@@ -74,9 +73,7 @@ DEFAULT_MEMORY_RECALL_LIMIT: Final = 5
 #: 东西（一次可能要走外部服务的上下文贡献），两个不同的数只会让人猜哪个先到。
 DEFAULT_MEMORY_RECALL_TIMEOUT_MS: Final = 3_000
 
-#: 召回片段的 priority 下界。取 100 = 插件基准（`sdk/manifest.py` 的默认 `priority`）：
-#: 记忆是「补充资料」，应当在内建片段（基准 0）与会话历史（`HISTORY_TRIM_PRIORITY` = 0）
-#: 之后才被丢。
+#: 召回片段的 priority 下界。取 100 = 插件基准（`sdk/manifest.py` 的默认值）。
 DEFAULT_MEMORY_FRAGMENT_PRIORITY: Final = 100
 
 #: `MEM-003` 的两种处置。`degrade` 是默认：一个记忆后端挂了不该让实例不能对话。

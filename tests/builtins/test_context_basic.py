@@ -5,7 +5,7 @@
 | 通过 `ContextProviderContract` 全部用例 | `TestBasicContextProvider` |
 | 无 Memory / 检索插件时组装正常完成（`CTX-006`、`EDG-307`） | `TestUsableWithoutPlugins` |
 | trust 分级与放置位置（`CMD-005`） | `TestTrustPlacement` |
-| token 估算与实际裁剪一致（`CTX-003`） | `TestTokenEstimate` |
+| 片段提示值与最终消息结构计量分离（`CTX-010`） | `TestTokenEstimate` |
 | 配置校验：类型、数组写法、自相矛盾的组合 | `TestSettings` |
 | 内建以普通 manifest + `setup(api)` 注册（`BAS-005`） | `TestRegistration` |
 
@@ -58,7 +58,7 @@ from nucleamind.contracts import (
 )
 from nucleamind.kernel.turn.context_builder import assemble
 from nucleamind.kernel.turn.context_builder import estimate_tokens as kernel_estimate_tokens
-from nucleamind.kernel.turn.limits import TurnLimits
+from nucleamind.kernel.turn.request_size import estimate_messages_tokens
 from nucleamind.sdk.testing import (
     ContextProviderContract,
     FakePluginContext,
@@ -116,7 +116,6 @@ async def assemble_with(
     snapshot: SessionSnapshot,
     *,
     user_input: str = "你好",
-    budget: int | None = None,
 ):
     """走真的组装器，拿到最终会发给模型的消息序列。"""
     from nucleamind.kernel.turn.context_builder import ContextProviderBinding
@@ -126,7 +125,6 @@ async def assemble_with(
         user_input=user_input,
         correlation=make_correlation(),
         cancel=ManualCancel(),
-        limits=TurnLimits(context_max_tokens=budget) if budget else TurnLimits(),
         bindings=[ContextProviderBinding(provider=provider, owner=Builtin(), name="basic")],
         now=FIXED_NOW,
     )
@@ -255,13 +253,12 @@ class TestTrustPlacement:
 
 
 class TestTokenEstimate:
-    """自报的 `estimated_tokens` 与组装器真正用的那把尺必须同口径。"""
+    """片段提示值与 Kernel 最终结构计量是两项不同职责。"""
 
     @pytest.mark.parametrize(
         "text", ["", "a", "ab", "abc", "abcd", "你好", BASELINE_INSTRUCTIONS, "x" * 5000]
     )
-    def test_token_estimate_matches_the_kernel_trimmer(self, text: str) -> None:
-        """`R4` 逼着公式写两份，这条负责让两份永远相等。"""
+    def test_builtin_hint_uses_the_same_text_baseline(self, text: str) -> None:
         assert estimate_tokens(text) == kernel_estimate_tokens(text)
 
     async def test_each_fragment_reports_its_own_size(self) -> None:
@@ -269,35 +266,25 @@ class TestTokenEstimate:
         for fragment in fragments:
             assert fragment.estimated_tokens == estimate_tokens(fragment.content)
 
-    async def test_the_assembled_budget_accounts_for_every_fragment(self) -> None:
-        """组装器算出的总量 = 各片段自报之和 + 历史 + 本次输入，没有漏账。"""
+    async def test_assembly_recounts_the_final_message_structure(self) -> None:
         snapshot = snapshot_with("历史一", "历史二")
         assembled = await assemble_with(make_provider(instructions="你只说中文。"), snapshot)
-        expected = sum(item.estimated_tokens for item in assembled.fragments)
-        expected += sum(estimate_tokens(item.content) for item in snapshot.messages)
-        expected += estimate_tokens("你好")
-        assert assembled.estimated_tokens == expected
+        assert assembled.estimated_tokens == estimate_messages_tokens(assembled.messages)
 
-    async def test_a_tight_budget_drops_the_operator_block_before_history(self) -> None:
-        """运维指令与历史同为 priority 0，同优先级下先丢片段（组装器的约定）。"""
+    async def test_builder_keeps_operator_instructions_and_history_intact(self) -> None:
         snapshot = snapshot_with("历史一", "历史二")
-        fixed = estimate_tokens(BASELINE_INSTRUCTIONS) + estimate_tokens("你好")
         assembled = await assemble_with(
             make_provider(instructions="你只说中文。", include_runtime_facts=False),
             snapshot,
-            budget=fixed + estimate_tokens("历史一") + estimate_tokens("历史二"),
         )
-        assert [item.reason for item in assembled.dropped] == ["budget"]
-        assert assembled.dropped[0].fragment.trust is TrustLevel.OPERATOR
-        # 系统指令与历史都还在：预算刚好够，丢掉那一块就不必再动历史。
+        assert assembled.dropped == ()
+        assert any(item.trust is TrustLevel.OPERATOR for item in assembled.fragments)
         assert BASELINE_INSTRUCTIONS in assembled.messages[0].content
         assert any("历史一" in message.content for message in assembled.messages)
 
-    async def test_the_system_instructions_are_never_trimmed(self) -> None:
-        """裁到只剩系统段与本次输入仍超预算时报错，而不是悄悄丢掉指令（`CTX-003`）。"""
-        with pytest.raises(NucleaError) as caught:
-            await assemble_with(make_provider(), snapshot_with("历史"), budget=1)
-        assert caught.value.code is ErrorCode.INPUT_TOO_LARGE
+    async def test_builder_never_trims_system_instructions(self) -> None:
+        assembled = await assemble_with(make_provider(), snapshot_with("历史"))
+        assert BASELINE_INSTRUCTIONS in assembled.messages[0].content
 
 
 # --------------------------------------------------------------------------- 配置

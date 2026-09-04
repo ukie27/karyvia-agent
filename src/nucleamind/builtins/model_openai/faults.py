@@ -1,6 +1,6 @@
 """HTTP 状态码与 httpx 异常到 `NucleaError` 的映射（`MOD-003`）。
 
-职责：把「限流、超时、认证失败」三类外部故障折成可分类、`retryable` 标注如实的
+职责：把「限流、超时、认证失败、上下文超限」等外部故障折成可分类、`retryable` 标注如实的
 `NucleaError`；解析退避提示。
 不负责：发起请求、决定要不要重试（那是调用方的策略）、把内容过滤当异常——
 **内容过滤是 HTTP 200 上的正常响应**，走 `StopReason.CONTENT_FILTER`，见 `wire.py`。
@@ -25,6 +25,7 @@ import httpx
 from nucleamind.contracts import ErrorCode, JsonValue, NucleaError
 
 __all__ = [
+    "CONTEXT_OVERFLOW_ERROR_CODES",
     "QUOTA_ERROR_CODES",
     "error_for_status",
     "error_for_transport",
@@ -42,6 +43,17 @@ QUOTA_ERROR_CODES: Final[frozenset[str]] = frozenset(
     }
 )
 
+# OpenAI 与兼容网关常用的结构化上下文超限 code/type。只看结构字段，不扫描可能回显
+# prompt 的自由文本 message。
+CONTEXT_OVERFLOW_ERROR_CODES: Final[frozenset[str]] = frozenset(
+    {
+        "context_length_exceeded",
+        "context_window_exceeded",
+        "prompt_too_long",
+        "request_too_large",
+    }
+)
+
 #: 明确可重试的状态码。其余 4xx 是请求本身的问题，重试只是再错一次。
 _RETRYABLE_STATUS: Final[frozenset[int]] = frozenset({408, 409})
 
@@ -50,6 +62,7 @@ _FORBIDDEN: Final = "模型供应商拒绝了本次访问。"
 _RATE_LIMITED: Final = "模型供应商限流。"
 _QUOTA_EXHAUSTED: Final = "模型供应商的额度或计费已用尽。"
 _UPSTREAM_FAILED: Final = "模型供应商返回了错误响应。"
+_CONTEXT_OVERFLOW: Final = "模型请求超过供应商的上下文窗口。"
 _TIMED_OUT: Final = "模型请求超时。"
 _TRANSPORT_FAILED: Final = "无法连接模型供应商。"
 
@@ -130,6 +143,14 @@ def error_for_status(
         return NucleaError(ErrorCode.PERMISSION_DENIED, _FORBIDDEN, detail=detail)
     if status == 429:
         return _rate_limit_error(fields, detail)
+    if status == 413 or any(
+        fields.get(key) in CONTEXT_OVERFLOW_ERROR_CODES for key in ("code", "type")
+    ):
+        return NucleaError(
+            ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW,
+            _CONTEXT_OVERFLOW,
+            detail=detail,
+        )
     return NucleaError(
         ErrorCode.EXTERNAL_MODEL_PROVIDER,
         _UPSTREAM_FAILED,

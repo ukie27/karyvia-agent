@@ -18,6 +18,7 @@ from nucleamind.contracts import (
     CancelSignal,
     CapabilityKind,
     CapabilityRef,
+    ChunkKind,
     CompactionModel,
     ErrorCode,
     EventName,
@@ -41,7 +42,7 @@ from nucleamind.contracts import (
 from nucleamind.kernel.observability import EventBus
 
 from .limits import BudgetLedger
-from .request_size import estimate_messages_tokens, estimate_request_tokens
+from .request_size import ContextBudget, TokenAccounting, estimate_messages_tokens
 
 __all__ = [
     "DEFAULT_TURN_COMPACTOR_TIMEOUT_MS",
@@ -55,6 +56,9 @@ _SUMMARY_SOURCE = "turn-compactor"
 _CURRENT_USER_CHANGED = "before_model_request 删除或改写了当前用户输入。"
 _ORPHAN_TOOL_RESULT = "工具结果缺少紧邻的 assistant 调用声明。"
 _TOOL_EXCHANGE_MISMATCH = "assistant 工具调用与 tool 结果不完整匹配。"
+_SUBSTANTIVE_CHUNKS = frozenset(
+    {ChunkKind.TEXT, ChunkKind.REASONING, ChunkKind.TOOL_CALL}
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,10 +100,14 @@ def project_units(
     messages: Sequence[ModelMessage], protected_user: ModelMessage
 ) -> tuple[TurnContextUnit, ...]:
     """公开纯投影入口；结构非法时立即失败，不把修复责任交给插件。"""
-    return _project(tuple(messages), protected_user).units
+    return _project(tuple(messages), protected_user, None).units
 
 
-def _project(messages: tuple[ModelMessage, ...], protected_user: ModelMessage) -> _Projection:
+def _project(
+    messages: tuple[ModelMessage, ...],
+    protected_user: ModelMessage,
+    accounting: TokenAccounting | None,
+) -> _Projection:
     protected_index = _protected_user_index(messages, protected_user)
     spans: list[_Span] = []
     index = 0
@@ -112,7 +120,9 @@ def _project(messages: tuple[ModelMessage, ...], protected_user: ModelMessage) -
             stop = index + 1 + len(message.tool_calls)
             exchange = messages[index:stop]
             _validate_exchange(exchange)
-            _append_span(spans, exchange, index, stop, TurnContextUnitKind.TOOL_EXCHANGE)
+            _append_span(
+                spans, exchange, index, stop, TurnContextUnitKind.TOOL_EXCHANGE, accounting
+            )
             index = stop
             continue
         if message.role is Role.TOOL:
@@ -122,7 +132,7 @@ def _project(messages: tuple[ModelMessage, ...], protected_user: ModelMessage) -
             if index > protected_index and message.role is Role.ASSISTANT
             else TurnContextUnitKind.BASE
         )
-        _append_span(spans, (message,), index, index + 1, kind)
+        _append_span(spans, (message,), index, index + 1, kind, accounting)
         index += 1
     return _Projection(messages, tuple(spans))
 
@@ -151,12 +161,17 @@ def _append_span(
     start: int,
     stop: int,
     kind: TurnContextUnitKind,
+    accounting: TokenAccounting | None,
 ) -> None:
     unit = TurnContextUnit(
         unit_id=f"unit-{len(spans) + 1}",
         kind=kind,
         messages=messages,
-        estimated_tokens=estimate_messages_tokens(messages),
+        estimated_tokens=(
+            accounting.estimate_messages(messages)
+            if accounting is not None
+            else estimate_messages_tokens(messages)
+        ),
     )
     spans.append(_Span(unit, start, stop))
 
@@ -168,7 +183,15 @@ def _structure_error(message: str) -> NucleaError:
 class _BoundCompactionModel:
     """把当前 Provider、模型标识与 Turn 关联收窄成 `CompactionModel`。"""
 
-    __slots__ = ("_bus", "_info", "_inner", "_ledger", "_request", "_timeout_ms")
+    __slots__ = (
+        "_accounting",
+        "_bus",
+        "_info",
+        "_inner",
+        "_ledger",
+        "_request",
+        "_timeout_ms",
+    )
 
     def __init__(
         self,
@@ -177,9 +200,11 @@ class _BoundCompactionModel:
         info: ModelInfo,
         bus: EventBus,
         ledger: BudgetLedger,
+        accounting: TokenAccounting,
         timeout_ms: int,
     ) -> None:
         self._inner = inner
+        self._accounting = accounting
         self._request = request
         self._info = info
         self._bus = bus
@@ -224,6 +249,7 @@ class _BoundCompactionModel:
             },
         )
         response = await self._inner.complete(request, cancel)
+        self._accounting.observe(request, response.usage)
         self._bus.publish(
             EventName.MODEL_RESPONSE_RECEIVED,
             correlation=request.correlation,
@@ -241,6 +267,7 @@ class TurnCompactingModel:
     """在每次 Provider 调用前限制请求大小，并延续本 Turn 已产生的摘要。"""
 
     __slots__ = (
+        "_accounting",
         "_budget",
         "_bus",
         "_info",
@@ -259,11 +286,13 @@ class TurnCompactingModel:
         bus: EventBus,
         ledger: BudgetLedger,
         *,
-        budget: int,
+        budget: ContextBudget,
+        accounting: TokenAccounting,
         protected_user: ModelMessage,
         model_info: ModelInfo,
     ) -> None:
         self._inner = inner
+        self._accounting = accounting
         self._policy = policy
         self._bus = bus
         self._ledger = ledger
@@ -278,31 +307,61 @@ class TurnCompactingModel:
 
     async def complete(self, request: ModelRequest, cancel: CancelSignal) -> ModelResponse:
         prepared = await self._prepare(request, cancel)
-        return await self._inner.complete(prepared, cancel)
+        try:
+            response = await self._inner.complete(prepared, cancel)
+        except NucleaError as error:
+            if error.code is not ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW:
+                raise
+            prepared = await self._prepare(request, cancel, force=True)
+            response = await self._inner.complete(prepared, cancel)
+        self._accounting.observe(prepared, response.usage)
+        return response
 
     async def stream(
         self, request: ModelRequest, cancel: CancelSignal
     ) -> AsyncIterator[ModelChunk]:
         prepared = await self._prepare(request, cancel)
-        async for chunk in self._inner.stream(prepared, cancel):
-            yield chunk
+        emitted = False
+        try:
+            async for chunk in self._inner.stream(prepared, cancel):
+                emitted = emitted or chunk.kind in _SUBSTANTIVE_CHUNKS
+                if chunk.usage is not None:
+                    self._accounting.observe(prepared, chunk.usage)
+                yield chunk
+        except NucleaError as error:
+            if error.code is not ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW or emitted:
+                raise
+            prepared = await self._prepare(request, cancel, force=True)
+            async for chunk in self._inner.stream(prepared, cancel):
+                if chunk.usage is not None:
+                    self._accounting.observe(prepared, chunk.usage)
+                yield chunk
 
-    async def _prepare(self, request: ModelRequest, cancel: CancelSignal) -> ModelRequest:
+    async def _prepare(
+        self,
+        request: ModelRequest,
+        cancel: CancelSignal,
+        *,
+        force: bool = False,
+    ) -> ModelRequest:
         source = request.messages
         carried = self._carry(source)
         current = replace(request, messages=carried)
-        estimated = estimate_request_tokens(current)
-        if estimated <= self._budget:
+        estimated = self._accounting.estimate_request(current)
+        if not force and estimated <= self._budget.trigger_limit:
             self._remember(source, current.messages)
             return current
 
-        projection = _project(current.messages, self._protected_user)
+        projection = _project(current.messages, self._protected_user, self._accounting)
         if not projection.spans:
             raise self._too_large(estimated)
+        target = self._budget.target_limit
+        if force and estimated <= target:
+            target = max(1, int(estimated * 0.8))
         compaction_request = TurnCompactionRequest(
             request=current,
             units=projection.units,
-            target_tokens=self._budget,
+            target_tokens=target,
             estimated_tokens=estimated,
             correlation=current.correlation,
         )
@@ -312,12 +371,13 @@ class TurnCompactingModel:
             self._info,
             self._bus,
             self._ledger,
+            self._accounting,
             self._policy.timeout_ms,
         )
         result = await self._invoke(compaction_request, model, cancel)
         compacted = replace(current, messages=self._rebuild(projection, result))
-        final_size = estimate_request_tokens(compacted)
-        if final_size > self._budget:
+        final_size = self._accounting.estimate_request(compacted)
+        if final_size > target:
             raise self._too_large(final_size)
         self._remember(source, compacted.messages)
         return compacted
@@ -398,6 +458,10 @@ class TurnCompactingModel:
         return NucleaError(
             ErrorCode.INPUT_TOO_LARGE,
             "压缩后的模型请求仍超过上下文预算。",
-            detail={"estimated_tokens": estimated, "budget": self._budget},
+            detail={
+                "estimated_tokens": estimated,
+                "trigger_tokens": self._budget.trigger_limit,
+                "target_tokens": self._budget.target_limit,
+            },
             capability=self._policy.ref,
         )

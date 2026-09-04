@@ -41,7 +41,6 @@ from .compaction import (
 )
 from .context_builder import (
     DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS,
-    HISTORY_TRIM_PRIORITY,
     AssembledContext,
     ContextProviderBinding,
     DroppedFragment,
@@ -49,6 +48,7 @@ from .context_builder import (
     assemble,
     context_providers_from,
     estimate_tokens,
+    reassemble_history,
     replay_messages,
 )
 from .deps import ENGINE_HOOKS, EngineDeps, HookDispatcher, ToolInvoker
@@ -127,6 +127,7 @@ from .orchestration import (
     engine_deps,
 )
 from .orchestrator import TurnOrchestrator
+from .request_size import ContextBudget, TokenAccounting
 from .retry import (
     DEFAULT_RETRY_BASE_DELAY_MS,
     DEFAULT_RETRY_EMPTY_RESPONSE,
@@ -168,6 +169,7 @@ __all__ = [
     "Checkpoint",
     "CheckpointOwner",
     "ContextProviderBinding",
+    "ContextBudget",
     "CompactionApplied",
     "CompactionPolicy",
     "DEFAULT_COMPACTOR_TIMEOUT_MS",
@@ -195,7 +197,6 @@ __all__ = [
     "ENGINE_HOOKS",
     "EngineDeps",
     "FALLBACK_CONTEXT_MAX_TOKENS",
-    "HISTORY_TRIM_PRIORITY",
     "HOOK_ACTIONS",
     "HOOK_REPLACE_SLOTS",
     "HookBinding",
@@ -242,6 +243,7 @@ __all__ = [
     "TurnReceipt",
     "TurnState",
     "TurnStoppedByLimit",
+    "TokenAccounting",
     "as_nuclea",
     "assemble",
     "assistant_message",
@@ -261,6 +263,7 @@ __all__ = [
     "outcome_without_engine",
     "partition_tool_batches",
     "project_units",
+    "reassemble_history",
     "replay_messages",
     "render_message_content",
     "retry_delay_ms",

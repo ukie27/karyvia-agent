@@ -662,8 +662,8 @@ tests/sdk/test_public_surface.py
 **验收**
 
 - 技术方案 §10.2 的 14 步流程逐步可追踪（用事件序列断言）。
-- Context 裁剪：SYSTEM 不被裁剪；超预算时按 priority 逆序丢弃；HISTORY 从最旧丢
-  （`CTX-003`、`EDG-301`）。
+- Context Builder 完整渲染；最终 `ModelRequest` 由统一预算机制提前触发持久化或 Turn 压缩，
+  SYSTEM 与当前输入不进入可替换单元（`CTX-003`、`EDG-301`）。
 - `UNTRUSTED` 片段被包裹且带固定前缀，无法出现在系统指令位置（`CMD-005`、`EDG-306`）。
 - Context Provider 超时：跳过并记录（`CTX-005`、`EDG-302`）。
 - Interceptor 顺序确定性测试：多次运行顺序一致。
@@ -766,7 +766,7 @@ tests/architecture/test_kernel_runs_without_builtins.py
 
 **要点**（技术方案 §8.1）
 
-- 系统指令 + 会话历史 + 按 token 预算的尾部保留裁剪。
+- 系统指令与运行时事实；会话历史由 Kernel 统一投影，完整请求由 Kernel 统一计量。
 - 无 Memory、无检索插件时必须产出可用上下文（`CTX-006`、`EDG-307`）。
 - Context Provider **只读不写**，不得持久化任何内容（技术方案 §14 的职责划分风险项）。
 
@@ -775,7 +775,7 @@ tests/architecture/test_kernel_runs_without_builtins.py
 - 通过 `ContextProviderContract` 全部用例。
 - 无 Memory 插件时组装正常完成，不产生缺失依赖错误（`EDG-307`）。
 - Provider 没有写入路径：架构测试断言其不 import 任何持久化模块。
-- token 估算与实际裁剪结果一致性测试。
+- 片段诊断提示值与最终结构化请求计量分离测试。
 
 **规模**：约 250 行 + 250 行测试。**风险**：低。
 

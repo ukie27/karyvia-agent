@@ -31,6 +31,7 @@ import httpx
 from nucleamind.contracts import ErrorCode, JsonValue, NucleaError
 
 __all__ = [
+    "CONTEXT_OVERFLOW_ERROR_TYPES",
     "QUOTA_ERROR_TYPES",
     "RETRYABLE_ERROR_TYPES",
     "error_for_event",
@@ -48,6 +49,10 @@ QUOTA_ERROR_TYPES: Final[frozenset[str]] = frozenset(
         "credit_balance_too_low",
         "quota_exceeded",
     }
+)
+
+CONTEXT_OVERFLOW_ERROR_TYPES: Final[frozenset[str]] = frozenset(
+    {"context_length_exceeded", "context_window_exceeded", "prompt_too_long"}
 )
 
 #: SSE `error` 事件里表示「待会儿再来」的 `error.type`。流已经建立之后才收到的错误
@@ -134,8 +139,8 @@ def error_for_status(
     401 与 403 刻意分开：前者是「凭据不对或没配」，补救是去补配置，因此复用
     `CONFIG_SECRET_MISSING`——它与 `ctx.secret()` 在凭据缺失时抛的是同一个码，用户看到的
     是同一件事。403 是「凭据没问题但这个账号不许这么用」，补救在供应商那边。
-    413 单独走 `INPUT_TOO_LARGE`：那是「把消息改短或调小上下文预算」，与其余外部故障的
-    补救动作完全不同。
+    413 与结构化上下文超限 code/type 统一映射为可恢复语义，供 Kernel 在没有实质输出时
+    压缩并重试一次。
     """
     fields = _error_fields(body)
     detail: dict[str, JsonValue] = {"status": status, **fields}
@@ -146,8 +151,15 @@ def error_for_status(
         return NucleaError(ErrorCode.CONFIG_SECRET_MISSING, _AUTH_FAILED, detail=detail)
     if status == 403:
         return NucleaError(ErrorCode.PERMISSION_DENIED, _FORBIDDEN, detail=detail)
-    if status == 413:
-        return NucleaError(ErrorCode.INPUT_TOO_LARGE, _TOO_LARGE, detail=detail)
+    overflow = status == 413 or any(
+        fields.get(key) in CONTEXT_OVERFLOW_ERROR_TYPES for key in ("type", "code")
+    )
+    if overflow:
+        return NucleaError(
+            ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW,
+            _TOO_LARGE,
+            detail=detail,
+        )
     if status == 429:
         exhausted = _is_quota(fields)
         return NucleaError(
@@ -172,6 +184,12 @@ def error_for_event(payload: object) -> NucleaError:
     """
     fields = _error_fields(payload)
     kind = fields.get("type")
+    if any(fields.get(key) in CONTEXT_OVERFLOW_ERROR_TYPES for key in ("type", "code")):
+        return NucleaError(
+            ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW,
+            _TOO_LARGE,
+            detail=dict(fields),
+        )
     retryable = isinstance(kind, str) and kind in RETRYABLE_ERROR_TYPES and not _is_quota(fields)
     return NucleaError(
         ErrorCode.EXTERNAL_MODEL_PROVIDER,

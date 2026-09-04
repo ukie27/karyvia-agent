@@ -1,5 +1,5 @@
 """职责：Turn 准入、执行组装与事件/持久化收口，也是 Turn 事件的唯一发布点。
-不负责：模型—工具循环、Hook、Context 裁剪、工具执行与排队策略。
+不负责：模型—工具循环、Hook 实现、压缩策略、工具执行与排队策略。
 准入顺序是去重 → Session 并发 → 分流。MERGE 每批一个 Turn；命令 Turn 有事件但不写历史。
 """
 
@@ -247,26 +247,36 @@ class TurnOrchestrator:
             user_input=user_input,
             correlation=state.correlation,
             cancel=token,
-            limits=deps.limits,
             bindings=deps.context_providers,
             extra_fragments=state.fragments,
             memory=deps.memory,
             hooks=deps.hooks,
-            model_info=deps.model_info,
+            accounting=deps.token_accounting,
             now=deps.clock(),
             provider_timeout_ms=deps.context_provider_timeout_ms,
             on_failure=lambda error: self._report(state, error),
         )
+        request = ModelRequest(
+            model_id=deps.model_id,
+            messages=context.messages,
+            correlation=state.correlation,
+            tools=deps.tool_specs,
+            stream=deps.stream,
+            timeout_ms=deps.limits.turn_timeout_ms,
+        )
+        model_info = deps.model_info or deps.model.describe(deps.model_id)
         compacted = await compact_once(
             snapshot=snapshot,
-            assembled=context,
+            context=context,
+            request=request,
             user_input=user_input,
             correlation=state.correlation,
             cancel=token,
             sessions=deps.sessions,
             policy=deps.compactor,
+            budget=deps.limits.resolve_context_budget(model_info),
+            accounting=deps.token_accounting,
             now=deps.clock(),
-            on_failure=lambda error: self._report(state, error),
         )
         if compacted is not None:
             deps.bus.publish(
@@ -278,31 +288,9 @@ class TurnOrchestrator:
                     "compactor": deps.compactor.name if deps.compactor is not None else None,
                 },
             )
-            context = await assemble(
-                snapshot=compacted.snapshot,
-                user_input=user_input,
-                correlation=state.correlation,
-                cancel=token,
-                limits=deps.limits,
-                bindings=deps.context_providers,
-                extra_fragments=state.fragments,
-                memory=deps.memory,
-                hooks=deps.hooks,
-                model_info=deps.model_info,
-                now=deps.clock(),
-                provider_timeout_ms=deps.context_provider_timeout_ms,
-                on_failure=lambda error: self._report(state, error),
-            )
+            context = compacted.context
+            request = replace(request, messages=context.messages)
         state.transcript.add_inputs(batch)
-
-        request = ModelRequest(
-            model_id=deps.model_id,
-            messages=context.messages,
-            correlation=state.correlation,
-            tools=deps.tool_specs,
-            stream=deps.stream,
-            timeout_ms=deps.limits.turn_timeout_ms,
-        )
         terminal = await self._drive(request, state, token)
         if isinstance(terminal, TurnCompleted) and terminal.truncated:
             state.truncated = True

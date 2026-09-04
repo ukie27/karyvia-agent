@@ -473,7 +473,7 @@ async def test_an_existing_session_reports_loaded_not_started() -> None:
     assert names(harness).count("session.loaded") == 1
 
 
-async def test_trimmed_history_is_compacted_reloaded_and_reassembled_once() -> None:
+async def test_request_pressure_compacts_and_reuses_the_collected_fragments() -> None:
     store = FakeSessionStore(
         [
             old_message(1, Role.USER, "旧问题" * 30),
@@ -487,7 +487,7 @@ async def test_trimmed_history_is_compacted_reloaded_and_reassembled_once() -> N
         store=store,
         context_providers=[binding(provider)],
         compactor=compaction_policy(compactor),
-        limits=TurnLimits(context_max_tokens=40),
+        limits=TurnLimits(context_max_tokens=45),
     )
 
     receipt = await harness.send()
@@ -495,7 +495,7 @@ async def test_trimmed_history_is_compacted_reloaded_and_reassembled_once() -> N
     assert receipt.outcome is not None
     assert receipt.outcome.status is TurnStatus.COMPLETED
     assert compactor.calls == 1
-    assert provider.calls == 2
+    assert provider.calls == 1
     assert len(store.compactions) == 1
     assert names(harness).count("session.compacted") == 1
     event = harness.events.of(EventName.SESSION_COMPACTED)[0]
@@ -503,7 +503,7 @@ async def test_trimmed_history_is_compacted_reloaded_and_reassembled_once() -> N
     assert harness.provider.requests[0].messages[0].content == "前情摘要"
 
 
-async def test_second_assembly_never_triggers_another_compaction() -> None:
+async def test_oversized_persistent_summary_fails_before_persistence() -> None:
     store = FakeSessionStore(
         [
             old_message(1, Role.USER, "旧问题" * 30),
@@ -523,12 +523,14 @@ async def test_second_assembly_never_triggers_another_compaction() -> None:
     receipt = await harness.send()
 
     assert receipt.outcome is not None
-    assert receipt.outcome.status is TurnStatus.COMPLETED
+    assert receipt.outcome.status is TurnStatus.FAILED
+    assert receipt.outcome.error is not None
+    assert receipt.outcome.error.code is ErrorCode.PLUGIN_HOOK_FAILED
     assert compactor.calls == 1
-    assert len(store.compactions) == 1
+    assert store.compactions == []
 
 
-async def test_compactor_failure_is_reported_but_turn_continues() -> None:
+async def test_persistent_compactor_failure_fails_the_turn() -> None:
     store = FakeSessionStore([old_message(1, Role.USER, "旧问题" * 60)])
     compactor = ScriptedCompactor(error=RuntimeError("boom"))
     harness = build(
@@ -541,11 +543,12 @@ async def test_compactor_failure_is_reported_but_turn_continues() -> None:
     receipt = await harness.send()
 
     assert receipt.outcome is not None
-    assert receipt.outcome.status is TurnStatus.COMPLETED
-    assert receipt.content == "仍然回答"
+    assert receipt.outcome.status is TurnStatus.FAILED
+    assert receipt.outcome.error is not None
+    assert receipt.outcome.error.code is ErrorCode.PLUGIN_HOOK_FAILED
     assert compactor.calls == 1
     assert store.compactions == []
-    assert names(harness).count("plugin.failed") == 1
+    assert harness.provider.requests == []
 
 
 # ------------------------------------------------------------------ F 取消

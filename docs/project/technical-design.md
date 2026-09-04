@@ -207,7 +207,7 @@ src/nucleamind/
 │   │   ├── orchestration.py   # 编排的装配面与产物：OrchestratorDeps / TurnReceipt（D14）
 │   │   ├── transcript.py      # 一次 turn 攒下的记录与账本（D14）
 │   │   ├── translation.py     # 引擎事件 → EventName / TurnOutcome 的唯一翻译表（D14）
-│   │   ├── context_builder.py # context 组装：优先级 / 预算 / trust / 裁剪
+│   │   ├── context_builder.py # context 组装：Provider / 过滤 / trust / 渲染
 │   │   ├── hooks.py           # Observer 与 Interceptor 派发
 │   │   ├── invoker.py         # 工具执行：schema 校验、宽限期、孤儿任务表（D14）
 │   │   ├── cancel.py          # CancelToken + 检查点
@@ -753,11 +753,11 @@ engine 的不变量（写进 docstring 并由测试守护）：
   受限重放」换取了持久化格式的稳定（`SES-006`）。
 - **命令类 turn 不写会话历史**。命令输出不是模型对话的一部分，写进去只会在下一轮占预算；
   命令影响 turn 的正规路径是 `CommandResult.fragments`（`CMD-004`）。
-- **上下文压缩已由 D51 以插件能力实现**。确定性请求级裁剪仍先执行；只有历史确实被裁掉、
-  且 `context.compactor` 显式选中一条 `COMPACTOR` 能力时，orchestrator 才尝试一次压缩。
-  插件决定摘要正文与水位，Kernel 负责超时、结果校验、`SessionStore.compact()`、重载、
-  `session.compacted` 事件与失败回退。同一 turn 重组后不再触发第二次压缩。裁到只剩系统段
-  与当前输入仍超预算时仍抛 `INPUT_TOO_LARGE`，压缩不用于掩盖当前请求本身过大。
+- **持久化会话压缩由 `COMPACTOR` 能力实现**。Context Builder 完整渲染消息，不先执行
+  确定性硬裁剪。完整请求接近统一触发线、存在可重放历史且 `context.compactor` 已显式
+  选中时，orchestrator 至多调用一次。插件决定摘要与水位；Kernel 在写入前以完整请求验证
+  结果达到目标，再调用 `SessionStore.compact()` 并发布 `session.compacted`。插件异常、
+  超时、非法结果或未达到目标均直接终止 Turn，不保留旧裁剪结果作为回退。
 - **Turn 内临时压缩是独立的 `TURN_COMPACTOR` 能力**。Orchestrator 把 `RetryingModel`
   包在状态化 `TurnCompactingModel` 内，Engine 仍只看到四槽 `EngineDeps`。每轮
   `before_model_request` 改写完成后，包装器估算消息、工具 schema、参数和 provider blocks
@@ -766,6 +766,14 @@ engine 的不变量（写进 docstring 并由测试守护）：
   仅传递到当前 Turn 的后续迭代，不读写 Session 或 Transcript。插件故障、非法结果、
   超时或压缩后仍超限均终止当前 Turn；Kernel 不内置第二套策略。Runtime 要求该能力必选，
   并默认选中内建 `basic`。
+- **三条预算链路共用 `TokenAccounting` 与 `ContextBudget`**。计量对象是最终结构化
+  `ModelRequest`，覆盖文本、role/消息开销、工具调用参数、工具结果、工具 schema、采样参数
+  与 provider blocks；当前不扩展消息契约之外的多模态分支。模型窗口先扣最大输出空间，
+  再保留 5% 安全余量，压缩目标为触发线的 80%。实际输入 usage 按 Session 保存为最近一次
+  已发送请求的前缀锚点；后续请求只有在模型、工具、采样参数与完整消息前缀都一致时，才按
+  “锚点真实 token + 新增消息估算”计量。压缩、Hook 改写或请求形态变化会使锚点失效并恢复
+  完整请求估算。Provider 返回结构化上下文超限错误时，只在尚未产生实质输出的前提下强制
+  压缩并重试一次。
 - **`MERGE` 下整批归一个 turn**。被合并的消息不产生自己的事件流，只在执行 turn 的
   `turn.started` 载荷里留 `merged_from`；提交方拿到的 `TurnReceipt` 就是执行 turn 的那一份。
 
@@ -835,7 +843,7 @@ turn 终态只有四个：`COMPLETED` / `CANCELLED` / `FAILED` / `STOPPED_BY_LIM
 | `tool_timeout_ms` | 120000 | 单工具超时错误，turn 继续 |
 | `tool_result_max_bytes` | 65536 | 截断并置 `truncated=True` |
 | `turn_timeout_ms` | 900000 | `CANCELLED(reason=TIMEOUT)` |
-| `context_max_tokens` | 由模型能力推导 | 触发裁剪策略 |
+| `context_max_tokens` | 由模型能力推导 | 作为输入硬上限并派生提前压缩线与目标水位 |
 
 缺省配置下不存在无界执行路径，这一点由 `tests/kernel/test_limits.py` 逐项断言。
 
@@ -1296,7 +1304,7 @@ Protocol）：`kernel/` 与 `runtime/` 都要调用 CLI 能力，而 `R2` 禁止
 | CLI 入口 | `builtins/cli_entry/` | stdin/stdout + 单次执行模式；`Ctrl-C` → 取消在跑的 turn，再按一次退出进程；输入输出走统一消息契约（`MSG-007`） |
 | Model Provider | `builtins/model_openai/` | OpenAI 兼容 Chat Completions（回答 §17.2 第 5 项） |
 | Session | `builtins/session_jsonl/` | 每 session 一个 JSONL + 一个 meta.json，追加写 + 原子替换 |
-| Context | `builtins/context_basic/` | 系统指令 + 历史 + 按 token 预算的尾部保留裁剪 |
+| Context | `builtins/context_basic/` | 贡献系统指令与运行时事实；历史由 Kernel 投影，预算由完整请求统一计量 |
 | Turn Compactor | `builtins/context_compact_basic/` | 从最旧单元开始替换连续前缀，生成有界、确定性摘要 |
 | 基础工具 | `builtins/tools_fs/`、`tools_shell/` | 6 个工具，复用 nanobot 已验证的路径守卫与沙箱 |
 | 命令 | `builtins/commands_core/` | `/help` `/config` `/session` `/plugins` `/capabilities` `/cancel` |
@@ -1354,24 +1362,21 @@ JSONL 每行一条记录，字段即 `contracts/session.py` 的序列化形式�
 
 `D18` 落地时对本段「Context」一行的四处细化（实现在 `builtins/context_basic/`）：
 
-- **它不贡献历史**。本段原文写的是「系统指令 + 历史 + 按 token 预算的尾部保留裁剪」，
-  但 `D14` 之后历史重放（`context_builder.replay_messages`，含 `EDG-305` 的投影规则）与
-  从最旧丢起的裁剪都在组装器里。Provider 再贡献一份历史片段，等于把同一段对话讲两遍，
+- **它不贡献历史**。历史重放由 `context_builder.replay_messages` 按 Session 快照统一完成。
+  Provider 再贡献一份历史片段，等于把同一段对话讲两遍，
   还绕过了投影规则。因此内建 Provider 的产出恰好是三类片段：基线系统指令、运行时事实、
   运维配置的自定义指令。所谓「尾部保留裁剪」由组装器履行，不在本内建内。
 - **运维在 `config.json` 里写的 `instructions` 是 `TrustLevel.OPERATOR` 而不是 `SYSTEM`**。
   契约对这一级的定义就是「实例拥有者通过配置显式提供的内容，可信但不是系统本身」。
-  代价是它落在历史之后的一条 user 消息里而不是 system 消息里，因此给它 `priority=0`
-  （与内建基准同级、最晚被裁）。把配置文本升为 `SYSTEM` 等于取消 `CMD-005` 的分级，
+  代价是它落在历史之后的一条 user 消息里而不是 system 消息里，因此沿用内建基准
+  `priority=0`；该值不参与 token 预算。把配置文本升为 `SYSTEM` 等于取消 `CMD-005` 的分级，
   那不是一个内建能力该自行决定的事。只有基线指令与运行时事实是 `trust=SYSTEM`。
 - **零 IO**（技术方案 §14 的「Provider 只读不写」）。模块连 `os` / `pathlib` 都不 import，由
   `tests/architecture/test_builtin_no_privilege.py::test_read_only_builtins_have_no_syntactic_route_to_persistence`
   按「没有语法途径」而不是「看起来没写盘」来断言。因此它不可能因为缺少某个可选插件而
   失败，`CTX-006`/`EDG-307` 由此成立。
-- **token 估算的公式在 `builtins/` 与 `kernel/` 各写一份**。`R4` 禁止内建 import kernel，
-  而片段自报的 `estimated_tokens` 与组装器裁剪时用的尺子必须同口径——自报偏小则请求真的
-  超窗，偏大则白丢内容。两份由 `tests/builtins/test_context_basic.py` 的一条逐字符对照
-  测试钉住，与 `kernel/config/schema.py` 重写六个默认值是同一种做法。
+- **片段自报估算不参与预算**。`estimated_tokens` 作为 SDK 4.x 字段仍由来源填写，但
+  Kernel 只在完成信任包装和消息渲染后计量完整请求，因此内建不需要越层导入 Kernel。
 
 `D19` 落地时对本段「Model Provider」一行的四处细化（实现在 `builtins/model_openai/`）：
 
@@ -1539,18 +1544,19 @@ Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中
          -> 超时/失败：跳过并记录（CTX-005、EDG-302）
       c. 收集 ContextFragment；按 trust 决定放置位置，UNTRUSTED 包裹为数据块
       d. context_assemble Interceptor 顺序执行
-      e. 按 context_max_tokens 裁剪：SYSTEM 不裁剪，其余按 priority 逆序丢弃，
-         HISTORY 从最旧开始丢（CTX-003、EDG-301）
-      f. 若历史确实被裁且 context.compactor 已显式配置，调用一次 COMPACTOR；
-         校验并持久化摘要后重载、重组一次；插件失败则沿用 e 的确定性结果
+      e. 渲染完整 ModelMessage，不按片段自报 estimated_tokens 裁剪
+      f. 对含工具 schema 与参数的完整 ModelRequest 统一计量；接近触发线且已配置
+         COMPACTOR 时调用一次，写 Session 前校验摘要达到目标；插件失败直接终止 Turn
  8  从 registry 取生效工具集 -> tool_specs（与模型可见列表同源）
  9  before_model_request Interceptor
     （`D09` 起由 engine **每轮**分发；此处是 orchestrator 对第一轮的视角，D14 不得重复分发——
       否则第一轮触发两遍。engine 内部每轮迭代前分发一次，见 §6.2.1）
-10  TurnCompactingModel 估算 Hook 改写后的完整请求：
+10  TurnCompactingModel 用同一计量器检查 Hook 改写后的完整请求：
       未超限 -> 直接调用模型
       超限 -> 调用当前 TURN_COMPACTOR，用不可信摘要替换连续单元前缀
       策略需要模型时，只能使用当次 CompactionModel（当前模型、无工具、非流式、不递归压缩）
+      Provider 实际 usage 锚定相同请求前缀，只估算新增尾部；结构化上下文超限在无实质
+      输出时压缩并重试一次
 11  engine.run_turn 继续迭代：
       【检查点 2】-> model.stream()
       【检查点 3】每个分片：yield ModelDelta -> orchestrator 转 OutboundMessage(DELTA)

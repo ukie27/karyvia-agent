@@ -1,10 +1,10 @@
-"""Context 组装：Provider 调度、trust 放置与预算裁剪（技术方案 §10.2 第 7 步 a–e）。
+"""Context 组装：Provider 调度、过滤、trust 放置与最终消息渲染。
 
 职责：并发调用全部生效的 `ContextProvider`（各自独立超时、失败隔离），分发
-`context_assemble` 拦截器，按 `trust` 决定片段的放置位置，并在 `context_max_tokens`
-之内裁剪出一份 `ModelMessage` 序列。
+`context_assemble` 拦截器，并按 `trust` 决定片段的放置位置，产出 `ModelMessage` 序列。
 不负责：调用模型、决定谁是 Provider（Registry 说了算）、持久化压缩历史
-（`compaction.py` 在本函数返回后协调）、**长期记忆的召回策略与降级**
+（`compaction.py` 在本函数返回后协调）、请求预算判断与压缩（模型请求包装层负责）、
+**长期记忆的召回策略与降级**
 （`memory.py` 负责；这里只调用一次并把结果与其余片段同批处理）。本模块不做任何 IO，
 只 await 注入进来的 Provider 与 Hook。
 
@@ -18,11 +18,11 @@
    落进数据块。
 3. **`sensitivity=SECRET` 的片段不进模型请求**（`contracts/context.py` 的 `Sensitivity`
    docstring 写死），过期片段同理丢弃。两者都记进 `dropped`，不静默消失。
-4. **拦截器在裁剪之前**。先裁后钩等于让插件在预算之外再塞东西。
+4. **先渲染再计量**。`ContextFragment.estimated_tokens` 是插件提供的提示值，不再作为
+   Kernel 的预算真相；最终消息和完整请求都使用 `request_size.py` 的同一把尺。
 
-**仍超限怎么办**：丢到只剩系统段与当前输入仍超预算时抛 `INPUT_TOO_LARGE`
-（→ turn `FAILED`）。普通裁剪始终先产出确定结果；可选 Compactor 只在历史确实被裁
-时尝试持久化摘要，失败不会改变本次已组装好的上下文。
+本模块不做确定性硬裁剪。超预算请求统一进入持久化压缩或 Turn 临时压缩；插件失败直接
+终止 Turn，不存在回退到旧裁剪结果的第二条路径。
 """
 
 from __future__ import annotations
@@ -46,7 +46,6 @@ from nucleamind.contracts import (
     HookAction,
     HookContext,
     HookName,
-    ModelInfo,
     ModelMessage,
     NucleaError,
     ProviderId,
@@ -59,14 +58,12 @@ from nucleamind.contracts import (
 
 from ..registry import CapabilityRegistry
 from .deps import HookDispatcher
-from .limits import TurnLimits
 from .memory import MemoryRecall
 from .message_projection import render_message_content
-from .request_size import estimate_tokens
+from .request_size import TokenAccounting, estimate_tokens
 
 __all__ = [
     "DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS",
-    "HISTORY_TRIM_PRIORITY",
     "AssembledContext",
     "ContextProviderBinding",
     "DroppedFragment",
@@ -74,16 +71,12 @@ __all__ = [
     "assemble",
     "context_providers_from",
     "estimate_tokens",
+    "reassemble_history",
     "replay_messages",
 ]
 
 #: 单个 Context Provider 的独立超时（§10.2 第 7 步 b）。
 DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS: Final = 3_000
-
-#: 会话历史在裁剪序列里的优先级。取 0（= 内建基准）而不是更小的值：历史是用户资产，
-#: 应当在插件片段（基准 100）之后才被丢；但它不该比内建片段更晚被丢——同优先级时先丢
-#: 片段、再丢历史，因为片段下一轮还能重新产出，历史丢了就是丢了。
-HISTORY_TRIM_PRIORITY: Final = 0
 
 @dataclass(frozen=True, slots=True)
 class RegisteredContextProvider:
@@ -126,8 +119,6 @@ class AssembledContext:
     fragments: tuple[ContextFragment, ...]
     dropped: tuple[DroppedFragment, ...]
     estimated_tokens: int
-    budget: int
-    history_dropped: int = 0
 
 def context_providers_from(registry: CapabilityRegistry) -> tuple[ContextProviderBinding, ...]:
     """从已冻结的 registry 取出全部生效的 Context Provider，按 `(priority, provider, name)` 排序。
@@ -182,12 +173,11 @@ async def assemble(
     user_input: str,
     correlation: Correlation,
     cancel: CancelSignal,
-    limits: TurnLimits,
     bindings: Sequence[ContextProviderBinding] = (),
     extra_fragments: Iterable[ContextFragment] = (),
     hooks: HookDispatcher | None = None,
-    model_info: ModelInfo | None = None,
     memory: MemoryRecall | None = None,
+    accounting: TokenAccounting | None = None,
     now: datetime,
     provider_timeout_ms: int = DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS,
     on_failure: Callable[[NucleaError], None] | None = None,
@@ -195,16 +185,15 @@ async def assemble(
     """走完 §10.2 第 7 步的 a–e，产出一份可直接交给 engine 的消息序列。
 
     `extra_fragments` 是命令注入的片段（`CommandResult.fragments`，`CMD-004`）：它们与
-    Provider 产出的片段同批参与拦截、放置与裁剪，没有旁路。
+    Provider 产出的片段同批参与拦截、过滤与放置，没有旁路。
 
     `memory` 是长期记忆的召回（`None` = 不启用）。它产出的片段**与上面两批完全同
-    等**：同批拦截、同批放置、同批裁剪。做成 `assemble` 的一个参数而不是让 orchestrator
+    等**：同批拦截、同批过滤、同批放置。做成 `assemble` 的一个参数而不是让 orchestrator
     自己召回再拼进 `extra_fragments`，是因为「召回」就是上下文组装的 a 步——放在外面会让
     「片段从哪来」有两个答案，而 `orchestrator.py` 也贴着 500 行上限。**查询词是本次输入**
     （`MemoryRecall` 自己挡掉空串）；策略与降级全在 `memory.py`，这里只调它。
 
-    **异常约定**：Provider 失败交给 `on_failure` 后跳过；裁剪到底仍超预算抛
-    `INPUT_TOO_LARGE`。
+    **异常约定**：Provider 失败交给 `on_failure` 后跳过；空上下文直接拒绝。
     记忆后端的失败按 `MemoryRecall.critical` 分叉（`MEM-003`），判定在那一侧。
     **取消语义**：`cancel` 透传给每个 Provider 与记忆后端；本函数自身不设检查点
     （检查点 1 在 orchestrator，就在调用本函数之前）。
@@ -226,15 +215,29 @@ async def assemble(
         else:
             kept.append(fragment)
 
-    budget = limits.resolve_context_max_tokens(model_info)
-    plan = _trim(kept, replay_messages(snapshot), user_input, budget, dropped)
+    messages = _render(kept, replay_messages(snapshot), user_input)
+    meter = accounting or TokenAccounting()
     return AssembledContext(
-        messages=_render(plan, user_input),
-        fragments=(*plan.system, *plan.fragments),
+        messages=messages,
+        fragments=tuple(kept),
         dropped=tuple(dropped),
-        estimated_tokens=plan.tokens,
-        budget=budget,
-        history_dropped=plan.history_dropped,
+        estimated_tokens=meter.estimate_messages(messages),
+    )
+
+
+def reassemble_history(
+    context: AssembledContext,
+    snapshot: SessionSnapshot,
+    user_input: str,
+    accounting: TokenAccounting,
+) -> AssembledContext:
+    """保留本轮已经取得的片段，只用压缩后的 Session 快照替换历史。"""
+    messages = _render(context.fragments, replay_messages(snapshot), user_input)
+    return AssembledContext(
+        messages=messages,
+        fragments=context.fragments,
+        dropped=context.dropped,
+        estimated_tokens=accounting.estimate_messages(messages),
     )
 
 
@@ -349,94 +352,28 @@ _PLACEHOLDER: Final = ContextFragment(
 # ------------------------------------------------------------------------------- e
 
 
-@dataclass(frozen=True, slots=True)
-class _Plan:
-    """裁剪后的组装计划。"""
-
-    system: tuple[ContextFragment, ...]
-    fragments: tuple[ContextFragment, ...]
-    history: tuple[ModelMessage, ...]
-    tokens: int
-    history_dropped: int
-
-
-def _trim(
+def _render(
     fragments: Sequence[ContextFragment],
     history: Sequence[ModelMessage],
     user_input: str,
-    budget: int,
-    dropped: list[DroppedFragment],
-) -> _Plan:
-    """按预算裁剪（`CTX-003`、`EDG-301`）。
-
-    丢弃顺序：`priority` 逆序；同优先级内**先丢片段（按 (provider, name) 序）、再丢历史
-    （从最旧）**。片段下一轮还能重新产出，历史丢了就是丢了。系统段与当前输入永不裁剪。
-    """
+) -> tuple[ModelMessage, ...]:
+    """渲染为系统段 → 历史 → 上下文块 → 当前输入。"""
     system = tuple(item for item in fragments if item.trust is TrustLevel.SYSTEM)
-    body = [item for item in fragments if item.trust is not TrustLevel.SYSTEM]
-    kept_history = list(history)
-    original_history_count = len(kept_history)
-
-    fixed = sum(item.estimated_tokens for item in system) + estimate_tokens(user_input)
-    total = fixed + sum(item.estimated_tokens for item in body)
-    total += sum(estimate_tokens(message.content) for message in kept_history)
-
-    # 每次丢一个「当前最该丢的单元」：body 里 priority 最大的那个，或最旧的一条历史。
-    while total > budget and (body or kept_history):
-        if _fragment_goes_first(body):
-            victim = max(range(len(body)), key=lambda index: (body[index].priority, index))
-            fragment = body.pop(victim)
-            dropped.append(DroppedFragment(fragment, "budget"))
-            total -= fragment.estimated_tokens
-        else:
-            total -= estimate_tokens(kept_history.pop(0).content)
-
-    if total > budget:
-        raise NucleaError(
-            ErrorCode.INPUT_TOO_LARGE,
-            "系统指令与本次输入本身已超出上下文预算，无法在不丢失指令的前提下裁剪。",
-            detail={"estimated_tokens": total, "budget": budget},
-        )
-    return _Plan(
-        system=system,
-        fragments=tuple(body),
-        history=tuple(kept_history),
-        tokens=total,
-        history_dropped=original_history_count - len(kept_history),
-    )
-
-
-def _fragment_goes_first(body: Sequence[ContextFragment]) -> bool:
-    """还有片段就先丢片段。
-
-    这不是「片段比历史不重要」，而是 `HISTORY_TRIM_PRIORITY = 0` 与
-    `ContextFragment.priority >= 0`（契约层保证非负）两条合起来的必然结果：任何片段的
-    优先级都不低于历史，同优先级时按上面的约定片段先走。写成一个具名函数是为了让这条
-    推理在代码里留下痕迹——直接写 `if body:` 六个月后就没人知道它凭什么成立。
-    """
-    return bool(body)
-
-
-def _render(plan: _Plan, user_input: str) -> tuple[ModelMessage, ...]:
-    """把计划渲染成消息序列：系统段 → 历史 → 上下文块 → 当前输入。
-
-    非系统片段合成**一条** user 消息而不是各自一条：模型看到的是一段带来源标注的参考
-    资料，而不是一串来路不明的「用户发言」。渲染一律走 `as_model_text()`。
-    """
+    body = tuple(item for item in fragments if item.trust is not TrustLevel.SYSTEM)
     messages: list[ModelMessage] = []
-    if plan.system:
+    if system:
         messages.append(
             ModelMessage(
                 role=Role.SYSTEM,
-                content="\n\n".join(item.as_model_text() for item in plan.system),
+                content="\n\n".join(item.as_model_text() for item in system),
             )
         )
-    messages.extend(plan.history)
-    if plan.fragments:
+    messages.extend(history)
+    if body:
         messages.append(
             ModelMessage(
                 role=Role.USER,
-                content="\n\n".join(item.as_model_text() for item in plan.fragments),
+                content="\n\n".join(item.as_model_text() for item in body),
             )
         )
     if user_input:

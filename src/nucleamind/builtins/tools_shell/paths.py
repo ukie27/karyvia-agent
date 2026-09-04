@@ -19,7 +19,7 @@
 的内部模块，等于在能力边界之外偷偷建立一条依赖——`tools-fs` 被替换成第三方实现时，
 `tools-shell` 仍然绑在内建那份代码上。两份实现由
 `tests/builtins/test_tools_shell.py::test_cwd_guard_matches_the_fs_workspace_guard` 逐条对照
-钉住，与 `estimate_tokens` 在 `context_basic` 与 `context_builder` 里各写一份是同一种做法。
+钉住；该常量属于跨层协议事实，因此由测试保持两侧一致。
 
 **这是应用级守卫，不是 OS 沙箱**：校验与随后 `create_subprocess_exec` 使用该 cwd 之间存在
 TOCTOU 窗口——目标可以在这期间被换成一个指向根外的符号链接。更要紧的是，**守住 cwd 并不

@@ -1,20 +1,15 @@
-"""内建上下文的文本与估算：基线系统指令、运行时事实、token 粗估。
+"""内建上下文的文本与提示性估算：基线系统指令、运行时事实、token 粗估。
 
 职责：产出 `context_basic` 交给模型的三段文本（基线指令 / 运行时事实 / 运维指令的规范化
-形式），并给出与 Kernel 组装器同口径的 token 估算。
+形式），并填写 SDK 4.x `ContextFragment.estimated_tokens` 所需的诊断提示值。
 不负责：构造片段、决定 `trust`、读配置、任何 IO——那些在 `provider.py`。
 
-**为什么估算公式在这里又写了一份**：`R4` 禁止 `builtins/` import `kernel/`，而
-`kernel/turn/context_builder.py::estimate_tokens` 是裁剪时真正用的那把尺。片段自报的
-`estimated_tokens` 与组装器的尺子不同口径，会让「按预算裁剪」变成按两套数字裁剪：
-自报偏小则请求真的超窗，偏大则白丢内容。因此两处各写一份同样的公式，由
-`tests/builtins/test_context_basic.py::test_token_estimate_matches_the_kernel_trimmer`
-逐字符对照钉住——与 `kernel/config/schema.py` 重写六个默认值是同一种做法。
+此处估算不参与 Kernel 预算判断。Kernel 会在片段完成信任包装并渲染成最终消息后，按完整
+`ModelRequest` 统一重算；内建层也因此不需要越层导入 Kernel 计量器。
 """
 
 from __future__ import annotations
 
-import math
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Final
@@ -27,9 +22,6 @@ __all__ = [
     "normalize_instructions",
     "render_runtime_facts",
 ]
-
-#: 粗估 token 的字符比。**必须与 `kernel/turn/context_builder.py::_CHARS_PER_TOKEN` 相等。**
-_CHARS_PER_TOKEN: Final = 3
 
 #: 基线系统指令（`CTX-006`）：没有 Memory、没有检索插件、没有任何运维配置时，这一段
 #: 独自构成「可用上下文」。
@@ -50,9 +42,9 @@ BASELINE_INSTRUCTIONS: Final = (
 def estimate_tokens(text: str) -> int:
     """粗估一段文本的 token 数。空串为 0，其余至少 1。
 
-    宁可高估：低估会让请求真的超出模型窗口，高估只是多裁一点（与组装器同注释）。
+    这只是片段来源侧的诊断提示，不是请求预算输入。
     """
-    return math.ceil(len(text) / _CHARS_PER_TOKEN) if text else 0
+    return (len(text.encode("utf-8")) + 3) // 4 if text else 0
 
 
 def render_runtime_facts(

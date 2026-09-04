@@ -126,8 +126,11 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
   `turn.started`。
 - `trust=SYSTEM` 是进入系统指令位置的唯一凭据；不可信文本的包装由契约层
   `as_model_text()` 完成。
-- Context 确定性裁剪按既定优先级工作；只剩系统段和当前输入仍超预算时抛
-  `INPUT_TOO_LARGE`，不要伪装成已压缩成功。
+- Context 预算统一按最终结构化 `ModelRequest` 估算，并预留模型输出与安全余量；
+  `ContextFragment.estimated_tokens` 只作为来源元数据，不参与 Kernel 预算判断。Provider 的
+  实际输入 usage 只在请求形态与消息前缀一致时作为增量估算锚点，否则恢复完整请求估算。
+- `COMPACTOR` 只负责持久化会话压缩，`TURN_COMPACTOR` 只负责 Turn 内临时压缩；Kernel
+  负责触发、目标预算与最终校验。插件失败直接报错，不保留确定性请求级硬裁剪回退。
 - `ToolInvoker.invoke()` 约定不抛，并必须在 `timeout_ms + grace` 内返回。超时先请求子令牌
   取消，宽限后仍不返回则登记孤儿和未知副作用；不要直接 `task.cancel()`。
 

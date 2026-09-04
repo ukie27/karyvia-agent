@@ -17,7 +17,13 @@ vLLM / Ollama / LM Studio 与多数中转服务都兼容，`BAS-001` 的「配�
 
 from __future__ import annotations
 
-from .faults import QUOTA_ERROR_CODES, error_for_status, error_for_transport, retry_after_ms
+from .faults import (
+    CONTEXT_OVERFLOW_ERROR_CODES,
+    QUOTA_ERROR_CODES,
+    error_for_status,
+    error_for_transport,
+    retry_after_ms,
+)
 from .provider import (
     CHAT_COMPLETIONS_PATH,
     OpenAIModelProvider,
@@ -77,6 +83,7 @@ __all__ = [
     "CONFIG_REQUEST_TIMEOUT_KEY",
     "CONFIG_STREAM_IDLE_TIMEOUT_KEY",
     "CONFIG_SUPPORTS_TEMPERATURE_KEY",
+    "CONTEXT_OVERFLOW_ERROR_CODES",
     "DEFAULT_BASE_URL",
     "MAX_COMPLETION_TOKENS_FIELD",
     "MAX_TOKENS_FIELD",

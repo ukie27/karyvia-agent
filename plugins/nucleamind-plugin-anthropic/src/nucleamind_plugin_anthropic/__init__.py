@@ -52,7 +52,12 @@ from nucleamind.sdk import (
 )
 
 from .decode import StreamDecoder, decode_response, decode_stop_reason, decode_usage
-from .faults import error_for_event, error_for_status, error_for_transport
+from .faults import (
+    CONTEXT_OVERFLOW_ERROR_TYPES,
+    error_for_event,
+    error_for_status,
+    error_for_transport,
+)
 from .provider import AnthropicModelProvider, read_credential, setup
 from .settings import (
     CACHING_KEYS,
@@ -78,6 +83,7 @@ from .wire import (
 __all__ = [
     "CACHING_KEYS",
     "CAPABILITY_NAME",
+    "CONTEXT_OVERFLOW_ERROR_TYPES",
     "ENTRY_PROPERTIES",
     "MODEL_ENTRY_KEYS",
     "MANIFEST",

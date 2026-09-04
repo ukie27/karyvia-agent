@@ -1,12 +1,12 @@
-"""Context 组装的行为测试（`D14` 验收：技术方案 §10.2 第 7 步 a–e）。
+"""Context 组装的行为测试。
 
 | 组 | 验收内容 |
 | --- | --- |
 | A Provider 调度 | 并发调用、顺序确定、超时/失败隔离（`CTX-005`、`EDG-302`） |
 | B 放置 | `trust` 决定位置；`UNTRUSTED` 被包裹且进不了系统指令位（`CMD-005`、`EDG-306`） |
 | C 过滤 | `SECRET` 与过期片段被丢弃并记录 |
-| D 拦截器 | `context_assemble` 在裁剪之前，累积生效 |
-| E 裁剪 | SYSTEM 不裁、priority 逆序、HISTORY 从最旧、裁到底仍超限即报错（`CTX-003`、`EDG-301`） |
+| D 拦截器 | `context_assemble` 的结果进入最终渲染与统一计量 |
+| E 计量 | Builder 不裁剪，按最终 `ModelMessage` 结构重算 |
 | F 重放 | 历史投影跳过 tool 记录与空正文 |
 """
 
@@ -40,12 +40,12 @@ from nucleamind.kernel.registry import CapabilityRegistry
 from nucleamind.kernel.turn import (
     CancelToken,
     RegisteredContextProvider,
-    TurnLimits,
     assemble,
     context_providers_from,
     estimate_tokens,
     replay_messages,
 )
+from nucleamind.kernel.turn.request_size import estimate_messages_tokens
 
 from ._engine_support import CORRELATION
 from ._orchestrator_support import FakeContextProvider, binding, fragment
@@ -96,7 +96,6 @@ async def build(**kwargs: object):  # noqa: ANN201 - 关键字直接透传给 as
         "user_input": "请统计文件数",
         "correlation": CORRELATION,
         "cancel": CancelToken(),
-        "limits": TurnLimits(),
         "now": NOW,
     }
     defaults.update(kwargs)
@@ -204,7 +203,6 @@ async def test_history_sits_between_system_and_the_current_input() -> None:
         (Role.ASSISTANT, "上一答"),
         (Role.USER, "请统计文件数"),
     ]
-    assert context.history_dropped == 0
 
 
 # ------------------------------------------------------------------ C 过滤
@@ -260,25 +258,24 @@ class Injector:
         return HookOutcome(HookAction.REPLACE, fragments=(*context.fragments, self.extra))
 
 
-async def test_context_assemble_interceptor_runs_before_trimming() -> None:
+async def test_context_assemble_interceptor_is_rendered_and_recounted() -> None:
     injected = fragment("plugin:hook", content="钩子加的", trust=TrustLevel.OPERATOR, tokens=1000)
     hooks = Injector(injected)
 
     context = await build(
         extra_fragments=[fragment("builtin:sys", content="系统", trust=TrustLevel.SYSTEM)],
         hooks=hooks,
-        limits=TurnLimits(context_max_tokens=50),
     )
 
-    # 钩子看得到已有片段，而它加的那一大块随后仍要过裁剪——先裁后钩就绕过预算了。
     assert hooks.seen == [1]
-    assert [item.reason for item in context.dropped] == ["budget"]
+    assert [item.source for item in context.fragments] == ["builtin:sys", "plugin:hook"]
+    assert context.estimated_tokens == estimate_messages_tokens(context.messages)
 
 
-# ------------------------------------------------------------------ E 裁剪
+# ------------------------------------------------------------------ E 最终结构计量
 
 
-async def test_system_survives_and_fragments_drop_by_priority_descending() -> None:
+async def test_builder_does_not_drop_fragments_by_estimate_or_priority() -> None:
     context = await build(
         extra_fragments=[
             fragment("builtin:sys", content="系统", trust=TrustLevel.SYSTEM, tokens=10),
@@ -287,15 +284,18 @@ async def test_system_survives_and_fragments_drop_by_priority_descending() -> No
             fragment("plugin:high", content="插件", trust=TrustLevel.OPERATOR, tokens=10,
                      priority=100),
         ],
-        limits=TurnLimits(context_max_tokens=30),
     )
 
-    assert [item.source for item in context.fragments] == ["builtin:sys", "builtin:low"]
-    assert [item.fragment.source for item in context.dropped] == ["plugin:high"]
+    assert [item.source for item in context.fragments] == [
+        "builtin:sys",
+        "builtin:low",
+        "plugin:high",
+    ]
+    assert context.dropped == ()
     assert context.messages[0].role is Role.SYSTEM
 
 
-async def test_history_is_dropped_oldest_first_and_only_after_fragments() -> None:
+async def test_builder_keeps_complete_history_for_the_compression_layer() -> None:
     history = snapshot(
         record(Role.USER, "最旧" * 20),
         record(Role.ASSISTANT, "中间" * 20),
@@ -305,17 +305,15 @@ async def test_history_is_dropped_oldest_first_and_only_after_fragments() -> Non
         snapshot=history,
         extra_fragments=[fragment("plugin:x", content="片段", trust=TrustLevel.OPERATOR,
                                   tokens=5)],
-        limits=TurnLimits(context_max_tokens=40),
     )
 
     kept = [m.content for m in context.messages if m.role in (Role.USER, Role.ASSISTANT)]
-    assert context.fragments == ()  # 片段先走
-    assert "最旧" * 20 not in kept  # 历史从最旧开始丢
+    assert [item.source for item in context.fragments] == ["plugin:x"]
+    assert "最旧" * 20 in kept
     assert "最新" * 20 in kept
-    assert context.history_dropped == 1
 
 
-async def test_non_replayable_records_do_not_count_as_dropped_history() -> None:
+async def test_non_replayable_records_are_still_excluded_from_rendering() -> None:
     context = await build(
         snapshot=snapshot(
             record(Role.TOOL, "工具输出", tool_call_id="c1"),
@@ -323,19 +321,18 @@ async def test_non_replayable_records_do_not_count_as_dropped_history() -> None:
             record(Role.USER, "旧问题" * 20),
             record(Role.ASSISTANT, "旧回答" * 20),
         ),
-        limits=TurnLimits(context_max_tokens=10),
     )
 
-    assert context.history_dropped == 2
+    rendered = [message.content for message in context.messages]
+    assert "工具输出" not in rendered
+    assert "旧问题" * 20 in rendered
+    assert "旧回答" * 20 in rendered
 
 
-async def test_trimming_to_the_bone_still_over_budget_raises() -> None:
-    with pytest.raises(NucleaError) as caught:
-        await build(
-            user_input="很长的输入" * 200,
-            limits=TurnLimits(context_max_tokens=5),
-        )
-    assert caught.value.code is ErrorCode.INPUT_TOO_LARGE
+async def test_large_input_is_left_intact_for_request_level_budgeting() -> None:
+    content = "很长的输入" * 200
+    context = await build(user_input=content)
+    assert context.messages[-1].content == content
 
 
 def test_estimate_tokens_is_zero_for_empty_text() -> None:

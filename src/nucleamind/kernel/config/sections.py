@@ -145,9 +145,9 @@ class ContextSection:
 
     #: 单个 Context Provider 的独立超时。超时后记录故障并跳过（`CTX-005`、`EDG-302`）。
     provider_timeout_ms: int = DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS
-    #: `COMPACTOR` 能力名。`None` = 不启用持久化压缩，只做逐请求确定性裁剪。
+    #: `COMPACTOR` 能力名。`None` = 不改写 Session，超限仍由 Turn Compactor 处理。
     compactor: str | None = None
-    #: 单次 compactor 调用预算；超时回退到首次裁剪结果。
+    #: 单次 compactor 调用预算；超时或非法结果直接终止当前 Turn。
     compactor_timeout_ms: int = DEFAULT_COMPACTOR_TIMEOUT_MS
     #: 每轮模型请求超限时使用的临时压缩能力；生产实例必须能解析到该名字。
     turn_compactor: str = DEFAULT_TURN_COMPACTOR
@@ -177,8 +177,7 @@ class MemorySection:
     recall_limit: int = DEFAULT_MEMORY_RECALL_LIMIT
     #: 一次召回的预算。超时按 `on_failure` 处置。
     recall_timeout_ms: int = DEFAULT_MEMORY_RECALL_TIMEOUT_MS
-    #: 召回片段的 priority **下界**（不是覆写）。理由见 `kernel/turn/memory.py` 第 2 条：
-    #: priority 0 会让记忆与会话历史在裁剪序里不可区分，而历史丢了就是丢了。
+    #: 召回片段的 priority 下界；这是拦截器与诊断可见的来源元数据，不参与 token 预算。
     fragment_priority: int = DEFAULT_MEMORY_FRAGMENT_PRIORITY
     #: `MEM-003`：`degrade` = 后端故障时这一轮没有记忆、turn 照常跑（默认）；
     #: `fail` = turn `FAILED`。降级**不等于静默**，错误一定会被报出去。

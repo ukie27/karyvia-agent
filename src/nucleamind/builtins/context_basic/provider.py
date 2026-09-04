@@ -2,7 +2,7 @@
 
 职责：实现 `ContextProvider`，为每次 turn 贡献基线系统指令、运行时事实与运维配置的自定义
 指令三类片段；同时提供内建注册入口 `setup(api)`。
-不负责：重放会话历史、按预算裁剪、决定片段的最终位置（都在
+不负责：重放会话历史、完整请求计量、决定片段的最终位置（都在
 `kernel/turn/context_builder.py`）、持久化任何东西——**本模块不做任何 IO**。
 
 三条决定了本模块形状的规则：
@@ -13,11 +13,10 @@
 - **`trust` 分成两级**：内建基线指令与运行时事实是系统自己产出的，`trust=SYSTEM`；
   运维在 `config.json` 里写的 `instructions` 是 `TrustLevel.OPERATOR`——契约对这一级的
   定义就是「实例拥有者通过配置显式提供的内容，可信但不是系统本身」。代价是它落在
-  历史之后的一条 user 消息里而不是 system 消息里，因此给它 `priority=0`（与内建基准同级、
-  最晚被裁）。想让配置文本进系统指令位置，等于取消 `CMD-005` 的分级，那不是一个内建能力
+  历史之后的一条 user 消息里而不是 system 消息里，因此给它内建基准 `priority=0`。
+  想让配置文本进系统指令位置，等于取消 `CMD-005` 的分级，那不是一个内建能力
   该自行决定的事。
-- **历史不由这里贡献**。§8.1 原文写的是「系统指令 + 历史 + 尾部保留裁剪」，但 `D14` 之后
-  历史重放（`replay_messages`）与从最旧丢起的裁剪都在组装器里。Provider 再贡献一份历史
+- **历史不由这里贡献**。历史由组装器按 Session 快照统一重放，Provider 再贡献一份历史
   片段就是把同一段对话讲两遍，还绕过了 `EDG-305` 的投影规则。见交接文档对 §8.1 的细化。
 """
 
@@ -73,8 +72,7 @@ CONFIG_INSTRUCTIONS_KEY: Final = "instructions"
 CONFIG_USE_BASELINE_KEY: Final = "use_baseline_instructions"
 CONFIG_RUNTIME_FACTS_KEY: Final = "include_runtime_facts"
 
-#: 运维指令片段的优先级。取 0 = 内建基准 = `HISTORY_TRIM_PRIORITY`：它进不了系统指令
-#: 位置（`trust=OPERATOR`），但也不该比一个第三方检索插件的片段更早被丢。
+#: 运维指令片段沿用内建能力的 priority 基准；预算层不读取此值。
 OPERATOR_PRIORITY: Final = 0
 
 #: 「既不要基线、也不给自定义指令」的拒绝理由。抽成常量是为了让 `TRY003` 与「失败信息

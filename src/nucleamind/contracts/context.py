@@ -2,7 +2,7 @@
 
 职责：定义上下文片段的种类、范围、敏感级别与四级信任度，并在契约层强制
 `UNTRUSTED` 片段的数据块包裹。
-不负责：组装顺序、预算裁剪、压缩与 Provider 调度——那些在 `kernel/context/`
+不负责：组装顺序、请求预算、压缩与 Provider 调度——那些在 `kernel/turn/`
 （`D08`）；本模块不含任何 IO。
 
 `trust` 是本模块的核心。`CMD-005` 要求「不可信来源的声明式扩展内容不得获得高于系统
@@ -119,9 +119,9 @@ class TrustLevel(StrEnum):
 class ContextFragment:
     """一段上下文贡献（§10.4、`CTX-001`）。
 
-    `priority` 小 = 先保留（技术方案 §5.2），裁剪时从大到小丢弃。
-    `estimated_tokens` 是 Provider 给出的估算，组装器据此做预算判断（`CTX-003`），
-    不要求精确，但必须非负且由 Provider 自己负责——组装器不回头去数 token。
+    `priority` 是 SDK 4.x 已发布的来源元数据，可供拦截器与诊断读取；Provider 调用顺序由
+    能力注册 priority 决定。`estimated_tokens` 同样仅供来源侧诊断；Kernel 的预算判断会在
+    片段渲染成最终 `ModelMessage` 后统一重算，不信任也不累加此值。
     """
 
     source: str

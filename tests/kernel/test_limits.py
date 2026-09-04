@@ -288,6 +288,19 @@ def test_explicit_context_budget_wins() -> None:
     assert limits.resolve_context_max_tokens(model) == 1_000
 
 
+def test_explicit_context_budget_cannot_exceed_the_model_input_window() -> None:
+    limits = TurnLimits(context_max_tokens=10_000)
+    model = ModelInfo("m", "p", context_window_tokens=4_096, max_output_tokens=1_024)
+    assert limits.resolve_context_max_tokens(model) == 3_072
+
+
+def test_context_budget_has_one_shared_trigger_and_target() -> None:
+    budget = TurnLimits(context_max_tokens=1_000).resolve_context_budget()
+    assert budget.hard_limit == 1_000
+    assert budget.trigger_limit == 950
+    assert budget.target_limit == 760
+
+
 def test_context_budget_derived_from_model_window() -> None:
     model = ModelInfo("m", "p", context_window_tokens=200_000, max_output_tokens=8_000)
     assert TurnLimits().resolve_context_max_tokens(model) == 192_000

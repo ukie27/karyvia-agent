@@ -622,6 +622,17 @@ class TestFaultMapping:
         """重试一次坏请求只是再错一次。"""
         assert not error_for_status(status).retryable
 
+    def test_context_overflow_has_a_semantic_error_code(self) -> None:
+        error = error_for_status(
+            400,
+            body={"error": {"type": "invalid_request_error", "code": "context_length_exceeded"}},
+        )
+        assert error.code is ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW
+        assert not error.retryable
+
+    def test_request_entity_too_large_uses_the_same_recovery_code(self) -> None:
+        assert error_for_status(413).code is ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW
+
     def test_timeouts_map_to_the_timeout_category(self) -> None:
         error = error_for_transport(httpx.ReadTimeout("slow"))
         assert error.code is ErrorCode.TIMEOUT_MODEL_REQUEST

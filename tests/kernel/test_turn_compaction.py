@@ -10,14 +10,18 @@ from nucleamind.builtins.context_compact_basic import BasicTurnContextCompactor
 from nucleamind.contracts import (
     Builtin,
     CancelSignal,
+    ChunkKind,
     CompactionModel,
     ErrorCode,
     EventName,
     ModelMessage,
     ModelRequest,
+    ModelResponse,
     NucleaError,
     RiskLevel,
     Role,
+    StopReason,
+    TokenUsage,
     ToolCall,
     ToolSpec,
     TurnCompactionRequest,
@@ -25,14 +29,20 @@ from nucleamind.contracts import (
     TurnContextUnitKind,
 )
 from nucleamind.kernel.observability import EventBus, MemoryRingSink
-from nucleamind.kernel.turn import BudgetLedger, TurnLimits
+from nucleamind.kernel.turn import BudgetLedger, TokenAccounting, TurnLimits
 from nucleamind.kernel.turn.request_size import estimate_request_tokens
 from nucleamind.kernel.turn.turn_compaction import (
     TurnCompactingModel,
     TurnCompactionPolicy,
     project_units,
 )
-from nucleamind.sdk.testing import FakeModelProvider, ManualCancel, make_correlation, text_response
+from nucleamind.sdk.testing import (
+    FakeModelProvider,
+    ManualCancel,
+    StaticTurnContextCompactor,
+    make_correlation,
+    text_response,
+)
 
 
 def _request(*messages: ModelMessage, tools: tuple[ToolSpec, ...] = ()) -> ModelRequest:
@@ -54,12 +64,14 @@ def _model(
     timeout_ms: int = 120_000,
 ) -> TurnCompactingModel:
     limits = TurnLimits(context_max_tokens=budget)
+    accounting = TokenAccounting()
     return TurnCompactingModel(
         provider,
         TurnCompactionPolicy(compactor, "test", Builtin(), timeout_ms),  # type: ignore[arg-type]
         EventBus(request.correlation.instance_id),
         BudgetLedger(limits),
-        budget=budget,
+        budget=limits.resolve_context_budget(),
+        accounting=accounting,
         protected_user=next(m for m in reversed(request.messages) if m.role is Role.USER),
         model_info=provider.describe(request.model_id),
     )
@@ -192,7 +204,8 @@ async def test_compactor_can_use_the_current_model_without_recursing() -> None:
         TurnCompactionPolicy(compactor, "model", Builtin()),
         bus,
         BudgetLedger(limits),
-        budget=80,
+        budget=limits.resolve_context_budget(),
+        accounting=TokenAccounting(),
         protected_user=user,
         model_info=provider.describe(request.model_id),
     )
@@ -250,3 +263,89 @@ async def test_compactor_timeout_fails_once_without_fallback() -> None:
 
     assert excinfo.value.code is ErrorCode.TIMEOUT_TURN_COMPACTION
     assert provider.requests == []
+
+
+async def test_actual_usage_calibrates_later_estimates_upward() -> None:
+    user = ModelMessage(Role.USER, "短请求")
+    request = _request(user)
+    response = ModelResponse(
+        request.model_id,
+        StopReason.END_TURN,
+        content="answer",
+        usage=TokenUsage(input_tokens=200, output_tokens=1),
+    )
+    provider = FakeModelProvider([response])
+    limits = TurnLimits(context_max_tokens=1_000)
+    accounting = TokenAccounting()
+    model = TurnCompactingModel(
+        provider,
+        TurnCompactionPolicy(BasicTurnContextCompactor(), "basic", Builtin()),
+        EventBus(request.correlation.instance_id),
+        BudgetLedger(limits),
+        budget=limits.resolve_context_budget(),
+        accounting=accounting,
+        protected_user=user,
+        model_info=provider.describe(request.model_id),
+    )
+
+    await model.complete(request, ManualCancel())
+
+    assert accounting.correction_factor > 1
+    assert accounting.estimate_request(request) >= 200
+
+
+class _OverflowOnceProvider(FakeModelProvider):
+    def __init__(self) -> None:
+        super().__init__([text_response("recovered")])
+        self.overflowed = False
+
+    async def complete(self, request, cancel):  # noqa: ANN001, ANN202
+        if not self.overflowed:
+            self.overflowed = True
+            self.requests.append(request)
+            raise NucleaError(
+                ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW,
+                "模型请求超过供应商窗口。",
+            )
+        return await super().complete(request, cancel)
+
+    def stream(self, request, cancel):  # noqa: ANN001, ANN201
+        return self._overflow_stream(request, cancel)
+
+    async def _overflow_stream(self, request, cancel):  # noqa: ANN001, ANN202
+        if not self.overflowed:
+            self.overflowed = True
+            self.requests.append(request)
+            raise NucleaError(
+                ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW,
+                "模型请求超过供应商窗口。",
+            )
+        async for chunk in super().stream(request, cancel):
+            yield chunk
+
+
+async def test_provider_context_overflow_forces_one_compaction_and_retry() -> None:
+    user = ModelMessage(Role.USER, "继续")
+    request = _request(ModelMessage(Role.ASSISTANT, "history" * 30), user)
+    provider = _OverflowOnceProvider()
+    model = _model(request, provider, StaticTurnContextCompactor(), budget=1_000)
+
+    response = await model.complete(request, ManualCancel())
+
+    assert response.content == "recovered"
+    assert len(provider.requests) == 2
+    assert sum(len(message.content) for message in provider.requests[1].messages) < sum(
+        len(message.content) for message in provider.requests[0].messages
+    )
+
+
+async def test_stream_context_overflow_recovers_before_substantive_output() -> None:
+    user = ModelMessage(Role.USER, "继续")
+    request = _request(ModelMessage(Role.ASSISTANT, "history" * 30), user)
+    provider = _OverflowOnceProvider()
+    model = _model(request, provider, StaticTurnContextCompactor(), budget=1_000)
+
+    chunks = [chunk async for chunk in model.stream(request, ManualCancel())]
+
+    assert any(chunk.kind is ChunkKind.TEXT and chunk.text == "recovered" for chunk in chunks)
+    assert len(provider.requests) == 2

@@ -233,7 +233,7 @@ producer ── bus.publish(name, correlation, payload, error)
 | `runtime/bootstrap.py` | 启动顺序、新组件连接与最终所有权转交 | 插件策略、解析或独立状态机 |
 | `runtime/plugin_bootstrap.py` | Manifest 到本次注册尝试的 Runtime 策略 | 实例锁、Channel 运行或通用 Kernel 机制 |
 | `kernel/turn/orchestrator.py` | 固定编排阶段之间的连接 | 某阶段已有独立状态机或多种策略 |
-| `kernel/turn/context_builder.py` | 通用 Context 排序/预算机制 | 具体产品内容或独立压缩算法 |
+| `kernel/turn/context_builder.py` | 通用 Context 收集、过滤、放置与消息渲染 | 请求预算或独立压缩算法 |
 | `kernel/plugins/loader.py` | 通用依赖与加载机制 | Manifest 项目规则或产品策略 |
 | `kernel/config/schema.py` | 字段声明到 Config 的映射 | 新字段形状、I/O 或能力选择逻辑 |
 | `sdk/api.py` / `manifest.py` | 公开协议与纯校验 | Runtime 行为、发现、网络或文件 I/O |

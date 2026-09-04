@@ -32,6 +32,8 @@ from nucleamind.contracts import (
     TurnStatus,
 )
 
+from .request_size import ContextBudget
+
 __all__ = [
     "DEFAULT_MAX_ITERATIONS",
     "DEFAULT_MAX_TOOL_CALLS_PER_TURN",
@@ -56,7 +58,7 @@ DEFAULT_TURN_TIMEOUT_MS: Final = 900_000
 
 #: `context_max_tokens` 的兜底值：技术方案写的是「由模型能力推导」，但 `ModelInfo` 允许
 #: Provider 不声明窗口（`context_window_tokens=0`）。此时既不能假设窗口很大，也不能让
-#: 裁剪策略无上限——取一个所有主流模型都容得下的保守值，宁可裁多了也不生成超限请求
+#: 请求预算不能无上限——取一个保守值，宁可提前压缩也不生成超限请求
 #: （`CTX-003`）。
 FALLBACK_CONTEXT_MAX_TOKENS: Final = 8_192
 
@@ -78,7 +80,7 @@ class LimitKind(StrEnum):
 
 #: 每项越界后的 turn 终态（技术方案 §6.4 表格「触发行为」列）。
 #: `None` 表示**这项越界不终止 turn**：单工具超时只让那一次调用失败，结果截断只置
-#: `truncated=True`，上下文超限触发裁剪——三者都不该把整轮对话打掉。
+#: `truncated=True`，上下文超限触发压缩——三者都不该直接决定整轮终态。
 #: 六个 kind 全部登记，缺项直接 KeyError：终态未定的预算项不该有触发路径。
 LIMIT_OUTCOMES: Final[Mapping[LimitKind, tuple[TurnStatus | None, CancelReason | None]]] = (
     MappingProxyType(
@@ -183,12 +185,10 @@ class TurnLimits:
         **异常约定**：模型声明的最大输出不小于窗口时抛 `CONFIG_INVALID`。那份声明自相
         矛盾，静默按窗口处理只会把错误推迟到一次 400 响应上（`MOD-005`：不得静默降级）。
         """
-        if self.context_max_tokens is not None:
-            return self.context_max_tokens
-        if model is None or model.context_window_tokens <= 0:
-            return FALLBACK_CONTEXT_MAX_TOKENS
-        budget = model.context_window_tokens - model.max_output_tokens
-        if budget <= 0:
+        model_budget: int | None = None
+        if model is not None and model.context_window_tokens > 0:
+            model_budget = model.context_window_tokens - model.max_output_tokens
+        if model is not None and model_budget is not None and model_budget <= 0:
             raise NucleaError(
                 ErrorCode.CONFIG_INVALID,
                 "模型声明的最大输出不小于上下文窗口，无法推导上下文预算。",
@@ -198,7 +198,18 @@ class TurnLimits:
                     "max_output_tokens": model.max_output_tokens,
                 },
             )
-        return budget
+        configured = self.context_max_tokens
+        if configured is not None and model_budget is not None:
+            return min(configured, model_budget)
+        if configured is not None:
+            return configured
+        if model_budget is not None:
+            return model_budget
+        return FALLBACK_CONTEXT_MAX_TOKENS
+
+    def resolve_context_budget(self, model: ModelInfo | None = None) -> ContextBudget:
+        """返回 Context、持久化压缩与 Turn 压缩共用的预算事实。"""
+        return ContextBudget.from_hard_limit(self.resolve_context_max_tokens(model))
 
     def truncate_tool_result(self, content: str) -> tuple[str, bool]:
         """按 `tool_result_max_bytes` 截断工具结果，返回 `(content, truncated)`（`EDG-403`）。
