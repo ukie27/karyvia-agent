@@ -1,12 +1,12 @@
 [project]
-name = "nucleamind"
+name = "karyvia"
 version = "0.3.0"
-description = "A modular, pluggable Agent Kernel"
+description = "Karyvia Agent: a modular, pluggable Agent Kernel"
 readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
-    {name = "NucleaMind contributors"}
+    {name = "Karyvia contributors"}
 ]
 keywords = ["ai", "agent", "chatbot"]
 classifiers = [
@@ -50,13 +50,13 @@ dev = [
 ]
 
 [project.scripts]
-# `nm` is the only command; no `nanobot` alias is kept (technical design 4.5).
-nm = "nucleamind.runtime.cli.main:app"
+# `karyvia` is the only command; no `nanobot` alias is kept (technical design 4.5).
+karyvia = "karyvia.runtime.cli.main:app"
 
 # Primary plugin discovery source (technical design 7.1). Official and
 # third-party plugins register in the same group and share one load path.
 # Empty until the plugin runtime lands in D25-D30.
-[project.entry-points."nucleamind.plugins"]
+[project.entry-points."karyvia.plugins"]
 
 [build-system]
 requires = ["hatchling"]
@@ -67,15 +67,15 @@ allow-direct-references = true
 
 [tool.hatch.build]
 include = [
-    "src/nucleamind/**/*.py",
+    "src/karyvia/**/*.py",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nucleamind"]
+packages = ["src/karyvia"]
 
 [tool.hatch.build.targets.sdist]
 include = [
-    "src/nucleamind/",
+    "src/karyvia/",
     "README.md",
     "LICENSE",
     "THIRD_PARTY_NOTICES.md",
@@ -112,16 +112,16 @@ max-complexity = 12
 # `tests/architecture/test_type_check_scope.py` 钉住。
 venvPath = "."
 venv = ".venv"
-include = ["src/nucleamind", "plugins/**/src", "examples/plugins/**/src"]
+include = ["src/karyvia", "plugins/**/src", "examples/plugins/**/src"]
 # 三个模块排除在外，因为 CI 用 `--no-deps` 装插件、`lark-oapi` / `mcp`
 # 在那里根本不存在（见 test_ci_plugin_list.py）。它们在本地报「SDK 类型未知」、在 CI 报
 # 「import 解析不到」，两套诊断对不上。**这张清单同样有守卫**：它必须恰好等于
 # import 了那三个包的模块集合，多一个少一个都失败。
 exclude = [
     "**/tests",
-    "plugins/nucleamind-plugin-feishu/src/nucleamind_plugin_feishu/client.py",
-    "plugins/nucleamind-plugin-feishu/src/nucleamind_plugin_feishu/gateway.py",
-    "plugins/nucleamind-plugin-mcp/src/nucleamind_plugin_mcp/client.py",
+    "plugins/karyvia-plugin-feishu/src/karyvia_plugin_feishu/client.py",
+    "plugins/karyvia-plugin-feishu/src/karyvia_plugin_feishu/gateway.py",
+    "plugins/karyvia-plugin-mcp/src/karyvia_plugin_mcp/client.py",
 ]
 typeCheckingMode = "strict"
 pythonVersion = "3.11"
@@ -133,7 +133,7 @@ asyncio_mode = "auto"
 testpaths = ["tests", "examples/plugins", "plugins"]
 
 [tool.coverage.run]
-source = ["src/nucleamind"]
+source = ["src/karyvia"]
 omit = ["tests/*", "**/tests/*"]
 
 [tool.coverage.report]

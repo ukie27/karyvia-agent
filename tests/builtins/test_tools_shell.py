@@ -32,9 +32,9 @@ from typing import Final
 
 import pytest
 
-from nucleamind.builtins.registry import TOOLS_SHELL
-from nucleamind.builtins.tools_fs import WorkspaceGuard as FsWorkspaceGuard
-from nucleamind.builtins.tools_shell import (
+from karyvia.builtins.registry import TOOLS_SHELL
+from karyvia.builtins.tools_fs import WorkspaceGuard as FsWorkspaceGuard
+from karyvia.builtins.tools_shell import (
     CONFIG_DISABLE_KEY,
     CONFIG_ENV_KEY,
     CONFIG_MAX_OUTPUT_CHARS_KEY,
@@ -49,21 +49,21 @@ from nucleamind.builtins.tools_shell import (
     resolve_settings,
     setup,
 )
-from nucleamind.builtins.tools_shell.command import MAX_COMMAND_LENGTH, build_argv
-from nucleamind.builtins.tools_shell.environ import BASELINE_NAMES, FORCED_ENV, build_environment
-from nucleamind.builtins.tools_shell.executor import render_output
-from nucleamind.builtins.tools_shell.paths import CwdGuard
-from nucleamind.builtins.tools_shell.process import (
+from karyvia.builtins.tools_shell.command import MAX_COMMAND_LENGTH, build_argv
+from karyvia.builtins.tools_shell.environ import BASELINE_NAMES, FORCED_ENV, build_environment
+from karyvia.builtins.tools_shell.executor import render_output
+from karyvia.builtins.tools_shell.paths import CwdGuard
+from karyvia.builtins.tools_shell.process import (
     CANCEL_POLL_MS,
     DEFAULT_GRACE_MS,
     ProcessOutcome,
     ProcessResult,
     run_process,
 )
-from nucleamind.contracts import (
+from karyvia.contracts import (
     ErrorCode,
     JsonValue,
-    NucleaError,
+    KaryviaError,
     ProviderId,
     RiskLevel,
     SideEffect,
@@ -72,10 +72,10 @@ from nucleamind.contracts import (
     ToolInvocation,
     ToolSpec,
 )
-from nucleamind.kernel.turn.invoker import tools_from
-from nucleamind.runtime.wiring import wire_capabilities
-from nucleamind.sdk import PluginContext
-from nucleamind.sdk.testing import (
+from karyvia.kernel.turn.invoker import tools_from
+from karyvia.runtime.wiring import wire_capabilities
+from karyvia.sdk import PluginContext
+from karyvia.sdk.testing import (
     FakePluginContext,
     ManualCancel,
     ToolContract,
@@ -295,18 +295,18 @@ def test_cwd_guard_matches_the_fs_workspace_guard(tmp_path: Path) -> None:
     assert shell_guard.resolve(str(root / "allowed.txt")) == fs_guard.resolve(str(root / "allowed.txt"))
 
     # 3. `..` 逃逸被拒绝
-    with pytest.raises(NucleaError) as shell_caught:
+    with pytest.raises(KaryviaError) as shell_caught:
         shell_guard.resolve("../evil")
-    with pytest.raises(NucleaError) as fs_caught:
+    with pytest.raises(KaryviaError) as fs_caught:
         fs_guard.resolve("../evil")
     assert shell_caught.value.code == fs_caught.value.code == ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
 
     # 4. 符号链接指向根外被拒绝
     link = root / "link_out"
     try_symlink(link, outside, directory=True)
-    with pytest.raises(NucleaError) as shell_caught:
+    with pytest.raises(KaryviaError) as shell_caught:
         shell_guard.resolve("link_out")
-    with pytest.raises(NucleaError) as fs_caught:
+    with pytest.raises(KaryviaError) as fs_caught:
         fs_guard.resolve("link_out")
     assert shell_caught.value.code == fs_caught.value.code == ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
 
@@ -331,18 +331,18 @@ class TestCwdEdgeCases:
         outside.mkdir()
         try_junction(root / "junction", outside)
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             CwdGuard(root).resolve("junction")
         assert caught.value.code is ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
         assert caught.value.detail["cwd"] == "junction", "detail 里只放原始串"
 
     def test_empty_cwd_is_rejected(self, tmp_path: Path) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             CwdGuard(tmp_path).resolve("")
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
     def test_cwd_with_nul_byte_is_rejected(self, tmp_path: Path) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             CwdGuard(make_workspace(tmp_path)).resolve("sub\x00evil")
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -504,7 +504,7 @@ class TestSideEffectLadder:
 
     def test_the_grace_constant_matches_the_kernel(self) -> None:
         """`R4` 逼得宽限期常量在 `builtins/` 与 `kernel/` 各写一份，这里对照钉住。"""
-        from nucleamind.kernel.turn.cancel import DEFAULT_TOOL_CANCEL_GRACE_MS
+        from karyvia.kernel.turn.cancel import DEFAULT_TOOL_CANCEL_GRACE_MS
 
         assert DEFAULT_GRACE_MS == DEFAULT_TOOL_CANCEL_GRACE_MS
 
@@ -620,7 +620,7 @@ class TestCrossPlatformContract:
         """平台分派只在 `process._spawn` 一处——挪到别处就会有人"顺手统一"成 exec。"""
         import inspect
 
-        from nucleamind.builtins.tools_shell import process
+        from karyvia.builtins.tools_shell import process
 
         source = inspect.getsource(process)
         assert source.count("os.name") == 1, "平台判断不该散落在多处"
@@ -637,7 +637,7 @@ class TestCrossPlatformContract:
         """`\\r\\n` 归一成 `\\n`（`NFR-605`）——输出在 `process._decode` 之后是平台无关的。"""
         # 测试在单元层（`_decode`），不跑真实进程——Windows 的 `echo` 会不会输出 `\r\n`
         # 取决于 shell 与重定向，而这条测试要断言的是「解码层归一了」。
-        from nucleamind.builtins.tools_shell.process import _decode
+        from karyvia.builtins.tools_shell.process import _decode
 
         assert _decode(b"line1\r\nline2\r\n") == "line1\nline2\n"
         assert _decode(b"line1\rline2") == "line1\nline2"
@@ -656,7 +656,7 @@ class TestSingleToolDisable:
         assert enabled_tool_names({CONFIG_DISABLE_KEY: [TOOL_NAME]}) == ()
 
     def test_an_unknown_name_is_refused(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             enabled_tool_names({CONFIG_DISABLE_KEY: ["shell.execute"]})
         assert caught.value.code is ErrorCode.CONFIG_INVALID
         assert "shell.execute" in caught.value.detail["unknown"]
@@ -772,12 +772,12 @@ class TestSettings:
 
     def test_timeout_must_be_positive(self, tmp_path: Path) -> None:
         ctx = FakePluginContext(config={CONFIG_WORKSPACE_KEY: str(tmp_path), CONFIG_TIMEOUT_KEY: 0})
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings(ctx)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
     def test_max_output_exceeding_contract_limit_is_rejected(self, tmp_path: Path) -> None:
-        from nucleamind.contracts.tool import MAX_TOOL_RESULT_LENGTH
+        from karyvia.contracts.tool import MAX_TOOL_RESULT_LENGTH
 
         ctx = FakePluginContext(
             config={
@@ -785,7 +785,7 @@ class TestSettings:
                 CONFIG_MAX_OUTPUT_CHARS_KEY: MAX_TOOL_RESULT_LENGTH + 1,
             }
         )
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings(ctx)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -809,7 +809,7 @@ class TestSettings:
         ],
     )
     def test_malformed_config_is_refused(self, key: str, value: JsonValue) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings(FakePluginContext(config={key: value}))
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -884,17 +884,17 @@ class TestCommandEdgeCases:
     """命令串的边界：空串 / NUL / 超长。"""
 
     def test_empty_command_is_rejected(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             build_argv("")
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
     def test_command_with_nul_byte_is_rejected(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             build_argv("echo\x00evil")
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
     def test_command_exceeding_max_length_is_rejected(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             build_argv("x" * (MAX_COMMAND_LENGTH + 1))
         assert caught.value.code is ErrorCode.INPUT_TOO_LARGE
 

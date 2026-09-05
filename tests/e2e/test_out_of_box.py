@@ -21,20 +21,20 @@ from pathlib import Path
 import httpx
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelReason,
     ErrorCode,
     InboundMessage,
-    NucleaError,
+    KaryviaError,
     Sender,
     TurnStatus,
 )
-from nucleamind.kernel.config import load_config
-from nucleamind.kernel.turn import CancelToken
-from nucleamind.runtime.bootstrap import bootstrap
-from nucleamind.runtime.cli.main import app
-from nucleamind.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
-from nucleamind.runtime.instance import AgentInstance
+from karyvia.kernel.config import load_config
+from karyvia.kernel.turn import CancelToken
+from karyvia.runtime.bootstrap import bootstrap
+from karyvia.runtime.cli.main import app
+from karyvia.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
+from karyvia.runtime.instance import AgentInstance
 
 from ._support import say, use_tool
 from .conftest import Recorder
@@ -56,12 +56,12 @@ def instance_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def init(instance_dir: Path) -> int:
-    """跑一次真的 `nm init`。"""
+    """跑一次真的 `karyvia init`。"""
     return app(["init", "--instance-dir", str(instance_dir)])
 
 
 async def run_prompt(instance_dir: Path, prompt: str) -> int:
-    """装配一次真实例并跑一条单次执行（`nm run -p` 的正文）。"""
+    """装配一次真实例并跑一条单次执行（`karyvia run -p` 的正文）。"""
     instance = await bootstrap(instance_dir=instance_dir)
     try:
         return await instance.run_cli(["-p", prompt], CancelToken())
@@ -165,7 +165,7 @@ def test_a_missing_credential_points_at_the_file_and_the_field(
     """
     assert init(instance_dir) == 0
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         asyncio.run(run_prompt(instance_dir, "你好"))
 
     error = caught.value
@@ -176,7 +176,7 @@ def test_a_missing_credential_points_at_the_file_and_the_field(
     assert MODEL_API_KEY_ENV in rendered
 
 
-def _render(error: NucleaError) -> str:
+def _render(error: KaryviaError) -> str:
     """把一条错误的**全部**可见面渲染成一段文本。
 
     `detail` 里有 `MappingProxyType`（契约层的冻结快照），`json.dumps` 不认得它，
@@ -317,7 +317,7 @@ def test_disabling_the_cli_entry_is_refused_with_a_reason(
         },
     )
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         asyncio.run(bootstrap(instance_dir=instance_dir))
     assert caught.value.code is ErrorCode.CONFIG_INVALID
     assert "/plugins/disable" in _render(caught.value)
@@ -331,7 +331,7 @@ def test_every_single_tool_and_command_can_be_turned_off(
     这条与上一条不同——它走的是 `wire_capabilities(keep=...)` 那条声明过滤路径，
     忘了传 `keep` 时这里会以 `PLUGIN_LOAD_FAILED` 失败。
     """
-    from nucleamind.builtins import commands_core, tools_fs, tools_shell
+    from karyvia.builtins import commands_core, tools_fs, tools_shell
 
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
     _write_config(

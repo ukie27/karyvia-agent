@@ -20,16 +20,16 @@
 以下信号通常说明位置放错了：
 
 - Kernel 中出现厂商名、平台名、产品 prompt 或插件 id。
-- Builtin/Plugin import `nucleamind.kernel` 或 `nucleamind.runtime`。
+- Builtin/Plugin import `karyvia.kernel` 或 `karyvia.runtime`。
 - Runtime 出现可独立复用的算法、状态机或协议适配。
 - 为一个实现增加新的 `CapabilityKind`，而现有 kind 已能表达。
 - 为未知未来增加空 Protocol、`dict[str, object]` 万能接口或整个宿主对象。
 
 ## 2. 新增一个普通插件
 
-1. 在 `plugins/nucleamind-plugin-<id>/` 或 `examples/plugins/` 建独立发行包。
+1. 在 `plugins/karyvia-plugin-<id>/` 或 `examples/plugins/` 建独立发行包。
 2. Manifest 声明 id、版本、SDK 范围、setup、依赖和能力全集。
-3. 实现只导入 `nucleamind.sdk` 与 `nucleamind.contracts`。
+3. 实现只导入 `karyvia.sdk` 与 `karyvia.contracts`。
 4. 在 `setup(ctx, api)` 中通过对应 `register_*` 注册；声明与实际注册必须完全一致。
 5. 后台任务只通过 `ctx.spawn_task()` 创建，停止行为由生命周期管理器接管。
    `setup()` 失败时 Registry 与任务/订阅分别由 RegistrationBatch 和 StartupResources 回滚，
@@ -73,7 +73,7 @@
 7. `kernel/plugins/host.py`：声明核对后的注册分派。
 8. `kernel/plugins/declarations.py` / `host.py`：namespace、名称和覆盖规则。
 9. `runtime/wiring.py` 与 `runtime/selection.py`：从有效能力到生产消费者的连接。
-10. `tests/sdk/test_public_surface.py`：CapabilityKind ↔ NucleaAPI 的一一映射及快照。
+10. `tests/sdk/test_public_surface.py`：CapabilityKind ↔ KaryviaAPI 的一一映射及快照。
 11. `tests/contracts/test_protocols.py`：Protocol 形状快照。
 12. 插件加载、冲突、事务回滚、诊断输出和 integration 测试。
 13. Manifest JSON Schema、插件开发文档、SDK 版本和变更说明。
@@ -102,7 +102,7 @@
   --basetemp=.pytest-tmp/config
 ```
 
-新增整个小节还要更新 `NucleaConfig`、`config_to_json()` 顶层、Runtime 消费点和文档表。
+新增整个小节还要更新 `KaryviaConfig`、`config_to_json()` 顶层、Runtime 消费点和文档表。
 
 ## 6. 扩展 PluginContext 资源门面
 

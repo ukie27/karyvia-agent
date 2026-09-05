@@ -10,7 +10,7 @@
 
 这套用例**要求 `openai-api` 插件已经由全局插件管理器安装**：
 
-    nm plugins install --no-deps plugins/nucleamind-plugin-openai-api
+    karyvia plugins install --no-deps plugins/karyvia-plugin-openai-api
 
 没装时第一条用例会以一句能照做的话失败。
 """
@@ -24,11 +24,11 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import Channel
-from nucleamind.runtime.bootstrap import bootstrap
-from nucleamind.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
-from nucleamind.runtime.instance import AgentInstance
-from nucleamind.runtime.plugin_home import GlobalPluginHome
+from karyvia.contracts import Channel
+from karyvia.runtime.bootstrap import bootstrap
+from karyvia.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
+from karyvia.runtime.instance import AgentInstance
+from karyvia.runtime.plugin_home import GlobalPluginHome
 
 from ._support import say
 from .conftest import Recorder
@@ -91,7 +91,7 @@ def test_the_plugin_is_installed() -> None:
     names = {item.plugin_id for item in GlobalPluginHome.resolve().catalog()}
     assert PLUGIN_ID in names, (
         "openai-api 插件没有全局安装，请先跑："
-        "nm plugins install --no-deps plugins/nucleamind-plugin-openai-api"
+        "karyvia plugins install --no-deps plugins/karyvia-plugin-openai-api"
     )
 
 
@@ -159,7 +159,7 @@ async def test_history_persists_across_requests(instance_dir: Path, recorder: Re
         for prompt in ("你好", "还记得吗"):
             async with client.post(
                 f"{base_url}/v1/chat/completions",
-                headers={"X-NucleaMind-Conversation": "shared"},
+                headers={"X-Karyvia-Conversation": "shared"},
                 json={"model": MODEL_NAME, "messages": [{"role": "user", "content": prompt}]},
             ) as response:
                 assert response.status == 200

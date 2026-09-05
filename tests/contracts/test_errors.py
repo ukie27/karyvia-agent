@@ -1,6 +1,6 @@
 """错误契约测试（`D02`，需求 §10.7、`OBS-003`、`OBS-004`）。
 
-核心验收：携带哨兵密钥构造 `NucleaError` 后，`user_message`、`detail`、`repr`、`str`
+核心验收：携带哨兵密钥构造 `KaryviaError` 后，`user_message`、`detail`、`repr`、`str`
 与 `args` 均不含哨兵值——脱敏发生在构造时，下游忘记处理也不会泄漏。
 """
 
@@ -11,22 +11,22 @@ import dataclasses
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CODE_CATEGORIES,
     ErrorCategory,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
     SecretStr,
     redact,
 )
-from nucleamind.contracts.errors import (
+from karyvia.contracts.errors import (
     MASK,
     MAX_DETAIL_STRING_LENGTH,
     UnknownErrorCodeError,
     key_words,
     scrub,
 )
-from nucleamind.contracts.ids import Correlation, InstanceId, SessionKey, TurnId
+from karyvia.contracts.ids import Correlation, InstanceId, SessionKey, TurnId
 
 SENTINEL = "S3NT1NEL-do-not-leak-9f2a7c"
 
@@ -47,19 +47,19 @@ def test_every_category_has_at_least_one_code() -> None:
 def test_category_is_derived_not_supplied() -> None:
     """分类由码推导，杜绝同一个码在不同抛出点被归入不同类别。"""
     for code, category in CODE_CATEGORIES.items():
-        assert NucleaError(code, "x").category is category
+        assert KaryviaError(code, "x").category is category
 
 
 def test_unknown_code_is_a_programming_error() -> None:
     with pytest.raises(UnknownErrorCodeError):
-        NucleaError("not.a.registered.code", "x")  # pyright: ignore[reportArgumentType]
+        KaryviaError("not.a.registered.code", "x")  # pyright: ignore[reportArgumentType]
 
 
 # ------------------------------------------------------------------ 脱敏
 
 
 def test_sentinel_never_survives_construction() -> None:
-    error = NucleaError(
+    error = KaryviaError(
         ErrorCode.EXTERNAL_MODEL_PROVIDER,
         f"调用失败，使用的密钥是 {SENTINEL}",
         detail={"api_key": SENTINEL, "endpoint": "https://example.invalid/v1"},
@@ -88,7 +88,7 @@ def test_sentinel_never_survives_construction() -> None:
     ],
 )
 def test_sensitive_key_names_are_masked(key: str) -> None:
-    error = NucleaError(ErrorCode.CONFIG_INVALID, "配置无效", detail={key: SENTINEL})
+    error = KaryviaError(ErrorCode.CONFIG_INVALID, "配置无效", detail={key: SENTINEL})
     assert error.detail[key] == MASK
 
 
@@ -115,7 +115,7 @@ def test_sensitive_key_names_are_masked(key: str) -> None:
 )
 def test_benign_key_names_survive(key: str) -> None:
     """脱敏不能把可观测性一起打掉——用量统计和会话标识都必须原样保留。"""
-    error = NucleaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "调用失败", detail={key: 1234})
+    error = KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "调用失败", detail={key: 1234})
     assert error.detail[key] == 1234
 
 
@@ -135,7 +135,7 @@ def test_key_words_splits_on_word_boundaries(key: str, expected: tuple[str, ...]
 
 def test_session_key_is_not_treated_as_secret() -> None:
     """会话标识不是密钥；把它打码会让诊断失去主线索。"""
-    error = NucleaError(
+    error = KaryviaError(
         ErrorCode.PERSISTENCE_READ_FAILED,
         "读取会话失败",
         detail={"session_key": "cli~local~default"},
@@ -155,7 +155,7 @@ def test_session_key_is_not_treated_as_secret() -> None:
 )
 def test_known_token_shapes_are_masked_regardless_of_key_name(value: str) -> None:
     """键名没命中时，值的形状是第二道防线。"""
-    error = NucleaError(ErrorCode.CONFIG_INVALID, f"来自 {value}", detail={"note": value})
+    error = KaryviaError(ErrorCode.CONFIG_INVALID, f"来自 {value}", detail={"note": value})
     assert value not in str(error.detail["note"])
     assert value not in error.user_message
 
@@ -181,7 +181,7 @@ def test_redaction_stops_at_depth_limit() -> None:
 
 
 def test_long_strings_are_truncated() -> None:
-    error = NucleaError(
+    error = KaryviaError(
         ErrorCode.INPUT_TOO_LARGE, "输入过大", detail={"body": "x" * (MAX_DETAIL_STRING_LENGTH + 50)}
     )
     body = error.detail["body"]
@@ -241,13 +241,13 @@ def test_secret_str_survives_deepcopy_as_itself() -> None:
 
 
 def test_detail_is_read_only() -> None:
-    error = NucleaError(ErrorCode.CONFIG_INVALID, "配置无效", detail={"path": "/x"})
+    error = KaryviaError(ErrorCode.CONFIG_INVALID, "配置无效", detail={"path": "/x"})
     with pytest.raises(TypeError):
         error.detail["path"] = "/y"  # pyright: ignore[reportIndexIssue]
 
 
 def test_attributes_are_read_only() -> None:
-    error = NucleaError(ErrorCode.CONFIG_INVALID, "配置无效")
+    error = KaryviaError(ErrorCode.CONFIG_INVALID, "配置无效")
     with pytest.raises(AttributeError):
         error.code = ErrorCode.KERNEL_UNEXPECTED  # pyright: ignore[reportAttributeAccessIssue]
 
@@ -258,7 +258,7 @@ def test_with_correlation_returns_new_instance() -> None:
         session_key=SessionKey("cli", "local"),
         turn_id=TurnId("t-1"),
     )
-    original = NucleaError(ErrorCode.TIMEOUT_TOOL_CALL, "工具超时", retryable=True)
+    original = KaryviaError(ErrorCode.TIMEOUT_TOOL_CALL, "工具超时", retryable=True)
     attached = original.with_correlation(correlation)
 
     assert original.correlation is None
@@ -268,5 +268,5 @@ def test_with_correlation_returns_new_instance() -> None:
 
 
 def test_is_an_exception() -> None:
-    with pytest.raises(NucleaError):
-        raise NucleaError(ErrorCode.KERNEL_UNEXPECTED, "内部错误")
+    with pytest.raises(KaryviaError):
+        raise KaryviaError(ErrorCode.KERNEL_UNEXPECTED, "内部错误")

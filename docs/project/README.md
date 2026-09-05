@@ -1,11 +1,11 @@
-# NucleaMind 当前状态与接手入口
+# Karyvia 当前状态与接手入口
 
 > 更新基线：D53。这里描述当前事实，不记录逐 PR 流水账；历史摘要见
 > [`history.md`](./history.md)，精确变化以 Git 为准。
 
 ## 结论
 
-NucleaMind 已经具备一套可运行、受架构守卫约束的 Agent Kernel 骨架。它不再是“等待以后
+Karyvia 已经具备一套可运行、受架构守卫约束的 Agent Kernel 骨架。它不再是“等待以后
 填充的目录结构”：从配置、插件发现和事务加载，到 Registry、Session 并发、Context、Turn
 执行、工具调用、事件、持久化和 CLI，主链路已经贯通。
 
@@ -48,9 +48,9 @@ NucleaMind 已经具备一套可运行、受架构守卫约束的 Agent Kernel �
 - SDK 版本：`5.0.0`；5.0 删除独立 `COMPACTOR`，统一由请求级 `TURN_COMPACTOR` 压缩，并在
   Turn 收口时持久化可精确映射的 Session 前缀。外部插件故障统一隔离并进入
   诊断；宿主发布的内建基线装配错误仍直接拒绝启动。
-- `NucleaAPI` 与 `CapabilityKind` 当前一一覆盖十类能力。
-- `nm init`、`nm run`、`nm serve`、`nm config show`、`nm session`、
-  `nm plugins`、`nm capabilities` 已可用。
+- `KaryviaAPI` 与 `CapabilityKind` 当前一一覆盖十类能力。
+- `karyvia init`、`karyvia run`、`karyvia serve`、`karyvia config show`、`karyvia session`、
+  `karyvia plugins`、`karyvia capabilities` 已可用。
 
 ## 架构是否仍然极简
 
@@ -154,7 +154,7 @@ mkdir -p .pytest-tmp
 .venv/bin/python -m basedpyright
 ```
 
-完整 E2E 需要七个官方插件登记到隔离的 NucleaMind 全局插件目录，确保安装目录发现链路可用。
+完整 E2E 需要七个官方插件登记到隔离的 Karyvia 全局插件目录，确保安装目录发现链路可用。
 架构测试、类型检查和插件清单守卫不能因为开发环境缺依赖而跳过。
 
 ## 阅读顺序

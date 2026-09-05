@@ -1,6 +1,6 @@
 # Design Constraints
 
-以下规则约束 NucleaMind 的架构决策。添加功能或修复 bug 时，优先选择尊重这些边界的路径。
+以下规则约束 Karyvia 的架构决策。添加功能或修复 bug 时，优先选择尊重这些边界的路径。
 执行规则在 [`../AGENTS.md`](../AGENTS.md)，层次与代码所有权在
 [`../docs/project/architecture-map.md`](../docs/project/architecture-map.md)，常见改动路线在
 [`../docs/project/change-guide.md`](../docs/project/change-guide.md)；本文件只放判断标准。
@@ -17,7 +17,7 @@ Tool 注册、Plugin Runtime、基础配置。用户需求能力一律做成插�
 Browser、MCP、Automation、Multi-Agent 都在这一侧。
 
 `kernel/turn/engine.py` 是核心路径，有 ≤400 行的硬上限和 import 白名单，各有测试盯着。
-**内建与插件同等身份**（`BAS-005`）：它们共用一个 `NucleaAPI` 实现、同一条加载路径、
+**内建与插件同等身份**（`BAS-005`）：它们共用一个 `KaryviaAPI` 实现、同一条加载路径、
 同一套资源与生命周期边界。写内建时不要另开注册通道——`tests/architecture/test_builtin_no_privilege.py`
 的符号扫描就是为此存在的。
 
@@ -44,7 +44,7 @@ Wire payload、持久化记录、第三方 SDK 对象是不可信的动态边界
 
 **`Any` 必须带 `# boundary: 理由` 注释**，否则 `tests/architecture/test_any_usage.py`
 会拦下来。它对 `plugins/` 全目录生效，包括测试树。平台 SDK 对象在归一化之后就不该
-再存在——`plugins/nucleamind-plugin-feishu/` 里 `Any` 只出现在两个 SDK 出口模块上。
+再存在——`plugins/karyvia-plugin-feishu/` 里 `Any` 只出现在两个 SDK 出口模块上。
 
 `typing.cast` 不做运行时校验。每个新 cast 必须有同路径的运行时检查支撑，或有从构造与
 控制流即可明确的不变式（不明显时在本地注释说明）。不要仅为让 basedpyright 闭嘴而 cast。

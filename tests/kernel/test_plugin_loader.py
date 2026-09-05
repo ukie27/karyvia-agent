@@ -16,8 +16,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from nucleamind.contracts import ErrorCode
-from nucleamind.kernel.plugins import (
+from karyvia.contracts import ErrorCode
+from karyvia.kernel.plugins import (
     STATE_FILE,
     STATE_VERSION_KEY,
     PlanNode,

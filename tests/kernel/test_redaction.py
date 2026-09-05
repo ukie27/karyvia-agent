@@ -10,19 +10,19 @@ import json
 from datetime import UTC, datetime
 from typing import Final
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Correlation,
     ErrorCode,
     EventName,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     RuntimeEvent,
     SecretStr,
     SessionKey,
     TurnId,
 )
-from nucleamind.contracts.errors import MASK
-from nucleamind.kernel.observability import (
+from karyvia.contracts.errors import MASK
+from karyvia.kernel.observability import (
     MAX_PAYLOAD_ENTRIES,
     MAX_SEQUENCE_ITEMS,
     error_to_json,
@@ -30,7 +30,7 @@ from nucleamind.kernel.observability import (
     prepare_payload,
 )
 
-SENTINEL: Final = "nm-sentinel-9d41ab77-do-not-leak"
+SENTINEL: Final = "karyvia-sentinel-9d41ab77-do-not-leak"
 
 CORRELATION: Final = Correlation(
     instance_id=InstanceId("inst-1"),
@@ -141,7 +141,7 @@ def test_derived_turn_keeps_its_parent() -> None:
 
 
 def test_error_to_json_carries_code_category_and_detail() -> None:
-    error = NucleaError(
+    error = KaryviaError(
         ErrorCode.CONFIG_INVALID, "配置有问题。", detail={"field": "model", "api_key": SENTINEL}
     )
     payload = error_to_json(error)
@@ -153,7 +153,7 @@ def test_error_to_json_carries_code_category_and_detail() -> None:
 
 
 def test_event_error_is_serialized_in_place() -> None:
-    error = NucleaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "上游挂了。")
+    error = KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "上游挂了。")
     payload = event_to_json(_event(name=EventName.MODEL_REQUEST_FAILED, error=error))
     nested = payload["error"]
     assert isinstance(nested, dict)

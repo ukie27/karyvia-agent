@@ -10,7 +10,7 @@ import dataclasses
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     UNTRUSTED_DATA_PREFIX,
     ArtifactRef,
     Concurrency,
@@ -20,7 +20,7 @@ from nucleamind.contracts import (
     FragmentKind,
     FragmentScope,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     RiskLevel,
     SessionKey,
     SideEffect,
@@ -31,7 +31,7 @@ from nucleamind.contracts import (
     TrustLevel,
     TurnId,
 )
-from nucleamind.contracts.tool import MAX_TOOL_RESULT_LENGTH
+from karyvia.contracts.tool import MAX_TOOL_RESULT_LENGTH
 
 CORRELATION = Correlation(InstanceId("default"), SessionKey("cli", "local"), TurnId("t-1"))
 SCHEMA = {"type": "object", "properties": {"path": {"type": "string"}}}
@@ -71,7 +71,7 @@ def test_instances_are_frozen() -> None:
 
 @pytest.mark.parametrize("name", ["FS.Read", "fs-read", "1fs", "fs.", ".read", "fs read", ""])
 def test_tool_name_shape_is_enforced(name: str) -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         spec(name=name)
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -83,14 +83,14 @@ def test_valid_tool_names_are_accepted(name: str) -> None:
 
 def test_description_is_required() -> None:
     """模型只能靠描述决定是否调用，空描述等于把工具藏起来。"""
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         spec(description="")
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
 
 def test_read_only_tool_must_be_safe() -> None:
     assert spec(read_only=True, risk=RiskLevel.SAFE).read_only
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         spec(read_only=True, risk=RiskLevel.DESTRUCTIVE)
 
 
@@ -109,13 +109,13 @@ def test_tool_call_arguments_are_frozen_snapshot() -> None:
 
 
 def test_tool_call_rejects_non_json_arguments() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         ToolCall("c-1", "fs.read", {"handle": object()})  # pyright: ignore[reportArgumentType]
 
 
 def test_invocation_timeout_must_be_positive() -> None:
     """`KER-009`：缺省配置下不存在无界执行路径，因此没有「永不超时」这个选项。"""
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         ToolInvocation(ToolCall("c-1", "fs.read"), CORRELATION, timeout_ms=0)
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -143,44 +143,44 @@ def test_side_effect_unknown_is_a_first_class_state() -> None:
         ok=False,
         content="",
         side_effect=SideEffect.UNKNOWN,
-        error=NucleaError(ErrorCode.TIMEOUT_TOOL_CALL, "工具未在宽限期内返回。"),
+        error=KaryviaError(ErrorCode.TIMEOUT_TOOL_CALL, "工具未在宽限期内返回。"),
     )
     assert cancelled.side_effect is SideEffect.UNKNOWN
 
 
 def test_failure_must_carry_error() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         result(ok=False, content="出错了")
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
 def test_success_must_not_carry_error() -> None:
-    with pytest.raises(NucleaError) as exc:
-        result(error=NucleaError(ErrorCode.KERNEL_UNEXPECTED, "boom"))
+    with pytest.raises(KaryviaError) as exc:
+        result(error=KaryviaError(ErrorCode.KERNEL_UNEXPECTED, "boom"))
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
 def test_oversized_content_is_rejected() -> None:
     """`TOL-003`：截断在执行器侧完成，契约只拦「截断没做」。"""
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         result(content="x" * (MAX_TOOL_RESULT_LENGTH + 1))
     assert exc.value.code is ErrorCode.INPUT_TOO_LARGE
 
 
 def test_negative_duration_is_rejected() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         result(duration_ms=-1)
 
 
 def test_data_is_normalized() -> None:
     assert result(data={"lines": 3}).data == {"lines": 3}
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         result(data={"raw": object()})
 
 
 def test_error_detail_is_already_redacted() -> None:
-    """堆栈不进这里；`NucleaError` 在构造时已完成脱敏（§10.5 末段）。"""
-    failure = NucleaError(
+    """堆栈不进这里；`KaryviaError` 在构造时已完成脱敏（§10.5 末段）。"""
+    failure = KaryviaError(
         ErrorCode.EXTERNAL_MODEL_PROVIDER,
         "调用失败",
         detail={"api_key": "sk-abcdefghijklmnop0123"},
@@ -191,7 +191,7 @@ def test_error_detail_is_already_redacted() -> None:
 
 def test_artifact_requires_media_type() -> None:
     assert ArtifactRef("artifacts/out.png", "image/png").media_type == "image/png"
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         ArtifactRef("artifacts/out.png", "")
     assert exc.value.code is ErrorCode.INPUT_UNSUPPORTED_MEDIA
 
@@ -213,7 +213,7 @@ def test_only_system_and_untrusted_are_accepted() -> None:
     两种后果。"""
     assert result(trust=TrustLevel.SYSTEM).trust is TrustLevel.SYSTEM
     for rejected in (TrustLevel.OPERATOR, TrustLevel.USER):
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             result(trust=rejected)
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 

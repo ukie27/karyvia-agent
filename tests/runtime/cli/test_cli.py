@@ -1,11 +1,11 @@
-"""`nm` 的进程入口：argv 解析、实例选择参数与三个子命令的只读路径。
+"""`karyvia` 的进程入口：argv 解析、实例选择参数与三个子命令的只读路径。
 
-职责：验 `app()` 的派发与退出码、`parse_options()` 摘参数的规则、`nm config show` 与
-`nm session` 在真实实例目录上的输出。
-不负责：验 `nm run` 的交互（那需要一个真终端；它的正文由
+职责：验 `app()` 的派发与退出码、`parse_options()` 摘参数的规则、`karyvia config show` 与
+`karyvia session` 在真实实例目录上的输出。
+不负责：验 `karyvia run` 的交互（那需要一个真终端；它的正文由
 `tests/runtime/test_bootstrap.py` 与 `tests/builtins/test_cli_entry.py` 覆盖）。
 
-**退出码是这套用例的主角**：`nm` 要能进脚本，「失败了但返回 0」比打印得难看严重得多。
+**退出码是这套用例的主角**：`karyvia` 要能进脚本，「失败了但返回 0」比打印得难看严重得多。
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError
-from nucleamind.runtime.cli.main import app, parse_options, resolve_version
+from karyvia.contracts import ErrorCode, KaryviaError
+from karyvia.runtime.cli.main import app, parse_options, resolve_version
 
 from .._support import SCRIPT, TEST_MANIFESTS, text_response, write_config
 
@@ -50,15 +50,15 @@ def test_instance_options_are_taken_out_of_the_argv() -> None:
 
 
 def test_a_dangling_option_value_is_reported(capsys: pytest.CaptureFixture[str]) -> None:
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         parse_options(["--instance"])
     assert caught.value.code is ErrorCode.INPUT_MALFORMED
     # 同一条错误经 `app()` 时变成退出码 2 而不是 traceback。
     assert app(["config", "--instance"]) == 2
-    assert "nm:" in capsys.readouterr().err
+    assert "karyvia:" in capsys.readouterr().err
 
 
-# ------------------------------------------------------------------------- nm init
+# ------------------------------------------------------------------------- karyvia init
 
 
 def test_init_generates_a_config_and_returns_zero(
@@ -76,9 +76,9 @@ def test_init_generates_a_config_and_returns_zero(
 def test_init_puts_a_named_instance_under_the_instances_container(tmp_path: Path) -> None:
     assert app(["init", "--instance", "work"]) == 0
 
-    root = tmp_path / ".nucleamind" / "instances" / "work"
+    root = tmp_path / ".karyvia" / "instances" / "work"
     assert (root / "config.json").is_file()
-    assert not (tmp_path / ".nucleamind" / "work").exists()
+    assert not (tmp_path / ".karyvia" / "work").exists()
 
 
 def test_init_refuses_to_overwrite_and_returns_three(
@@ -96,12 +96,12 @@ def test_init_refuses_to_overwrite_and_returns_three(
 
 def test_init_takes_no_arguments(capsys: pytest.CaptureFixture[str]) -> None:
     assert app(["init", "show"]) == 2
-    assert "nm:" in capsys.readouterr().err
+    assert "karyvia:" in capsys.readouterr().err
 
 
 def test_init_help_returns_zero(capsys: pytest.CaptureFixture[str]) -> None:
     assert app(["init", "--help"]) == 0
-    assert "nm init" in capsys.readouterr().out
+    assert "karyvia init" in capsys.readouterr().out
 
 
 def test_run_on_a_fresh_instance_generates_a_config_and_stops(
@@ -127,7 +127,7 @@ def test_run_does_not_touch_an_existing_config(tmp_path: Path) -> None:
     assert not (tmp_path / "config.schema.json").exists()
 
 
-# ------------------------------------------------------------------ nm config show
+# ------------------------------------------------------------------ karyvia config show
 
 
 def test_config_show_prints_the_effective_document(
@@ -165,10 +165,10 @@ def test_config_show_does_not_take_the_instance_lock(tmp_path: Path) -> None:
 
 def test_an_unknown_config_subcommand_returns_two(capsys: pytest.CaptureFixture[str]) -> None:
     assert app(["config", "nope"]) == 2
-    assert "nm:" in capsys.readouterr().err
+    assert "karyvia:" in capsys.readouterr().err
 
 
-# --------------------------------------------------------------------- nm session
+# --------------------------------------------------------------------- karyvia session
 
 
 def test_session_list_reports_an_empty_instance(
@@ -182,12 +182,12 @@ def test_session_list_reports_an_empty_instance(
 def test_session_show_needs_an_id(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     write_config(tmp_path)
     assert app(["session", "show", "--instance-dir", str(tmp_path)]) == 2
-    assert "nm:" in capsys.readouterr().err
+    assert "karyvia:" in capsys.readouterr().err
 
 
 async def _write_a_session(root: Path) -> None:
-    from nucleamind.kernel.turn import CancelToken
-    from nucleamind.runtime.bootstrap import bootstrap
+    from karyvia.kernel.turn import CancelToken
+    from karyvia.runtime.bootstrap import bootstrap
 
     instance = await bootstrap(instance_dir=root, manifests=TEST_MANIFESTS)
     try:
@@ -199,10 +199,10 @@ async def _write_a_session(root: Path) -> None:
 def test_session_list_sees_a_written_session(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`nm session` 装的是**生效的**会话存储，因此它看得到刚写下的那条历史。
+    """`karyvia session` 装的是**生效的**会话存储，因此它看得到刚写下的那条历史。
 
     **本用例是同步的**：`app()` 自己 `asyncio.run()`，在一个已经在跑的循环里调它会当场
-    报错——那正是「`nm` 是进程入口」的形状，不是缺陷。
+    报错——那正是「`karyvia` 是进程入口」的形状，不是缺陷。
     """
     write_config(tmp_path)
     asyncio.run(_write_a_session(tmp_path))

@@ -14,7 +14,7 @@
 - **和真的组装器对接，而不是只断言片段字段**。本内建产出什么，只有经
   `kernel/turn/context_builder.assemble()` 渲染成 `ModelMessage` 之后才谈得上「可用上下文」；
   `trust` 决定位置这条尤其如此——片段上写着 `OPERATOR` 不等于它真的没进 system 消息。
-  测试可以 import `kernel/`（`R4` 只约束 `src/nucleamind/builtins/`），实现不行。
+  测试可以 import `kernel/`（`R4` 只约束 `src/karyvia/builtins/`），实现不行。
 - **时钟注入而不是冻结**。运行时事实片段的内容要能逐字符断言，注入一个固定 `clock` 比
   monkeypatch `datetime.now` 少一层魔法，也顺带证明了这个注入点确实存在。
 """
@@ -26,7 +26,7 @@ from typing import Final
 
 import pytest
 
-from nucleamind.builtins.context_basic import (
+from karyvia.builtins.context_basic import (
     BASELINE_INSTRUCTIONS,
     CAPABILITY_NAME,
     CONFIG_INSTRUCTIONS_KEY,
@@ -39,8 +39,8 @@ from nucleamind.builtins.context_basic import (
     resolve_settings,
     setup,
 )
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS, CONTEXT_BASIC
-from nucleamind.contracts import (
+from karyvia.builtins.registry import BUILTIN_MANIFESTS, CONTEXT_BASIC
+from karyvia.contracts import (
     UNTRUSTED_DATA_PREFIX,
     Builtin,
     CapabilityKind,
@@ -49,17 +49,17 @@ from nucleamind.contracts import (
     FragmentKind,
     FragmentScope,
     JsonValue,
-    NucleaError,
+    KaryviaError,
     Role,
     SessionKey,
     SessionMessage,
     SessionSnapshot,
     TrustLevel,
 )
-from nucleamind.kernel.turn.context_builder import assemble
-from nucleamind.kernel.turn.context_builder import estimate_tokens as kernel_estimate_tokens
-from nucleamind.kernel.turn.request_size import estimate_messages_tokens
-from nucleamind.sdk.testing import (
+from karyvia.kernel.turn.context_builder import assemble
+from karyvia.kernel.turn.context_builder import estimate_tokens as kernel_estimate_tokens
+from karyvia.kernel.turn.request_size import estimate_messages_tokens
+from karyvia.sdk.testing import (
     ContextProviderContract,
     FakePluginContext,
     ManualCancel,
@@ -118,7 +118,7 @@ async def assemble_with(
     user_input: str = "你好",
 ):
     """走真的组装器，拿到最终会发给模型的消息序列。"""
-    from nucleamind.kernel.turn.context_builder import ContextProviderBinding
+    from karyvia.kernel.turn.context_builder import ContextProviderBinding
 
     return await assemble(
         snapshot=snapshot,
@@ -313,7 +313,7 @@ class TestSettings:
     @pytest.mark.parametrize("configured", [123, {"a": 1}, ["ok", 5], True])
     def test_a_bad_instructions_type_is_a_config_error(self, configured: object) -> None:
         ctx = FakePluginContext(config={CONFIG_INSTRUCTIONS_KEY: configured})  # type: ignore[dict-item]
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings(ctx)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -322,14 +322,14 @@ class TestSettings:
     def test_a_bad_switch_type_is_a_config_error(self, key: str, configured: object) -> None:
         """`1` 不是 `True`：静默接受它，用户就永远不知道自己那行配置写错了。"""
         ctx = FakePluginContext(config={key: configured})  # type: ignore[dict-item]
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings(ctx)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
     def test_disabling_the_baseline_without_instructions_is_rejected(self) -> None:
         """那等于要一个没有任何系统指令的 Agent；正规做法是禁用本内建。"""
         ctx = FakePluginContext(config={CONFIG_USE_BASELINE_KEY: False})
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings(ctx)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -378,7 +378,7 @@ class TestRegistration:
             def register_context_provider(self, name: str, provider: object) -> None:
                 raise AssertionError("配置非法时不该注册任何东西")
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             setup(RecordingApi())  # type: ignore[arg-type]
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 

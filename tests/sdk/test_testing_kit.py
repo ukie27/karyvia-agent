@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelSignal,
     Channel,
     ContextFragment,
@@ -28,6 +28,7 @@ from nucleamind.contracts import (
     InboundMessage,
     InstanceId,
     JsonValue,
+    KaryviaError,
     ModelCapability,
     ModelChunk,
     ModelInfo,
@@ -35,7 +36,6 @@ from nucleamind.contracts import (
     ModelProvider,
     ModelRequest,
     ModelResponse,
-    NucleaError,
     OutboundMessage,
     RiskLevel,
     Role,
@@ -53,7 +53,7 @@ from nucleamind.contracts import (
     TurnOutcome,
     TurnStatus,
 )
-from nucleamind.sdk.testing import (
+from karyvia.sdk.testing import (
     FAKE_MODEL_ID,
     ChannelContract,
     ContextProviderContract,
@@ -124,7 +124,7 @@ def test_manual_cancel_is_a_switch_not_a_token() -> None:
     cancel.request()
     cancel.request()  # 幂等
     assert cancel.requested is True
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         cancel.raise_if_requested()
     assert excinfo.value.code is ErrorCode.CANCELLED_BY_USER
 
@@ -153,7 +153,7 @@ async def test_fake_model_provider_derives_stream_chunks_from_the_same_script() 
 
 async def test_fake_model_provider_reports_an_exhausted_script() -> None:
     """脚本用尽是测试代码的错，不是模型的错——必须响亮地失败而不是返回空响应。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         await FakeModelProvider().complete(_request(), ManualCancel())
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -242,7 +242,7 @@ class _EchoTool:
                 content="text 必须是字符串。",
                 truncated=False,
                 side_effect=SideEffect.NONE,
-                error=NucleaError(ErrorCode.INPUT_MALFORMED, "text 必须是字符串。"),
+                error=KaryviaError(ErrorCode.INPUT_MALFORMED, "text 必须是字符串。"),
             )
         return ToolResult(
             call_id=invocation.call.call_id,

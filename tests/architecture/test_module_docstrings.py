@@ -61,7 +61,7 @@ def test_enforced_layers_declare_responsibilities() -> None:
 
 def test_empty_layer_passes(tmp_path: Path) -> None:
     """目标目录尚不存在时返回通过而非报错，否则 D01 自身无法验收。"""
-    assert check_tree(tmp_path / "nucleamind", repo_root=tmp_path) == {}
+    assert check_tree(tmp_path / "karyvia", repo_root=tmp_path) == {}
 
 
 @pytest.mark.parametrize(
@@ -75,7 +75,7 @@ def test_empty_layer_passes(tmp_path: Path) -> None:
 )
 def test_inject_missing_header_is_rejected(label: str, docstring: str, tmp_path: Path) -> None:
     """注入缺行样例必须失败——证明守卫真的会拦。"""
-    package = tmp_path / "nucleamind"
+    package = tmp_path / "karyvia"
     write_module(package, "kernel/registry/resolve.py", docstring + "value = 1\n")
 
     offenders = check_tree(package, repo_root=tmp_path)
@@ -83,7 +83,7 @@ def test_inject_missing_header_is_rejected(label: str, docstring: str, tmp_path:
 
 
 def test_compliant_header_passes(tmp_path: Path) -> None:
-    package = tmp_path / "nucleamind"
+    package = tmp_path / "karyvia"
     write_module(
         package,
         "kernel/registry/resolve.py",

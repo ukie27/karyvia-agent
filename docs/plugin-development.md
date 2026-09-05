@@ -1,23 +1,23 @@
 # 插件开发入门
 
-本文写给要为 NucleaMind 写插件的人。读完你会知道一个插件由哪几样东西组成、它能做什么、
+本文写给要为 Karyvia 写插件的人。读完你会知道一个插件由哪几样东西组成、它能做什么、
 不能做什么，以及出错时去哪里看。
 
 仓库里有两个可以直接对照的最小示例：
 
 | 示例 | 演示 |
 | --- | --- |
-| [`examples/plugins/nucleamind-plugin-echo-tool`](../examples/plugins/nucleamind-plugin-echo-tool) | 新增一项能力（工具） |
-| [`examples/plugins/nucleamind-plugin-session-memory`](../examples/plugins/nucleamind-plugin-session-memory) | 覆盖一项内建能力（会话存储） |
+| [`examples/plugins/karyvia-plugin-echo-tool`](../examples/plugins/karyvia-plugin-echo-tool) | 新增一项能力（工具） |
+| [`examples/plugins/karyvia-plugin-session-memory`](../examples/plugins/karyvia-plugin-session-memory) | 覆盖一项内建能力（会话存储） |
 
 本文里的代码块由 `tests/e2e/test_plugin_docs.py` 直接执行，因此它们不会与实现脱节。
 
 ## 1. 一个插件由四样东西组成
 
 ```text
-nucleamind-plugin-<id>/
+karyvia-plugin-<id>/
 ├── pyproject.toml                      # entry point：让宿主发现得到它
-├── src/nucleamind_plugin_<id>/
+├── src/karyvia_plugin_<id>/
 │   └── __init__.py                     # MANIFEST（声明） + setup（注册）
 └── tests/                              # 继承 sdk.testing 的契约测试基类
 ```
@@ -31,18 +31,18 @@ import 兄弟模块，依赖规则就成了空话。
 import 它取这一个对象，此时不该发生任何 IO。
 
 ```python
-from nucleamind.contracts import CapabilityKind
-from nucleamind.sdk import CapabilityDecl, PluginManifest
+from karyvia.contracts import CapabilityKind
+from karyvia.sdk import CapabilityDecl, PluginManifest
 
 MANIFEST = PluginManifest(
-    # 小写字母、数字与中划线。它同时是包名 nucleamind-plugin-<id> 的后半段、
+    # 小写字母、数字与中划线。它同时是包名 karyvia-plugin-<id> 的后半段、
     # 状态目录名，以及别人覆盖你时写的 "plugin:<id>:<name>"。
     id="my-plugin",
     version="0.1.0",
     # 你支持的 SDK 区间。宿主落在区间外时拒绝加载并报 PLUGIN_SDK_INCOMPATIBLE，
     # 不带病运行。
     sdk_range=">=5.0.0,<6.0.0",
-    setup="nucleamind_plugin_my_plugin:setup",
+    setup="karyvia_plugin_my_plugin:setup",
     # 有约束力的全集：setup 里注册的每一项都必须在这里声明，反之亦然。
     capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="my.tool"),),
     # 用户能在 plugins.my-plugin.config 里写什么。宿主在加载前按它校验。
@@ -59,7 +59,7 @@ MANIFEST = PluginManifest(
 - **不要写 `priority`**。它的默认值是 100，而内建的基准是 0；写了就会被原样采纳，
   「内建排在插件前」会静默失效。
 - **`capabilities` 是有约束力的**。声明了却没注册、注册了却没声明，都是
-  `PLUGIN_LOAD_FAILED`。这不是形式主义——`overrides` 只能从声明来，`nm capabilities`
+  `PLUGIN_LOAD_FAILED`。这不是形式主义——`overrides` 只能从声明来，`karyvia capabilities`
   与启动诊断都建立在「声明即全集」上。
 - 外部插件加载失败会进入诊断并跳过，不会由插件自己决定中断实例。宿主自带的内建基线
   若装配失败仍属于启动错误；这个边界由 Runtime 按提供方身份决定，不是 manifest 字段。
@@ -67,11 +67,11 @@ MANIFEST = PluginManifest(
 ## 3. setup：注册
 
 ```python
-from nucleamind.contracts import RiskLevel, ToolSpec
-from nucleamind.sdk import NucleaAPI
+from karyvia.contracts import RiskLevel, ToolSpec
+from karyvia.sdk import KaryviaAPI
 
 
-def setup(api: NucleaAPI) -> None:
+def setup(api: KaryviaAPI) -> None:
     """在同步返回前完成全部注册。"""
     api.register_tool(
         ToolSpec(
@@ -89,7 +89,7 @@ def setup(api: NucleaAPI) -> None:
     )
 ```
 
-`NucleaAPI` 恰好有 10 个注册方法，与 10 类能力一一对应：`register_tool` /
+`KaryviaAPI` 恰好有 10 个注册方法，与 10 类能力一一对应：`register_tool` /
 `register_command` / `register_context_provider` / `register_model_provider` /
 `register_channel` / `register_memory_provider` / `register_session_store` /
 `register_turn_compactor` / `register_cli_entry` / `on`（Hook）。
@@ -114,7 +114,7 @@ Turn 压缩层。内建 `basic` 当前不调用它，第三方和后续内建策
 `setup()` 只登记，不应在这里建立长连接或让后台任务抢跑。使用 `PluginContext` 的三个入口：
 
 ```python
-from nucleamind.sdk import NucleaAPI
+from karyvia.sdk import KaryviaAPI
 
 
 class Service:
@@ -125,7 +125,7 @@ class Service:
     async def run(self) -> None: ...
 
 
-def setup(api: NucleaAPI) -> None:
+def setup(api: KaryviaAPI) -> None:
     service = Service()
 
     async def connect() -> None:
@@ -151,19 +151,19 @@ def setup(api: NucleaAPI) -> None:
 ## 4. entry point：让宿主发现得到
 
 ```toml
-[project.entry-points."nucleamind.plugins"]
-my-plugin = "nucleamind_plugin_my_plugin:MANIFEST"
+[project.entry-points."karyvia.plugins"]
+my-plugin = "karyvia_plugin_my_plugin:MANIFEST"
 ```
 
 **name 必须等于 manifest 的 `id`**，对不上即失败。理由是「发现与启用分离」：宿主要在
 **读 manifest 之前**就知道候选叫什么，才能把没启用的候选直接筛掉——那是「未启用的插件
 不产生任何导入开销」的实现方式，不是一条要人遵守的纪律。
 
-Runtime 只读取由 `nm` 写入全局安装目录的 entry point 记录，不扫描整个 Python 环境，也不从
-实例配置读取代码路径。开发中的本地包同样交给 `nm plugins install <本地路径>`；修改后用
-`nm plugins update <id>` 重新构建。实例的 `plugins/` 目录只保存状态，不保存代码。默认安装
+Runtime 只读取由 `karyvia` 写入全局安装目录的 entry point 记录，不扫描整个 Python 环境，也不从
+实例配置读取代码路径。开发中的本地包同样交给 `karyvia plugins install <本地路径>`；修改后用
+`karyvia plugins update <id>` 重新构建。实例的 `plugins/` 目录只保存状态，不保存代码。默认安装
 会记录解析出的全部 Python 发行包版本，并拒绝与其他已安装插件形成同名包多版本；如果使用
-`--no-deps`，则明确表示依赖由运行 `nm` 的 Python 环境统一提供。
+`--no-deps`，则明确表示依赖由运行 `karyvia` 的 Python 环境统一提供。
 
 manifest 的 `dependencies` 表示其他插件的逻辑依赖。依赖必须先全局安装；被其他插件依赖的
 插件不能直接卸载。外部插件也不能使用内建插件 id，替换内建能力应通过能力声明中的
@@ -172,9 +172,9 @@ manifest 的 `dependencies` 表示其他插件的逻辑依赖。依赖必须先�
 ## 5. 安装 ≠ 启用
 
 ```bash
-nm plugins install nucleamind-plugin-my-plugin  # 全局装上，不生效
-nm plugins enable my-plugin                  # 写进 plugins.enabled
-nm run                                       # 下次启动生效（首版不热更新）
+karyvia plugins install karyvia-plugin-my-plugin  # 全局装上，不生效
+karyvia plugins enable my-plugin                  # 写进 plugins.enabled
+karyvia run                                       # 下次启动生效（首版不热更新）
 ```
 
 配置里长这样：
@@ -207,8 +207,8 @@ Python/OS API；需要隔离不可信代码时，应在进程外使用容器或�
 想替换内建实现（或另一个插件的实现）时，在声明里写 `overrides`：
 
 ```python
-from nucleamind.contracts import CapabilityKind
-from nucleamind.sdk import CapabilityDecl
+from karyvia.contracts import CapabilityKind
+from karyvia.sdk import CapabilityDecl
 
 DECL = CapabilityDecl(
     kind=CapabilityKind.SESSION_STORE,
@@ -223,7 +223,7 @@ DECL = CapabilityDecl(
 
 1. **覆盖永不由加载顺序决定**。没声明 `overrides` 而撞了名字，是
    `PLUGIN_REGISTRATION_CONFLICT`，且**冲突各方都不生效**——选任何一边都是替用户做决定。
-2. **覆盖不静默**。`nm capabilities` 的「被覆盖」段会印出被顶掉的那一项与顶掉它的那一项，
+2. **覆盖不静默**。`karyvia capabilities` 的「被覆盖」段会印出被顶掉的那一项与顶掉它的那一项，
    两边都带提供方标识。
 3. **覆盖目标不存在不会降级成新增注册**，而是 `CAPABILITY_OVERRIDE_TARGET_MISSING`。
 
@@ -253,8 +253,8 @@ manifest 是**静态**的，而 `CapabilityHost.finish()` 要求声明的 `(kind
 对这种情况声明一个**命名空间**：
 
 ```python
-from nucleamind.contracts import CapabilityKind
-from nucleamind.sdk import CapabilityDecl
+from karyvia.contracts import CapabilityKind
+from karyvia.sdk import CapabilityDecl
 
 DECL = CapabilityDecl(
     kind=CapabilityKind.TOOL,
@@ -280,17 +280,17 @@ registry 在解析之后只读，没有第二个注册时机。
 5. **只有可并存且按名字唯一的能力**（`tool` / `command` / `model` / `channel` / `memory`）
    能声明命名空间。SINGLETON 的槽位只有一个，给它开前缀等于让「唯一」失去判定对象。
 
-冲突语义一个字没变：registry 仍按精确 `(kind, name)` 判，`nm capabilities` 印的是**实际
+冲突语义一个字没变：registry 仍按精确 `(kind, name)` 判，`karyvia capabilities` 印的是**实际
 注册的**名字。命名空间只影响 manifest 与动态注册项的对应方式，不改变资源服务或信任边界。
 
 ## 8. 测试：继承契约测试基类
 
-`nucleamind.sdk.testing` 发布了 8 个契约测试基类与一批 Fake。内建实现与你的插件**继承
+`karyvia.sdk.testing` 发布了 8 个契约测试基类与一批 Fake。内建实现与你的插件**继承
 同一个基类**——这就是「可替换」的可执行形态。
 
 ```python
-from nucleamind.contracts import SessionStore
-from nucleamind.sdk.testing import InMemorySessionStore, SessionStoreContract
+from karyvia.contracts import SessionStore
+from karyvia.sdk.testing import InMemorySessionStore, SessionStoreContract
 
 
 class TestMyStore(SessionStoreContract):
@@ -307,8 +307,8 @@ class TestMyStore(SessionStoreContract):
 
 | 现象 | 命令 | 说明 |
 | --- | --- | --- |
-| 插件没被加载 | `nm plugins list` | 列出候选、跳过原因与两个阶段的失败 |
-| 不知道谁提供了某项能力 | `nm capabilities` | 生效 / 被覆盖 / 已禁用 / 冲突四段，各带提供方 |
+| 插件没被加载 | `karyvia plugins list` | 列出候选、跳过原因与两个阶段的失败 |
+| 不知道谁提供了某项能力 | `karyvia capabilities` | 生效 / 被覆盖 / 已禁用 / 冲突四段，各带提供方 |
 
 三类失败有各自稳定的错误码，别混着读：
 
@@ -320,9 +320,9 @@ class TestMyStore(SessionStoreContract):
 
 ## 10. 依赖规则
 
-插件**只能** import `nucleamind.contracts` 与 `nucleamind.sdk`。够到 `nucleamind.kernel.*`
+插件**只能** import `karyvia.contracts` 与 `karyvia.sdk`。够到 `karyvia.kernel.*`
 的插件在本仓库会被架构守卫拦下；在你自己的仓库里没人拦，但那些是私有模块，不承诺任何
 兼容性，随时会变。
 
-契约类型直接从 `nucleamind.contracts` 导入，不从 `nucleamind.sdk` 转发——`SecretStr`、
+契约类型直接从 `karyvia.contracts` 导入，不从 `karyvia.sdk` 转发——`SecretStr`、
 `SessionKey`、`ToolSpec` 这些都在前者。

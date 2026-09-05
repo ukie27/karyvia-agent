@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CommandInvocation,
     CommandParam,
     CommandResult,
@@ -24,7 +24,7 @@ from nucleamind.contracts import (
     FragmentScope,
     InboundMessage,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     Sender,
     SessionKey,
     TrustLevel,
@@ -85,37 +85,37 @@ def test_spec_declares_names_parameters_and_operator_requirement() -> None:
 @pytest.mark.parametrize("name", ["/help", "Help", "help_me", "-help", "1help", ""])
 def test_command_name_shape(name: str) -> None:
     """前缀是路由的配置项，不是命令身份的一部分——名字里不许出现它。"""
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         spec(name=name)
 
 
 def test_alias_must_not_repeat_the_name() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         spec(aliases=("help",))
     assert excinfo.value.code is ErrorCode.INPUT_MALFORMED
 
 
 def test_description_is_required() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         spec(description="")
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         param(description="")
 
 
 def test_required_parameter_may_not_follow_an_optional_one() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         spec(parameters=(param(name="a"), param(name="b", required=True)))
     assert "必填参数" in excinfo.value.user_message
 
 
 def test_repeated_parameter_must_be_last() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         spec(parameters=(param(name="a", repeated=True), param(name="b")))
     assert spec(parameters=(param(name="a"), param(name="b", repeated=True))).parameters[1].repeated
 
 
 def test_parameter_names_are_unique() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         spec(parameters=(param(name="a"), param(name="a")))
 
 
@@ -130,7 +130,7 @@ def test_invocation_keeps_the_original_message_and_correlation() -> None:
 
 
 def test_invocation_rejects_a_prefixed_name() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         CommandInvocation("/help", (), "/help", MESSAGE, CORRELATION)
 
 
@@ -148,30 +148,30 @@ def test_disposition_has_the_four_values_from_the_design() -> None:
 
 def test_handler_may_not_return_model_turn() -> None:
     """`MODEL_TURN` 是「未命中」，那是 dispatcher 的结论，不是 handler 的。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         CommandResult(Disposition.MODEL_TURN, content="x")
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
 def test_rejected_requires_an_error_and_others_forbid_it() -> None:
-    error = NucleaError(ErrorCode.INPUT_MALFORMED, "参数不对。")
+    error = KaryviaError(ErrorCode.INPUT_MALFORMED, "参数不对。")
     assert CommandResult(Disposition.REJECTED, error=error).error is error
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         CommandResult(Disposition.REJECTED, content="x")
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         CommandResult(Disposition.COMMAND_HANDLED, content="x", error=error)
 
 
 def test_continue_requires_rewritten_input_and_others_forbid_it() -> None:
     assert CommandResult(Disposition.COMMAND_CONTINUE, rewritten_input="改写后").content == ""
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         CommandResult(Disposition.COMMAND_CONTINUE)
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         CommandResult(Disposition.COMMAND_HANDLED, content="x", rewritten_input="改写后")
 
 
 def test_handled_must_produce_output_or_fragments() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         CommandResult(Disposition.COMMAND_HANDLED)
     assert "毫无反馈" in excinfo.value.user_message
     assert CommandResult(Disposition.COMMAND_HANDLED, fragments=(FRAGMENT,)).content == ""

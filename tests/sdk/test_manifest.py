@@ -1,7 +1,7 @@
 """manifest 的校验矩阵（技术方案 §7.2、`SDK-005`、`CMP-001`、`PLG-001`）。
 
 两条被反复验证的性质：**每一条校验失败都给出字段路径**，以及**失败一律是
-`NucleaError`**——缺兼容字段直接判定失败并指出位置，不做兜底猜测。
+`KaryviaError`**——缺兼容字段直接判定失败并指出位置，不做兜底猜测。
 """
 
 from __future__ import annotations
@@ -11,22 +11,22 @@ from typing import Final
 import pytest
 from pydantic import ValidationError
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityArity,
     CapabilityKind,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
 )
-from nucleamind.sdk import CapabilityDecl, PluginManifest, parse_manifest
-from nucleamind.sdk.version import SDK_VERSION
+from karyvia.sdk import CapabilityDecl, PluginManifest, parse_manifest
+from karyvia.sdk.version import SDK_VERSION
 
 #: 一份最小可用 manifest。各用例在它上面打补丁，只改一处，失败原因因此无歧义。
 VALID: Final[dict[str, object]] = {
     "id": "memory-sqlite",
     "version": "0.1.0",
     "sdk_range": ">=5.0,<6.0",
-    "setup": "nucleamind_plugin_memory_sqlite.plugin:setup",
+    "setup": "karyvia_plugin_memory_sqlite.plugin:setup",
     "capabilities": [{"kind": "memory", "name": "sqlite"}],
 }
 
@@ -49,7 +49,7 @@ def test_minimal_manifest_parses() -> None:
 
 def test_removed_critical_field_is_rejected() -> None:
     """SDK 4 不再接受由插件决定宿主是否中断的旧字段。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         parse(critical=True)
     assert "critical" in str(excinfo.value.detail)
 
@@ -123,7 +123,7 @@ INVALID_CASES: Final[list[tuple[dict[str, object], str]]] = [
     ("patch", "field"), INVALID_CASES, ids=[str(list(p)[0]) + ":" + f for p, f in INVALID_CASES]
 )
 def test_invalid_manifest_reports_the_offending_field(patch: dict[str, object], field: str) -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         parse(**patch)
     error = excinfo.value
     assert error.code is ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED
@@ -131,7 +131,7 @@ def test_invalid_manifest_reports_the_offending_field(patch: dict[str, object], 
 
 
 #: 结构错误由 pydantic 发现，`parse_manifest()` 把它们连同**字段路径**一起转成
-#: `NucleaError`——`errors` 是 `[{"field": ..., "message": ...}]`。
+#: `KaryviaError`——`errors` 是 `[{"field": ..., "message": ...}]`。
 STRUCTURAL_CASES: Final[list[tuple[dict[str, object], str]]] = [
     ({"unknown_field": 1}, "unknown_field"),
     ({"permissions": []}, "permissions"),
@@ -144,7 +144,7 @@ STRUCTURAL_CASES: Final[list[tuple[dict[str, object], str]]] = [
 
 @pytest.mark.parametrize(("patch", "path"), STRUCTURAL_CASES, ids=[p for _, p in STRUCTURAL_CASES])
 def test_structural_errors_carry_a_field_path(patch: dict[str, object], path: str) -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         parse(**patch)
     detail = dict(excinfo.value.detail)
     assert detail["origin"] == "test"
@@ -157,14 +157,14 @@ def test_structural_errors_carry_a_field_path(patch: dict[str, object], path: st
 def test_missing_required_field_is_rejected_without_guessing() -> None:
     """`CMP-001`：缺少 `sdk_range` 这类兼容字段直接判定失败，不做兜底。"""
     data = {key: value for key, value in VALID.items() if key != "sdk_range"}
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         parse_manifest(data, origin="test")
     assert "sdk_range" in str(excinfo.value.detail)
 
 
 def test_direct_construction_still_validates_semantics() -> None:
     """插件作者在自己的模块里直接构造时，语义校验同样生效（不只是 `parse_manifest`）。"""
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         PluginManifest(
             id="Bad_Id",
             version="1.0",
@@ -195,7 +195,7 @@ def test_every_multi_unique_kind_may_declare_a_namespace(kind: CapabilityKind) -
 def test_no_other_kind_may_declare_a_namespace(kind: CapabilityKind) -> None:
     """SINGLETON 的槽位按定义只有一个，给它开前缀等于让「唯一」失去判定对象；
     MULTI 类本来就允许同一提供方注册多条同名能力，不需要这个机制。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         CapabilityDecl(kind=kind, name="ns", namespace=True)
     assert caught.value.code is ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED
 
@@ -203,7 +203,7 @@ def test_no_other_kind_may_declare_a_namespace(kind: CapabilityKind) -> None:
 def test_a_namespace_may_not_also_declare_overrides() -> None:
     """一条声明能注册出任意多个名字，哪一个才是覆盖者无从判定——静默挑一个正是
     `EDG-102`「覆盖永不由加载顺序决定」要堵的路。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         CapabilityDecl(
             kind=CapabilityKind.TOOL,
             name="mcp",
@@ -227,7 +227,7 @@ def test_the_default_is_not_a_namespace() -> None:
 
 def test_a_namespace_prefix_still_obeys_the_capability_name_shape() -> None:
     """前缀也是名字：形状仍由 `CapabilityRef` 校验，不因为它是前缀就放宽。"""
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         CapabilityDecl(kind=CapabilityKind.TOOL, name="Bad Name", namespace=True)
 
 
@@ -276,7 +276,7 @@ def test_json_schema_is_the_narrowed_view() -> None:
 )
 def test_config_schema_rejects_non_json_values(document: dict[str, object], pointer: str) -> None:
     """报错要指到位置。JSON Pointer 的两个转义（`~0` / `~1`）一并钉住。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         parse(config_schema=document)
     assert caught.value.code is ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED
     assert caught.value.detail["field"] == "config_schema"
@@ -287,7 +287,7 @@ def test_config_schema_rejects_a_self_referencing_document() -> None:
     """自引用在类型上完全合法，没有深度上界校验器自己会栈溢出。"""
     document: dict[str, object] = {}
     document["self"] = document
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         parse(config_schema=document)
     assert caught.value.code is ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED
 

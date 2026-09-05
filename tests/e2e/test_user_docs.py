@@ -30,7 +30,7 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.kernel.config.schema import SECTION_SPECS
+from karyvia.kernel.config.schema import SECTION_SPECS
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DOCS = REPO_ROOT / "docs"
@@ -39,7 +39,7 @@ CLI_DOC = DOCS / "cli.md"
 GETTING_STARTED = DOCS / "getting-started.md"
 PLUGIN_DEVELOPMENT = DOCS / "plugin-development.md"
 ROOT_README = REPO_ROOT / "README.md"
-CLI_MAIN = REPO_ROOT / "src" / "nucleamind" / "runtime" / "cli" / "main.py"
+CLI_MAIN = REPO_ROOT / "src" / "karyvia" / "runtime" / "cli" / "main.py"
 
 #: 字段表的一行：`| \`名字\` | 类型 | \`默认值\` | 说明 |`。
 #: 第二列（类型）刻意不参与比对——它是给人读的措辞，不是可判定的事实。
@@ -48,13 +48,13 @@ _FIELD_ROW = re.compile(r"^\|\s*`(?P<field>[a-z_]+)`\s*\|[^|]*\|\s*`(?P<default>
 #: 小节标题：`### \`turn\` —— …`。
 _SECTION_HEADING = re.compile(r"^###\s+`(?P<section>[a-z_]+)`")
 
-#: 子命令标题：`## \`nm init\``。取 `nm ` 后的第一个词。
-_COMMAND_HEADING = re.compile(r"^##\s+`nm\s+(?P<command>[a-z]+)")
+#: 子命令标题：`## \`karyvia init\``。取 `karyvia ` 后的第一个词。
+_COMMAND_HEADING = re.compile(r"^##\s+`karyvia\s+(?P<command>[a-z]+)")
 
 #: 用户文档中的全局安装命令。CI 还会额外用 pip 把包放进类型检查环境，那不是用户侧
-#: 插件管理语义，因此这里仅认 ``nm``。
+#: 插件管理语义，因此这里仅认 ``karyvia``。
 _INSTALL_COMMAND = re.compile(
-    r"nm\s+plugins\s+install\b[^\n]*?\s(?P<path>(?:examples/)?plugins/[A-Za-z0-9._-]+)"
+    r"karyvia\s+plugins\s+install\b[^\n]*?\s(?P<path>(?:examples/)?plugins/[A-Za-z0-9._-]+)"
 )
 
 
@@ -169,8 +169,8 @@ def test_the_cli_doc_lists_exactly_the_dispatched_subcommands() -> None:
 
 
 def test_the_top_level_usage_mentions_every_dispatched_subcommand() -> None:
-    """`nm --help` 与派发分支不许分叉——文档对了而 `--help` 漏了同样是骗人。"""
-    from nucleamind.runtime.cli.main import _USAGE
+    """`karyvia --help` 与派发分支不许分叉——文档对了而 `--help` 漏了同样是骗人。"""
+    from karyvia.runtime.cli.main import _USAGE
 
     missing = {name for name in _dispatched_commands() if f"  {name}" not in _USAGE}
     assert missing == set()

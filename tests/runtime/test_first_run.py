@@ -2,7 +2,7 @@
 
 职责：验 `config.json` 永不被覆盖、派生 schema 会被刷新、指引里有「文件/字段/变量名」
 且没有任何值，以及本模块自写的四个常量与内建模型供应商一致。
-不负责：模板内容（`tests/kernel/test_scaffold.py`）、`nm init` 的退出码
+不负责：模板内容（`tests/kernel/test_scaffold.py`）、`karyvia init` 的退出码
 （`tests/runtime/cli/test_cli.py`）、端到端路径（`tests/e2e/`）。
 
 **「永不覆盖」是 `EDG-501` 的可执行形态**：一个能覆盖用户配置的实现，在测试里表现为
@@ -14,13 +14,13 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from nucleamind.kernel.config import (
+from karyvia.kernel.config import (
     JSON_SCHEMA_FILENAME,
     InstanceLayout,
     config_json_schema,
     load_config,
 )
-from nucleamind.runtime.first_run import (
+from karyvia.runtime.first_run import (
     DEFAULT_MODEL_NAME,
     MODEL_API_KEY_ENV,
     MODEL_PLUGIN_ID,
@@ -103,7 +103,7 @@ class TestEnsureInitialConfig:
         assert result.missing_env == ()
 
     def test_it_creates_the_kernel_owned_directories(self, tmp_path: Path) -> None:
-        """首次运行之后 `nm run` 要能直接跑，而工具与会话各自需要自己的目录。"""
+        """首次运行之后 `karyvia run` 要能直接跑，而工具与会话各自需要自己的目录。"""
         ensure_initial_config(layout_at(tmp_path), env={})
         for name in ("sessions", "logs", "plugins", "workspace"):
             assert (tmp_path / name).is_dir()
@@ -150,11 +150,11 @@ class TestGuidance:
 def test_defaults_match_the_builtin_model_provider() -> None:
     """本模块自写的四个常量与 `builtins/model_openai/` 必须一致。
 
-    各写一份是刻意的（`nm init` 不该为了四个字符串把 httpx 拉进进程，`NFR-405`），
+    各写一份是刻意的（`karyvia init` 不该为了四个字符串把 httpx 拉进进程，`NFR-405`），
     与 `estimate_tokens` / `DEFAULT_GRACE_MS` 同一种做法——**因此必须有这条对照**。
     """
-    from nucleamind.builtins.model_openai import CAPABILITY_NAME, SECRET_NAME
-    from nucleamind.builtins.registry import BUILTIN_MANIFESTS
+    from karyvia.builtins.model_openai import CAPABILITY_NAME, SECRET_NAME
+    from karyvia.builtins.registry import BUILTIN_MANIFESTS
 
     assert MODEL_PROVIDER_NAME == CAPABILITY_NAME
     assert MODEL_SECRET_NAME == SECRET_NAME

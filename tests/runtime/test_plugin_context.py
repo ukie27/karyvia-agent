@@ -14,17 +14,17 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     ErrorCode,
     EventName,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     RuntimeEvent,
     SecretStr,
 )
-from nucleamind.kernel.observability import EventBus
-from nucleamind.runtime.access import GuardedHttpAccess
-from nucleamind.runtime.plugin_context import (
+from karyvia.kernel.observability import EventBus
+from karyvia.runtime.access import GuardedHttpAccess
+from karyvia.runtime.plugin_context import (
     PluginRuntime,
     RuntimePluginContext,
     build_plugin_context,
@@ -86,7 +86,7 @@ def test_a_facade_without_a_workspace_is_honest_about_it(tmp_path: Path) -> None
     """没有 workspace 时 `fs` / `shell` 无处落地——报 `CAPABILITY_MISSING` 而不是
     悄悄拿一个临时目录当根。"""
     ctx = make_ctx(tmp_path, workspace=None)
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         _ = ctx.fs
     assert caught.value.code is ErrorCode.CAPABILITY_MISSING
 
@@ -108,7 +108,7 @@ def test_a_secret_resolves_from_the_environment(tmp_path: Path) -> None:
 
 
 def test_a_missing_secret_reports_its_config_pointer(tmp_path: Path) -> None:
-    with pytest.raises(NucleaError) as missing:
+    with pytest.raises(KaryviaError) as missing:
         make_ctx(tmp_path).secret("api_key")
     assert missing.value.code is ErrorCode.CONFIG_SECRET_MISSING
     assert missing.value.detail["pointer"] == "/plugins/probe/secrets/api_key"
@@ -117,7 +117,7 @@ def test_a_missing_secret_reports_its_config_pointer(tmp_path: Path) -> None:
 def test_an_unexported_variable_reports_only_its_name(tmp_path: Path) -> None:
     """`EDG-502`：错误里只有变量名与位置，没有任何值。"""
     ctx = make_ctx(tmp_path, secrets={"api_key": "${NOPE}"}, env={})
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         ctx.secret("api_key")
     assert caught.value.code is ErrorCode.CONFIG_SECRET_MISSING
     assert "NOPE" in repr(caught.value.detail)
@@ -167,7 +167,7 @@ async def test_only_the_subscribed_event_is_delivered(tmp_path: Path) -> None:
 
 
 def test_publishing_without_a_loop_is_counted_not_crashed(tmp_path: Path) -> None:
-    """`publish()` 会在没有事件循环的路径上被调用（`instance.starting`、`nm config show`）。"""
+    """`publish()` 会在没有事件循环的路径上被调用（`instance.starting`、`karyvia config show`）。"""
     ctx = make_ctx(tmp_path)
 
     async def handler(event: RuntimeEvent) -> None:  # pragma: no cover - 永远不会被跑到
@@ -326,6 +326,6 @@ def test_the_two_facades_are_unavailable_before_the_instance_is_ready(tmp_path: 
     """`PluginContext` 要在 `setup()` 之前交给插件，而门面此时还不存在。"""
     ctx = make_ctx(tmp_path)
     for accessor in ("instance", "turns"):
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             getattr(ctx, accessor)
         assert caught.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED

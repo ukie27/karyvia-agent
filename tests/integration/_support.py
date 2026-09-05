@@ -27,7 +27,7 @@ from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CancelSignal,
     CapabilityKind,
@@ -60,17 +60,17 @@ from nucleamind.contracts import (
     TrustLevel,
     TurnId,
 )
-from nucleamind.kernel.observability import EventBus, MemoryRingSink
-from nucleamind.kernel.plugins import CapabilityDeclaration, CapabilityHost
-from nucleamind.kernel.registry import CapabilityRegistry, ResolutionReport, resolve_into
-from nucleamind.kernel.routing import (
+from karyvia.kernel.observability import EventBus, MemoryRingSink
+from karyvia.kernel.plugins import CapabilityDeclaration, CapabilityHost
+from karyvia.kernel.registry import CapabilityRegistry, ResolutionReport, resolve_into
+from karyvia.kernel.routing import (
     DedupCache,
     Dispatcher,
     RegisteredCommand,
     SessionScheduler,
     build_command_index,
 )
-from nucleamind.kernel.turn import (
+from karyvia.kernel.turn import (
     HookRouter,
     OrchestratorDeps,
     RegisteredContextProvider,
@@ -85,7 +85,7 @@ from nucleamind.kernel.turn import (
     context_providers_from,
     tools_from,
 )
-from nucleamind.sdk.testing import (
+from karyvia.sdk.testing import (
     FAKE_MODEL_ID,
     FakeModelProvider,
     FakePluginContext,

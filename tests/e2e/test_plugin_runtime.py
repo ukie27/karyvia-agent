@@ -9,8 +9,8 @@
 里程碑说的是「装上一个插件之后」，用 Fake 能力验它等于验了一台不存在的机器。因此这套
 用例**要求两个示例插件已经由全局管理器安装**：
 
-    nm plugins install --no-deps examples/plugins/nucleamind-plugin-echo-tool
-    nm plugins install --no-deps examples/plugins/nucleamind-plugin-session-memory
+    karyvia plugins install --no-deps examples/plugins/karyvia-plugin-echo-tool
+    karyvia plugins install --no-deps examples/plugins/karyvia-plugin-session-memory
 
 没装时第一条用例会以一句明确的话失败，而不是安静地少验几件事。启动只读全局安装目录，
 不会把环境里恰好存在的 Python 包误当成已安装插件。
@@ -24,13 +24,13 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import UNTRUSTED_DATA_PREFIX, ErrorCode, NucleaError
-from nucleamind.kernel.turn import CancelToken
-from nucleamind.runtime.bootstrap import bootstrap
-from nucleamind.runtime.cli.main import app
-from nucleamind.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
-from nucleamind.runtime.inspect import inspect_capabilities, inspect_plugins
-from nucleamind.runtime.plugin_home import GlobalPluginHome
+from karyvia.contracts import UNTRUSTED_DATA_PREFIX, ErrorCode, KaryviaError
+from karyvia.kernel.turn import CancelToken
+from karyvia.runtime.bootstrap import bootstrap
+from karyvia.runtime.cli.main import app
+from karyvia.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
+from karyvia.runtime.inspect import inspect_capabilities, inspect_plugins
+from karyvia.runtime.plugin_home import GlobalPluginHome
 from tests.runtime._support import register_test_manifest
 
 from ._support import say, use_tool
@@ -72,7 +72,7 @@ def write_config(instance_dir: Path, plugins: dict[str, object]) -> None:
 
 
 async def run_prompt(instance_dir: Path, prompt: str) -> int:
-    """装配一次真实例并跑一条单次执行（`nm run -p` 的正文）。"""
+    """装配一次真实例并跑一条单次执行（`karyvia run -p` 的正文）。"""
     instance = await bootstrap(instance_dir=instance_dir)
     try:
         return await instance.run_cli(["-p", prompt], CancelToken())
@@ -80,7 +80,7 @@ async def run_prompt(instance_dir: Path, prompt: str) -> int:
         await instance.stop()
 
 
-def render(error: NucleaError) -> str:
+def render(error: KaryviaError) -> str:
     """把一条错误的全部可见面渲染成文本，供「这几个字符串在不在」的断言用。"""
     return json.dumps(
         {"message": error.user_message, "detail": dict(error.detail)},
@@ -99,8 +99,8 @@ def test_both_example_plugins_are_installed_as_entry_points() -> None:
     missing = {ECHO_PLUGIN, MEMORY_PLUGIN} - names
     assert not missing, (
         f"示例插件没装：{sorted(missing)}。请先跑 "
-        "`nm plugins install --no-deps examples/plugins/nucleamind-plugin-echo-tool` 和 "
-        "`nm plugins install --no-deps examples/plugins/nucleamind-plugin-session-memory`"
+        "`karyvia plugins install --no-deps examples/plugins/karyvia-plugin-echo-tool` 和 "
+        "`karyvia plugins install --no-deps examples/plugins/karyvia-plugin-session-memory`"
     )
 
 
@@ -120,8 +120,8 @@ def test_installing_is_not_enabling(instance_dir: Path) -> None:
 
 #: turn 主循环的两个模块。它们是「Kernel 不认识任何具体插件」这条承诺的落点。
 _MAIN_LOOP = (
-    "src/nucleamind/kernel/turn/engine.py",
-    "src/nucleamind/kernel/turn/orchestrator.py",
+    "src/karyvia/kernel/turn/engine.py",
+    "src/karyvia/kernel/turn/orchestrator.py",
 )
 
 
@@ -134,7 +134,7 @@ def test_the_main_loop_names_no_plugin() -> None:
     repo_root = Path(__file__).resolve().parents[2]
     for relative in _MAIN_LOOP:
         source = (repo_root / relative).read_text(encoding="utf-8")
-        for needle in (ECHO_PLUGIN, MEMORY_PLUGIN, "nucleamind_plugin_", "builtins"):
+        for needle in (ECHO_PLUGIN, MEMORY_PLUGIN, "karyvia_plugin_", "builtins"):
             assert needle not in source, f"{relative} 里出现了 {needle!r}"
 
 
@@ -148,7 +148,7 @@ def test_the_example_plugins_are_covered_by_the_import_guard() -> None:
     from tests.architecture._common import plugin_package_roots
 
     covered = {root.name for root in plugin_package_roots()}
-    assert {"nucleamind-plugin-echo-tool", "nucleamind-plugin-session-memory"} <= covered
+    assert {"karyvia-plugin-echo-tool", "karyvia-plugin-session-memory"} <= covered
 
 
 # --------------------------------------------------------- ② 插件注册的工具参与真实 turn
@@ -210,7 +210,7 @@ def test_a_plugin_overrides_the_builtin_session_store(
 ) -> None:
     """§16.2 第 3 条。覆盖生效的可观察形态：会话历史**不再落盘**。
 
-    只断言 `nm capabilities` 里有那对关系是不够的——报告说了什么与真的用了谁是两件事。
+    只断言 `karyvia capabilities` 里有那对关系是不够的——报告说了什么与真的用了谁是两件事。
     """
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
     write_config(instance_dir, {"enabled": [MEMORY_PLUGIN]})
@@ -361,7 +361,7 @@ def test_an_incompatible_sdk_range_is_refused_with_its_own_code(
             "id": "from-the-future",
             "version": "1.0.0",
             "sdk_range": ">=99.0.0,<100.0.0",
-            "setup": "nucleamind_plugin_echo_tool:setup",
+            "setup": "karyvia_plugin_echo_tool:setup",
             "capabilities": [{"kind": "tool", "name": "future.thing"}],
         },
     )
@@ -381,7 +381,7 @@ def test_a_setup_that_cannot_be_loaded_is_reported_per_provider(
     """第三类：**运行失败**。manifest 过了阶段 A，`setup` 却跑不起来。
 
     与前两类的区别是它发生在**加载阶段**，因此结论在 `Wiring.outcomes` 里按提供方列出，
-    而不是在阶段 A 的清单里——`nm capabilities` 把这一段单独印成「加载失败的提供方」。
+    而不是在阶段 A 的清单里——`karyvia capabilities` 把这一段单独印成「加载失败的提供方」。
     """
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
     _directory_plugin(
@@ -391,7 +391,7 @@ def test_a_setup_that_cannot_be_loaded_is_reported_per_provider(
             "id": "broken-setup",
             "version": "1.0.0",
             "sdk_range": ">=5.0.0,<6.0.0",
-            "setup": "nucleamind_plugin_echo_tool:no_such_function",
+            "setup": "karyvia_plugin_echo_tool:no_such_function",
             "capabilities": [{"kind": "tool", "name": "broken.thing"}],
         },
     )
@@ -428,13 +428,13 @@ def test_both_session_stores_run_the_same_contract_suite() -> None:
     """
     import importlib.util
 
-    from nucleamind.sdk.testing import SessionStoreContract
+    from karyvia.sdk.testing import SessionStoreContract
     from tests.builtins.test_session_jsonl import TestJsonlSessionStore
 
     root = Path(__file__).resolve().parents[2]
     path = (
         root
-        / "examples/plugins/nucleamind-plugin-session-memory/tests/test_session_memory.py"
+        / "examples/plugins/karyvia-plugin-session-memory/tests/test_session_memory.py"
     )
     spec = importlib.util.spec_from_file_location("_session_memory_tests", path)
     assert spec is not None and spec.loader is not None

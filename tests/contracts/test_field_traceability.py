@@ -14,7 +14,7 @@ from typing import Final
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     ArtifactRef,
     AttachmentRef,
     Builtin,

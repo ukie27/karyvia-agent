@@ -69,12 +69,12 @@ def test_new_layers_and_plugins_are_within_line_limits() -> None:
 
 
 def test_empty_tree_passes(tmp_path: Path) -> None:
-    assert oversized_modules(tmp_path / "nucleamind", repo_root=tmp_path) == []
+    assert oversized_modules(tmp_path / "karyvia", repo_root=tmp_path) == []
 
 
 def test_inject_oversized_kernel_module_is_rejected(tmp_path: Path) -> None:
     """`kernel/` 的阈值是 500，注入 501 行必须被拦。"""
-    package = tmp_path / "nucleamind"
+    package = tmp_path / "karyvia"
     write_module(package, "kernel/turn/engine.py", "x = 1\n" * (KERNEL_MAX_LINES + 1))
 
     offenders = oversized_modules(package, repo_root=tmp_path)
@@ -85,9 +85,9 @@ def test_inject_oversized_kernel_module_is_rejected(tmp_path: Path) -> None:
 
 def test_inject_oversized_other_layer_module_is_rejected(tmp_path: Path) -> None:
     """其他层阈值是 800；`kernel/` 的 500 不得误用到全部层。"""
-    package = tmp_path / "nucleamind"
+    package = tmp_path / "karyvia"
     write_module(package, "builtins/tools_fs/read.py", "x = 1\n" * (DEFAULT_MAX_LINES + 1))
     write_module(package, "builtins/tools_fs/write.py", "x = 1\n" * (KERNEL_MAX_LINES + 1))
 
     offenders = oversized_modules(package, repo_root=tmp_path)
-    assert [path for path, _, _ in offenders] == ["nucleamind/builtins/tools_fs/read.py"]
+    assert [path for path, _, _ in offenders] == ["karyvia/builtins/tools_fs/read.py"]

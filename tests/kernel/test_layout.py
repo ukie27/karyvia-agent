@@ -4,7 +4,7 @@
 | --- | --- |
 | 实例目录解析优先级 | `TestResolution` |
 | 目录名与文件名固定 | `test_layout_names_are_frozen` |
-| 只读 `NUCLEAMIND_*` | `test_legacy_nanobot_env_is_ignored` |
+| 只读 `KARYVIA_*` | `test_legacy_nanobot_env_is_ignored` |
 | `ensure()` 建目录且幂等 | `TestEnsure` |
 | 派生路径都落在实例目录内 | `test_all_derived_paths_stay_inside_root` |
 
@@ -19,16 +19,16 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError, PluginId
-from nucleamind.kernel.config import (
+from karyvia.contracts import ErrorCode, KaryviaError, PluginId
+from karyvia.kernel.config import (
     CONFIG_FILENAME,
     DEFAULT_INSTANCE_NAME,
     INSTANCE_DIR_ENV,
     INSTANCE_NAME_ENV,
     INSTANCES_DIRNAME,
+    KARYVIA_HOME_ENV,
     LOCK_FILENAME,
     LOGS_DIRNAME,
-    NUCLEAMIND_HOME_ENV,
     PLUGINS_DIRNAME,
     SESSIONS_DIRNAME,
     WORKSPACE_DIRNAME,
@@ -45,10 +45,10 @@ def test_layout_names_are_frozen() -> None:
     assert LOGS_DIRNAME == "logs"
     assert WORKSPACE_DIRNAME == "workspace"
     assert DEFAULT_INSTANCE_NAME == "default"
-    assert INSTANCE_DIR_ENV == "NUCLEAMIND_INSTANCE_DIR"
-    assert INSTANCE_NAME_ENV == "NUCLEAMIND_INSTANCE"
+    assert INSTANCE_DIR_ENV == "KARYVIA_INSTANCE_DIR"
+    assert INSTANCE_NAME_ENV == "KARYVIA_INSTANCE"
     assert INSTANCES_DIRNAME == "instances"
-    assert NUCLEAMIND_HOME_ENV == "NUCLEAMIND_HOME"
+    assert KARYVIA_HOME_ENV == "KARYVIA_HOME"
 
 
 class TestResolution:
@@ -69,7 +69,7 @@ class TestResolution:
             env={INSTANCE_DIR_ENV: str(tmp_path / "env-dir"), INSTANCE_NAME_ENV: "env-name"},
             home=tmp_path,
         )
-        assert layout.root == (tmp_path / ".nucleamind" / "instances" / "work").resolve()
+        assert layout.root == (tmp_path / ".karyvia" / "instances" / "work").resolve()
 
     def test_env_dir_beats_env_name(self, tmp_path: Path) -> None:
         layout = InstanceLayout.resolve(
@@ -80,25 +80,25 @@ class TestResolution:
 
     def test_env_name_used_when_no_dir(self, tmp_path: Path) -> None:
         layout = InstanceLayout.resolve(env={INSTANCE_NAME_ENV: "staging"}, home=tmp_path)
-        assert layout.root == (tmp_path / ".nucleamind" / "instances" / "staging").resolve()
+        assert layout.root == (tmp_path / ".karyvia" / "instances" / "staging").resolve()
 
     def test_falls_back_to_default_instance(self, tmp_path: Path) -> None:
         layout = InstanceLayout.resolve(env={}, home=tmp_path)
         assert layout.root == (
-            tmp_path / ".nucleamind" / "instances" / DEFAULT_INSTANCE_NAME
+            tmp_path / ".karyvia" / "instances" / DEFAULT_INSTANCE_NAME
         ).resolve()
 
-    def test_nucleamind_home_is_the_data_root_itself(self, tmp_path: Path) -> None:
-        """环境变量直接指向数据根，不能再偷偷追加 `.nucleamind` 或 `global`。"""
-        data_root = tmp_path / "nm-data"
-        layout = InstanceLayout.resolve(env={NUCLEAMIND_HOME_ENV: str(data_root)})
+    def test_karyvia_home_is_the_data_root_itself(self, tmp_path: Path) -> None:
+        """环境变量直接指向数据根，不能再偷偷追加 `.karyvia` 或 `global`。"""
+        data_root = tmp_path / "karyvia-data"
+        layout = InstanceLayout.resolve(env={KARYVIA_HOME_ENV: str(data_root)})
         assert layout.root == data_root.resolve() / "instances" / DEFAULT_INSTANCE_NAME
 
-    def test_named_instance_uses_nucleamind_home_directly(self, tmp_path: Path) -> None:
-        data_root = tmp_path / "nm-data"
+    def test_named_instance_uses_karyvia_home_directly(self, tmp_path: Path) -> None:
+        data_root = tmp_path / "karyvia-data"
         layout = InstanceLayout.resolve(
             instance="work",
-            env={NUCLEAMIND_HOME_ENV: str(data_root)},
+            env={KARYVIA_HOME_ENV: str(data_root)},
         )
         assert layout.root == data_root.resolve() / "instances" / "work"
 
@@ -108,13 +108,13 @@ class TestResolution:
         assert layout.root.is_absolute()
 
     def test_legacy_nanobot_env_is_ignored(self, tmp_path: Path) -> None:
-        """新层只读 `NUCLEAMIND_*`（AGENTS.md）：旧名字不得有任何效果。"""
+        """新层只读 `KARYVIA_*`（AGENTS.md）：旧名字不得有任何效果。"""
         layout = InstanceLayout.resolve(
             env={"NANOBOT_INSTANCE_DIR": str(tmp_path / "legacy"), "NANOBOT_INSTANCE": "legacy"},
             home=tmp_path,
         )
         assert layout.root == (
-            tmp_path / ".nucleamind" / "instances" / DEFAULT_INSTANCE_NAME
+            tmp_path / ".karyvia" / "instances" / DEFAULT_INSTANCE_NAME
         ).resolve()
 
 
@@ -124,19 +124,19 @@ class TestInstanceNameValidation:
     @pytest.mark.parametrize("name", ["..", ".", "a/b", "a\\b", "   ", "x\x00y"])
     def test_rejects_unsafe_names(self, name: str, tmp_path: Path) -> None:
         """路径分量特有的形状由本模块判定，报 `CONFIG_INVALID`。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             InstanceLayout.resolve(instance=name, env={}, home=tmp_path)
         assert caught.value.code in {ErrorCode.CONFIG_INVALID, ErrorCode.INPUT_MALFORMED}
 
     def test_rejects_empty_name(self, tmp_path: Path) -> None:
         """空名字由共用的 `validate_identifier` 拦下，因此码是 `INPUT_MALFORMED`。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             InstanceLayout.resolve(instance="", env={}, home=tmp_path)
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
     def test_rejects_names_too_long_for_a_path_component(self, tmp_path: Path) -> None:
         """实例名下面还要接 `sessions/<storage_id>.json`，Windows 上 260 字符就到顶。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             InstanceLayout.resolve(instance="x" * 200, env={}, home=tmp_path)
         assert caught.value.code is ErrorCode.INPUT_TOO_LARGE
 
@@ -145,7 +145,7 @@ class TestInstanceNameValidation:
         self, name: str, tmp_path: Path
     ) -> None:
         layout = InstanceLayout.resolve(instance=name, env={}, home=tmp_path)
-        assert layout.root == (tmp_path / ".nucleamind" / "instances" / name).resolve()
+        assert layout.root == (tmp_path / ".karyvia" / "instances" / name).resolve()
 
     @pytest.mark.parametrize("name", ["default", "work", "my-instance", "inst_2", "a1"])
     def test_accepts_reasonable_names(self, name: str, tmp_path: Path) -> None:
@@ -167,7 +167,7 @@ class TestEnsure:
             assert path.is_dir()
 
     def test_writes_no_files(self, tmp_path: Path) -> None:
-        """`ensure()` 只建目录。生成 `config.json` 是 `D24` 的 `nm init`，不是加载路径。"""
+        """`ensure()` 只建目录。生成 `config.json` 是 `D24` 的 `karyvia init`，不是加载路径。"""
         layout = InstanceLayout.resolve(instance_dir=tmp_path / "inst", env={})
         layout.ensure()
         assert not layout.config_path.exists()

@@ -1,6 +1,6 @@
 """内建能力不享受特权的 AST 断言（`BAS-005`、`SDK-007`，技术方案 §8.3、§14）。
 
-职责：对真实源码树断言 `builtins/` 与外部插件受同一套约束——不 import `nucleamind.kernel.*`、
+职责：对真实源码树断言 `builtins/` 与外部插件受同一套约束——不 import `karyvia.kernel.*`、
 不持有自己的注册通道；声明为只读的内建连持久化的语法途径都没有。并用注入违规样例证明
 每条守卫都会拦。
 不负责：判定逻辑本身（见 `_boundaries.py`），也不导入被测模块。
@@ -85,7 +85,7 @@ def test_builtins_do_not_import_kernel() -> None:
     violations = [
         violation
         for violation in collect_violations(src_dir=SRC_DIR, repo_root=REPO_ROOT)
-        if violation.path.startswith("src/nucleamind/builtins/")
+        if violation.path.startswith("src/karyvia/builtins/")
     ]
     assert not violations, "builtins/ 违反依赖规则：\n" + "\n".join(
         str(violation) for violation in violations
@@ -166,8 +166,8 @@ def test_injected_kernel_import_in_builtins_is_rejected(tmp_path: Path) -> None:
     src = make_package_tree(tmp_path)
     write_module(
         src,
-        "nucleamind/builtins/sneaky.py",
-        "from nucleamind.kernel.registry import CapabilityRegistry\n",
+        "karyvia/builtins/sneaky.py",
+        "from karyvia.kernel.registry import CapabilityRegistry\n",
     )
     violations = collect_violations(src_dir=src, repo_root=tmp_path)
     assert {violation.rule for violation in violations} == {"R4"}

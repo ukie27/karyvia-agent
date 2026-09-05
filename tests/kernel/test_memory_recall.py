@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelSignal,
     ContextFragment,
     Correlation,
@@ -25,14 +25,14 @@ from nucleamind.contracts import (
     FragmentKind,
     FragmentScope,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     Sensitivity,
     SessionKey,
     TrustLevel,
     TurnId,
 )
-from nucleamind.kernel.turn import CancelToken, MemoryRecall, assemble, select_memory
-from nucleamind.kernel.turn.memory import MEMORY_RECALL_SCOPE
+from karyvia.kernel.turn import CancelToken, MemoryRecall, assemble, select_memory
+from karyvia.kernel.turn.memory import MEMORY_RECALL_SCOPE
 
 NOW = datetime(2026, 8, 12, tzinfo=UTC)
 KEY = SessionKey(channel_id="cli", conversation_id="c0")
@@ -169,8 +169,8 @@ async def test_recall_order_is_the_backends_order() -> None:
 
 async def test_a_broken_backend_degrades_by_default() -> None:
     """`MEM-003`：这一轮没有记忆，turn 照常跑。**但错误一定被报出去**——降级不等于静默。"""
-    memory = FakeMemory(fails=NucleaError(ErrorCode.PERSISTENCE_READ_FAILED, "后端挂了。"))
-    reported: list[NucleaError] = []
+    memory = FakeMemory(fails=KaryviaError(ErrorCode.PERSISTENCE_READ_FAILED, "后端挂了。"))
+    reported: list[KaryviaError] = []
 
     got = await recall_for(memory).recall(
         "q", CORRELATION, CancelToken(), on_failure=reported.append
@@ -181,15 +181,15 @@ async def test_a_broken_backend_degrades_by_default() -> None:
 
 
 async def test_on_failure_fail_makes_the_turn_fail() -> None:
-    memory = FakeMemory(fails=NucleaError(ErrorCode.PERSISTENCE_READ_FAILED, "后端挂了。"))
-    with pytest.raises(NucleaError) as caught:
+    memory = FakeMemory(fails=KaryviaError(ErrorCode.PERSISTENCE_READ_FAILED, "后端挂了。"))
+    with pytest.raises(KaryviaError) as caught:
         await recall_for(memory, critical=True).recall("q", CORRELATION, CancelToken())
     assert caught.value.code is ErrorCode.PERSISTENCE_READ_FAILED
 
 
 async def test_a_timeout_is_reported_with_its_own_code() -> None:
     memory = FakeMemory(delay=0.2)
-    reported: list[NucleaError] = []
+    reported: list[KaryviaError] = []
 
     got = await recall_for(memory, timeout_ms=10).recall(
         "q", CORRELATION, CancelToken(), on_failure=reported.append
@@ -203,7 +203,7 @@ async def test_a_timeout_is_reported_with_its_own_code() -> None:
 async def test_a_raw_exception_keeps_only_its_type_name() -> None:
     """第三方后端的异常文本可能带着连接串。"""
     memory = FakeMemory(fails=RuntimeError("postgres://user:pw@host/db"))
-    reported: list[NucleaError] = []
+    reported: list[KaryviaError] = []
 
     await recall_for(memory).recall("q", CORRELATION, CancelToken(), on_failure=reported.append)
 
@@ -218,10 +218,10 @@ async def test_cancellation_is_not_a_backend_failure() -> None:
     把它折成「这轮没有记忆」会让一条已被取消的 turn 带着半份上下文继续跑。判据是
     `ErrorCategory` 而不是逐个列举错误码。
     """
-    memory = FakeMemory(fails=NucleaError(ErrorCode.CANCELLED_BY_USER, "停。"))
-    reported: list[NucleaError] = []
+    memory = FakeMemory(fails=KaryviaError(ErrorCode.CANCELLED_BY_USER, "停。"))
+    reported: list[KaryviaError] = []
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await recall_for(memory).recall(
             "q", CORRELATION, CancelToken(), on_failure=reported.append
         )
@@ -235,7 +235,7 @@ async def test_cancellation_is_not_a_backend_failure() -> None:
 
 def test_a_named_backend_that_is_not_there_is_capability_missing() -> None:
     """静默退回「没有记忆」会让用户以为记忆在工作。错误里列出实际有哪几条。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         select_memory([("jsonl", "plugin:memory", FakeMemory())], "sqlite")  # type: ignore[list-item]
     assert caught.value.code is ErrorCode.CAPABILITY_MISSING
     assert caught.value.detail["available"] == ["jsonl"]
@@ -254,7 +254,7 @@ def test_the_named_backend_is_the_one_returned() -> None:
 
 
 async def assembled(memory: MemoryRecall | None, **kwargs: object) -> object:
-    from nucleamind.contracts import SessionSnapshot
+    from karyvia.contracts import SessionSnapshot
 
     return await assemble(
         snapshot=SessionSnapshot(session_key=KEY),

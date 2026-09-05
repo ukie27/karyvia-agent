@@ -19,10 +19,10 @@ import tomllib
 from pathlib import Path
 from types import ModuleType
 
-from nucleamind.contracts import CapabilityKind, ErrorCode
-from nucleamind.kernel.observability import PluginState
-from nucleamind.runtime.inventory import SkipReason, build_inventory
-from nucleamind.sdk import SDK_VERSION, CapabilityDecl, PluginManifest
+from karyvia.contracts import CapabilityKind, ErrorCode
+from karyvia.kernel.observability import PluginState
+from karyvia.runtime.inventory import SkipReason, build_inventory
+from karyvia.sdk import SDK_VERSION, CapabilityDecl, PluginManifest
 
 _VALID = """
 id = "{plugin_id}"
@@ -132,13 +132,13 @@ def test_an_unenabled_module_plugin_is_not_imported(tmp_path: Path) -> None:
 
 def test_twenty_unenabled_entry_points_import_nothing() -> None:
     """`NFR-401`：未启用的插件不产生启动开销。20 个候选、0 次导入。"""
-    points = tuple((f"ghost{i}", f"nucleamind_ghost_{i}.plugin:MANIFEST") for i in range(20))
+    points = tuple((f"ghost{i}", f"karyvia_ghost_{i}.plugin:MANIFEST") for i in range(20))
     started = time.perf_counter()
     inventory = build_inventory(entry_points=lambda: points)
     elapsed_ms = (time.perf_counter() - started) * 1000
     assert len(inventory.skipped) == 20
     assert not inventory.failures
-    assert not any(name.startswith("nucleamind_ghost_") for name in sys.modules)
+    assert not any(name.startswith("karyvia_ghost_") for name in sys.modules)
     # 结构性保证（一次导入都没有）才是本条的内容；墙钟只是它的下游，因此阈值给得很松，
     # 松到只有「有人偷偷加了 import」才会撞上。
     assert elapsed_ms < 100
@@ -153,13 +153,13 @@ def test_a_missing_required_field_reports_the_field_path(tmp_path: Path) -> None
     assert failure.error.code is ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED
     fields = {item["field"] for item in failure.error.detail["errors"]}
     assert {"sdk_range", "setup", "capabilities"} <= fields
-    assert failure.plugin_id == "acme" and "nucleamind.plugins:acme" in failure.origin
+    assert failure.plugin_id == "acme" and "karyvia.plugins:acme" in failure.origin
 
 
 def test_an_illegal_id_reports_the_field_path(tmp_path: Path) -> None:
     _plugin(tmp_path, "Acme", _manifest_text("Acme"))
     (failure,) = _inventory(tmp_path, enabled=["Acme"]).failures
-    # 语义校验（id 形状）直接抛 `NucleaError`，字段路径在 `detail["field"]` 而不是
+    # 语义校验（id 形状）直接抛 `KaryviaError`，字段路径在 `detail["field"]` 而不是
     # `errors` 列表里——那是 `sdk/manifest.py` 刻意收窄的错误面，两种形状都带得出字段。
     assert failure.error.code is ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED
     assert failure.error.detail["field"] == "id"

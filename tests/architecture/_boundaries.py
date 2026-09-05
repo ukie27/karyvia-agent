@@ -24,7 +24,7 @@ from pathlib import Path
 
 from ._common import IGNORED_DIRS, NEW_LAYERS, dotted_path, iter_modules, rel
 
-PACKAGE = "nucleamind"
+PACKAGE = "karyvia"
 
 #: 全部依赖规则编号。每条都必须有一个反向用例（见 `test_guard_integrity.py`）。
 RULES: tuple[str, ...] = ("R1", "R2", "R3", "R4", "R5")
@@ -90,15 +90,15 @@ def _imported_modules(tree: ast.Module, *, module_dotted: str) -> list[tuple[str
             if not base:
                 continue
             results.append((base, node.lineno))
-            # `from nucleamind.kernel import turn` 的目标层由 base 决定，
-            # 逐个 alias 再展开一次可覆盖 `from nucleamind import kernel`。
+            # `from karyvia.kernel import turn` 的目标层由 base 决定，
+            # 逐个 alias 再展开一次可覆盖 `from karyvia import kernel`。
             results.extend((f"{base}.{alias.name}", node.lineno) for alias in node.names)
 
     return results
 
 
 def _layer_of(imported: str) -> str | None:
-    """取出 import 目标所属的顶层（`nucleamind.kernel.x` -> `kernel`）。"""
+    """取出 import 目标所属的顶层（`karyvia.kernel.x` -> `kernel`）。"""
     if imported == PACKAGE or not imported.startswith(f"{PACKAGE}."):
         return None
     top = imported.split(".")[1]

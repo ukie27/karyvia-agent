@@ -2,10 +2,10 @@
 
 职责：验模板自己加载得了、文本形态跨平台一致、`${VAR}` 能被列出来；验派生的 schema 覆盖
 字段表的每一项、且真的能校验生成的配置。
-不负责：写盘（`tests/runtime/test_first_run.py`）、`nm init` 的退出码
+不负责：写盘（`tests/runtime/test_first_run.py`）、`karyvia init` 的退出码
 （`tests/runtime/cli/test_cli.py`）。
 
-**这套用例的中心是一条自证**：`nm init` 生成的那份配置，必须能被 `validate_config()` 与
+**这套用例的中心是一条自证**：`karyvia init` 生成的那份配置，必须能被 `validate_config()` 与
 派生的 JSON Schema **同时**接受。两条判定分叉的后果是用户对着一份合法配置看到红波浪线，
 或者相反——刚生成的文件下一次启动就报未知字段。
 """
@@ -17,8 +17,8 @@ import json
 import jsonschema
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError
-from nucleamind.kernel.config import (
+from karyvia.contracts import ErrorCode, KaryviaError
+from karyvia.kernel.config import (
     JSON_SCHEMA_FILENAME,
     SCHEMA_KEY,
     SECTION_SPECS,
@@ -28,7 +28,7 @@ from nucleamind.kernel.config import (
     defaults,
     validate_config,
 )
-from nucleamind.kernel.config.fields import FieldKind
+from karyvia.kernel.config.fields import FieldKind
 
 SECRET_REF = "${OPENAI_API_KEY}"
 
@@ -95,13 +95,13 @@ class TestTopLevelSchemaKey:
         validate_config({SCHEMA_KEY: "./config.schema.json"})
 
     def test_other_unknown_top_level_keys_are_still_rejected(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"$turn": {}})
         assert caught.value.code is ErrorCode.CONFIG_UNKNOWN_FIELD
 
     def test_a_mistyped_section_is_still_rejected(self) -> None:
         """放行的是一个具名键，不是「以 `$` 开头就放行」——后者会让拼错的小节静默消失。"""
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             validate_config({"turnn": {}})
 
 
@@ -126,7 +126,7 @@ class TestConfigJsonSchema:
 
     def test_every_field_kind_has_a_representation(self) -> None:
         """缺一种 `FieldKind` 就该在生成时 KeyError，而不是悄悄退化成「任意值」。"""
-        from nucleamind.kernel.config.json_schema import _KIND_SCHEMAS
+        from karyvia.kernel.config.json_schema import _KIND_SCHEMAS
 
         assert set(_KIND_SCHEMAS) == set(FieldKind)
 

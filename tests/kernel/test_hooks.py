@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     ErrorCode,
@@ -22,15 +22,15 @@ from nucleamind.contracts import (
     HookContext,
     HookName,
     HookOutcome,
+    KaryviaError,
     ModelMessage,
     ModelRequest,
-    NucleaError,
     Plugin,
     PluginId,
     Role,
 )
-from nucleamind.kernel.registry import CapabilityRegistry
-from nucleamind.kernel.turn import (
+from karyvia.kernel.registry import CapabilityRegistry
+from karyvia.kernel.turn import (
     HookBinding,
     HookRouter,
     RegisteredHook,
@@ -209,7 +209,7 @@ async def test_block_short_circuits_the_rest() -> None:
         ]
     )
 
-    from nucleamind.contracts import ToolCall, ToolInvocation
+    from karyvia.contracts import ToolCall, ToolInvocation
 
     outcome = await router.dispatch(
         HookContext(
@@ -257,7 +257,7 @@ async def test_reject_on_turn_start_short_circuits() -> None:
 
 async def test_observer_failures_do_not_affect_the_turn() -> None:
     trace: list[str] = []
-    failures: list[NucleaError] = []
+    failures: list[KaryviaError] = []
     router = HookRouter(
         [
             binding(
@@ -270,7 +270,7 @@ async def test_observer_failures_do_not_affect_the_turn() -> None:
         on_failure=failures.append,
     )
 
-    from nucleamind.contracts import TurnOutcome, TurnStatus
+    from karyvia.contracts import TurnOutcome, TurnStatus
 
     outcome = await router.dispatch(
         HookContext(
@@ -291,7 +291,7 @@ async def test_observer_failures_do_not_affect_the_turn() -> None:
 
 
 async def test_observer_timeout_is_reported_and_the_task_is_cancelled() -> None:
-    failures: list[NucleaError] = []
+    failures: list[KaryviaError] = []
     trace: list[str] = []
     router = HookRouter(
         [
@@ -305,7 +305,7 @@ async def test_observer_timeout_is_reported_and_the_task_is_cancelled() -> None:
         on_failure=failures.append,
     )
 
-    from nucleamind.contracts import ModelResponse, StopReason
+    from karyvia.contracts import ModelResponse, StopReason
 
     outcome = await router.dispatch(
         HookContext(
@@ -323,7 +323,7 @@ async def test_observer_timeout_is_reported_and_the_task_is_cancelled() -> None:
 
 async def test_interceptor_failure_is_skipped_and_the_rest_continue() -> None:
     trace: list[str] = []
-    failures: list[NucleaError] = []
+    failures: list[KaryviaError] = []
     router = HookRouter(
         [
             binding(Script("boom", trace, error=RuntimeError("炸")), priority=0, name="a"),
@@ -341,7 +341,7 @@ async def test_interceptor_failure_is_skipped_and_the_rest_continue() -> None:
 
 
 async def test_interceptor_timeout_is_isolated_per_handler() -> None:
-    failures: list[NucleaError] = []
+    failures: list[KaryviaError] = []
     trace: list[str] = []
     router = HookRouter(
         [
@@ -360,7 +360,7 @@ async def test_interceptor_timeout_is_isolated_per_handler() -> None:
 
 
 async def test_failure_detail_never_carries_the_exception_message() -> None:
-    failures: list[NucleaError] = []
+    failures: list[KaryviaError] = []
     router = HookRouter(
         [binding(Script("boom", [], error=RuntimeError("token=sk-live-should-not-leak")))],
         on_failure=failures.append,
@@ -374,7 +374,7 @@ async def test_failure_detail_never_carries_the_exception_message() -> None:
 
 async def test_observer_failure_does_not_raise() -> None:
     """观察者失败只上报，不改变 turn 结果（`NFR-204`）。"""
-    from nucleamind.contracts import TurnOutcome, TurnStatus
+    from karyvia.contracts import TurnOutcome, TurnStatus
 
     router = HookRouter(
         [
@@ -400,9 +400,9 @@ async def test_observer_failure_does_not_raise() -> None:
     assert outcome.action is HookAction.CONTINUE
 
 
-async def test_handler_raised_nuclea_error_passes_through_unchanged() -> None:
-    original = NucleaError(ErrorCode.PERMISSION_DENIED, "不许")
-    failures: list[NucleaError] = []
+async def test_handler_raised_karyvia_error_passes_through_unchanged() -> None:
+    original = KaryviaError(ErrorCode.PERMISSION_DENIED, "不许")
+    failures: list[KaryviaError] = []
     router = HookRouter(
         [binding(Script("boom", [], error=original))], on_failure=failures.append
     )
@@ -416,7 +416,7 @@ async def test_handler_raised_nuclea_error_passes_through_unchanged() -> None:
 
 
 async def test_wrong_action_for_this_hook_is_a_plugin_failure() -> None:
-    failures: list[NucleaError] = []
+    failures: list[KaryviaError] = []
     router = HookRouter(
         [binding(Script("bad", [], outcome=HookOutcome(HookAction.REJECT, reason="拒")))],
         on_failure=failures.append,
@@ -431,7 +431,7 @@ async def test_wrong_action_for_this_hook_is_a_plugin_failure() -> None:
 async def test_replace_with_the_wrong_payload_is_a_plugin_failure() -> None:
     from ._orchestrator_support import fragment
 
-    failures: list[NucleaError] = []
+    failures: list[KaryviaError] = []
     router = HookRouter(
         [
             binding(
@@ -481,7 +481,7 @@ def test_bindings_from_rejects_a_foreign_payload() -> None:
 
     try:
         bindings_from(registry)
-    except NucleaError as error:
+    except KaryviaError as error:
         assert error.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
     else:  # pragma: no cover - 失败路径
         raise AssertionError("载荷形状不对必须当场报错")

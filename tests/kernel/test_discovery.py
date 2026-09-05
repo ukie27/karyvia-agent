@@ -7,8 +7,8 @@ from types import ModuleType
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError
-from nucleamind.kernel.plugins import ENTRY_POINT_GROUP, PluginCandidate, discover, read_candidate
+from karyvia.contracts import ErrorCode, KaryviaError
+from karyvia.kernel.plugins import ENTRY_POINT_GROUP, PluginCandidate, discover, read_candidate
 
 
 def test_entry_point_metadata_becomes_a_candidate_without_importing() -> None:
@@ -50,7 +50,7 @@ def test_read_candidate_returns_the_manifest_object(monkeypatch: pytest.MonkeyPa
 
 @pytest.mark.parametrize("location", ["", "module", ":MANIFEST", "module:"])
 def test_entry_point_shape_is_validated(location: str) -> None:
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         read_candidate(PluginCandidate("acme", location))
 
     assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
@@ -58,7 +58,7 @@ def test_entry_point_shape_is_validated(location: str) -> None:
 
 
 def test_import_failure_exposes_only_the_exception_type() -> None:
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         read_candidate(PluginCandidate("acme", "module_that_does_not_exist:MANIFEST"))
 
     assert caught.value.detail["exception"] == "ModuleNotFoundError"
@@ -68,7 +68,7 @@ def test_import_failure_exposes_only_the_exception_type() -> None:
 def test_missing_manifest_attribute_is_reported(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setitem(sys.modules, "empty_plugin", ModuleType("empty_plugin"))
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         read_candidate(PluginCandidate("acme", "empty_plugin:MANIFEST"))
 
     assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED

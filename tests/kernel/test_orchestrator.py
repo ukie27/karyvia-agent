@@ -18,7 +18,7 @@ import asyncio
 from dataclasses import replace
 from datetime import UTC, datetime
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     UNTRUSTED_DATA_PREFIX,
     AttachmentRef,
     AttachmentSource,
@@ -32,7 +32,7 @@ from nucleamind.contracts import (
     HookAction,
     HookName,
     HookOutcome,
-    NucleaError,
+    KaryviaError,
     Role,
     SessionKey,
     SessionMessage,
@@ -44,10 +44,10 @@ from nucleamind.contracts import (
     TurnId,
     TurnStatus,
 )
-from nucleamind.contracts.message import MAX_ATTACHMENTS
-from nucleamind.kernel.routing import ConcurrencyPolicy, SessionScheduler
-from nucleamind.kernel.turn import RetryPolicy, TurnCompactionPolicy, TurnLimits, TurnReceipt
-from nucleamind.kernel.turn.transcript import Transcript, TurnState
+from karyvia.contracts.message import MAX_ATTACHMENTS
+from karyvia.kernel.routing import ConcurrencyPolicy, SessionScheduler
+from karyvia.kernel.turn import RetryPolicy, TurnCompactionPolicy, TurnLimits, TurnReceipt
+from karyvia.kernel.turn.transcript import Transcript, TurnState
 
 from ._engine_support import (
     RecordingHookDispatcher,
@@ -100,7 +100,7 @@ class ScriptedCompactor:
 
 
 def compaction_policy(compactor: ScriptedCompactor) -> TurnCompactionPolicy:
-    from nucleamind.contracts import Builtin
+    from karyvia.contracts import Builtin
 
     return TurnCompactionPolicy(compactor=compactor, name="summary", owner=Builtin())
 
@@ -117,7 +117,7 @@ def old_message(index: int, role: Role, content: str) -> SessionMessage:
 class CompactFailingStore(FakeSessionStore):
     async def compact(self, key, through, summary):  # noqa: ANN001, ANN202
         del key, through, summary
-        raise NucleaError(ErrorCode.PERSISTENCE_WRITE_FAILED, "压缩写入失败。")
+        raise KaryviaError(ErrorCode.PERSISTENCE_WRITE_FAILED, "压缩写入失败。")
 
 
 # ------------------------------------------------------------------ A 事件序列
@@ -336,7 +336,7 @@ async def test_a_rejected_command_keeps_the_session_usable() -> None:
 
 async def test_a_failing_model_produces_a_failed_turn_and_a_failed_frame() -> None:
     harness = build(
-        ScriptedProvider([NucleaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "供应商 500")])
+        ScriptedProvider([KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "供应商 500")])
     )
 
     receipt = await harness.send()
@@ -383,7 +383,7 @@ async def test_a_failing_tool_reports_call_failed_but_does_not_fail_the_turn() -
     failed = ToolResult(
         call_id="x", ok=False, content="没这个文件", truncated=False,
         side_effect=SideEffect.NONE,
-        error=NucleaError(ErrorCode.INPUT_MALFORMED, "路径不存在"),
+        error=KaryviaError(ErrorCode.INPUT_MALFORMED, "路径不存在"),
     )
     harness = build(
         ScriptedProvider([tool_response(tool_call("fs.read")), text_response("换个路径吧")]),
@@ -434,7 +434,7 @@ async def test_empty_assistant_messages_never_enter_history() -> None:
 
 async def test_orphan_tool_results_are_dropped_on_save() -> None:
     """没有对应调用声明的 tool 记录会让后续请求在 Provider 侧被拒。"""
-    from nucleamind.kernel.turn import Transcript
+    from karyvia.kernel.turn import Transcript
 
     transcript = Transcript(turn_id="t1", created_at=NOW, limits=TurnLimits())  # type: ignore[arg-type]
     transcript.add_tool_result(ok_result("孤儿", call_id="never-declared"))
@@ -633,7 +633,7 @@ async def test_shutdown_cancellation_finishes_the_turn_and_persists_partial_cont
         del request
 
         async def gen():  # noqa: ANN202
-            from nucleamind.contracts import ChunkKind, ModelChunk
+            from karyvia.contracts import ChunkKind, ModelChunk
 
             yield ModelChunk(kind=ChunkKind.TEXT, text="停机前的半句")
             partial_sent.set()
@@ -732,7 +732,7 @@ def _cancelling_stream(harness):  # noqa: ANN001, ANN202
     """产出两个分片后请求取消——「已产生的内容必须留存」才有东西可断言。"""
 
     async def gen():  # noqa: ANN202
-        from nucleamind.contracts import ChunkKind, ModelChunk
+        from karyvia.contracts import ChunkKind, ModelChunk
 
         yield ModelChunk(kind=ChunkKind.TEXT, text="已经")
         yield ModelChunk(kind=ChunkKind.TEXT, text="说了一半")
@@ -886,7 +886,7 @@ async def test_a_failing_wrap_up_falls_back_to_the_breach_description() -> None:
     harness = build(
         ScriptedProvider(
             [tool_response(tool_call("fs.read"))],
-            default=NucleaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "又挂了"),
+            default=KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "又挂了"),
         ),
         tool_specs=[tool_spec("fs.read")],
         limits=TurnLimits(max_iterations=1),
@@ -902,7 +902,7 @@ async def test_a_failing_wrap_up_falls_back_to_the_breach_description() -> None:
 
 async def test_reasoning_deltas_are_marked_and_never_become_the_answer() -> None:
     """推理不是答案：它照发给 UI，但不进历史、不构成最终正文。"""
-    from nucleamind.contracts import ChunkKind, ModelChunk, StopReason
+    from karyvia.contracts import ChunkKind, ModelChunk, StopReason
 
     chunks = [
         ModelChunk(kind=ChunkKind.REASONING, text="先想一下"),
@@ -926,7 +926,7 @@ async def test_the_watchdog_cancels_a_turn_that_never_returns() -> None:
 
     async def hang(request, cancel):  # noqa: ANN001, ANN202
         await cancel.wait()
-        raise NucleaError(ErrorCode.CANCELLED_BY_BUDGET, "超时了")
+        raise KaryviaError(ErrorCode.CANCELLED_BY_BUDGET, "超时了")
 
     harness.provider.complete = hang  # type: ignore[method-assign]
 
@@ -1046,9 +1046,9 @@ async def test_a_final_frame_with_only_attachments_is_still_sent() -> None:
 RETRY_FAST = RetryPolicy(max_attempts=3, base_delay_ms=1, max_delay_ms=1)
 
 
-def _flaky() -> NucleaError:
+def _flaky() -> KaryviaError:
     """一条如实标了 `retryable=True` 的上游故障，形状同 `model_openai/faults.py`。"""
-    return NucleaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "模型供应商限流。", retryable=True)
+    return KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "模型供应商限流。", retryable=True)
 
 
 async def test_a_transient_model_failure_no_longer_kills_the_turn() -> None:
@@ -1138,7 +1138,7 @@ async def test_max_tokens_turn_has_cancelled_stream_state() -> None:
     `TurnStatus` 仍然是 `COMPLETED`——模型没报错、turn 也没被取消——只是出站消息的
     呈现状态要说清楚这不是一个完整答案。
     """
-    from nucleamind.contracts import ModelResponse, StopReason
+    from karyvia.contracts import ModelResponse, StopReason
 
     truncated_response = ModelResponse(
         model_id="fake-model", stop_reason=StopReason.MAX_TOKENS, content="被截断的答案"
@@ -1155,7 +1155,7 @@ async def test_max_tokens_turn_has_cancelled_stream_state() -> None:
 
 async def test_max_tokens_continuation_aggregates_answer_and_persists_once() -> None:
     """多段 `MAX_TOKENS` 响应聚合成一条会话 assistant 记录。"""
-    from nucleamind.contracts import ModelResponse, StopReason
+    from karyvia.contracts import ModelResponse, StopReason
 
     harness = build(
         ScriptedProvider(

@@ -18,14 +18,14 @@ from pathlib import Path
 
 import pytest
 
-import nucleamind.runtime.bootstrap as bootstrap_module
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS
-from nucleamind.contracts import (
+import karyvia.runtime.bootstrap as bootstrap_module
+from karyvia.builtins.registry import BUILTIN_MANIFESTS
+from karyvia.contracts import (
     CancelSignal,
     CapabilityKind,
     ErrorCode,
     EventName,
-    NucleaError,
+    KaryviaError,
     SessionKey,
     SideEffect,
     StreamState,
@@ -33,12 +33,12 @@ from nucleamind.contracts import (
     ToolResult,
     ToolSpec,
 )
-from nucleamind.kernel.config import InstanceLock
-from nucleamind.kernel.turn import CancelToken
-from nucleamind.runtime.bootstrap import bootstrap, builtin_config_blocks
-from nucleamind.runtime.instance import AgentInstance
-from nucleamind.runtime.plugin_context import RuntimePluginContext
-from nucleamind.sdk import CapabilityDecl, NucleaAPI, PluginManifest
+from karyvia.kernel.config import InstanceLock
+from karyvia.kernel.turn import CancelToken
+from karyvia.runtime.bootstrap import bootstrap, builtin_config_blocks
+from karyvia.runtime.instance import AgentInstance
+from karyvia.runtime.plugin_context import RuntimePluginContext
+from karyvia.sdk import CapabilityDecl, KaryviaAPI, PluginManifest
 
 from ._support import (
     FAKE_MODEL_ID,
@@ -76,7 +76,7 @@ async def test_bootstrap_holds_the_instance_lock_until_stop(tmp_path: Path) -> N
     write_config(tmp_path)
     instance = await _boot(tmp_path)
     try:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             InstanceLock(instance.layout.lock_path).acquire()
         assert caught.value.code is ErrorCode.CONFIG_INSTANCE_LOCKED
     finally:
@@ -89,7 +89,7 @@ async def test_bootstrap_holds_the_instance_lock_until_stop(tmp_path: Path) -> N
 async def test_a_failed_start_releases_the_lock(tmp_path: Path) -> None:
     """启动失败也要放锁：否则「配置写错了」会附赠一个锁死的实例目录。"""
     write_config(tmp_path, model={"name": None})
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         await _boot(tmp_path)
     InstanceLock(tmp_path / "instance.lock").acquire().release()
 
@@ -106,7 +106,7 @@ async def test_a_builtin_setup_failure_keeps_its_precise_error(tmp_path: Path) -
     )
     write_config(tmp_path)
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _boot(tmp_path, manifests=manifests)
 
     assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
@@ -117,7 +117,7 @@ async def test_a_broken_config_is_written_to_the_logs(tmp_path: Path) -> None:
     """`EDG-501` 的后半句。这是 `write_config_error()` 唯一的调用点。"""
     tmp_path.mkdir(parents=True, exist_ok=True)
     (tmp_path / "config.json").write_text('{"turn": {"max_iterations": -1}}', encoding="utf-8")
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _boot(tmp_path)
     assert caught.value.code is ErrorCode.CONFIG_INVALID
     logs = list((tmp_path / "logs").glob("config-errors-*.jsonl"))
@@ -131,7 +131,7 @@ async def test_the_original_config_file_is_never_rewritten(tmp_path: Path) -> No
     tmp_path.mkdir(parents=True, exist_ok=True)
     raw = '{"turn": {"max_iterations": -1}}'
     (tmp_path / "config.json").write_text(raw, encoding="utf-8")
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         await _boot(tmp_path)
     assert (tmp_path / "config.json").read_text(encoding="utf-8") == raw
 
@@ -142,7 +142,7 @@ async def test_the_original_config_file_is_never_rewritten(tmp_path: Path) -> No
 async def test_disabling_the_cli_entry_is_rejected(tmp_path: Path) -> None:
     """`EDG-108`：配置试图禁用 CLI 入口时显式拒绝并说明原因。"""
     write_config(tmp_path, plugins={"disable": ["cli-entry"]})
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _boot(tmp_path)
     assert caught.value.code is ErrorCode.CONFIG_INVALID
     assert caught.value.detail["pointer"] == "/plugins/disable"
@@ -277,7 +277,7 @@ async def test_missing_required_capabilities_fail_the_start(
 ) -> None:
     """§10.1 步骤 8：四项必需能力各须有一个生效实现，缺一即以 `CAPABILITY_MISSING` 终止。"""
     write_config(tmp_path)
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _boot(tmp_path, manifests=manifests_without(missing))
     assert caught.value.code is ErrorCode.CAPABILITY_MISSING
     assert caught.value.detail["kind"] == kind
@@ -286,7 +286,7 @@ async def test_missing_required_capabilities_fail_the_start(
 async def test_a_missing_model_name_names_the_field(tmp_path: Path) -> None:
     """「缺什么、去哪儿补」是启动错误的全部价值（`BAS-006` 的前身）。"""
     write_config(tmp_path, model={"provider": "fake"})
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _boot(tmp_path)
     assert caught.value.code is ErrorCode.CONFIG_INVALID
     assert caught.value.detail["pointer"] == "/model/name"
@@ -442,7 +442,7 @@ async def _wait_forever() -> None:
     await asyncio.Event().wait()
 
 
-def setup_with_side_effects(api: NucleaAPI) -> None:
+def setup_with_side_effects(api: KaryviaAPI) -> None:
     """留下两类必须回滚的 setup 副作用：事件订阅与后台任务。"""
     ctx = api.ctx
     assert isinstance(ctx, RuntimePluginContext)
@@ -459,7 +459,7 @@ def setup_with_side_effects(api: NucleaAPI) -> None:
     )
 
 
-def setup_optional_failure(api: NucleaAPI) -> None:
+def setup_optional_failure(api: KaryviaAPI) -> None:
     del api
     raise RuntimeError("boom")
 
@@ -604,7 +604,7 @@ async def test_a_named_memory_backend_is_wired_into_the_orchestrator(tmp_path: P
 async def test_naming_a_backend_that_is_not_registered_refuses_to_start(tmp_path: Path) -> None:
     """静默退回「没有记忆」会让用户以为记忆在工作。指针指向那一个要改的键。"""
     write_config(tmp_path, memory={"provider": "sqlite"})
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _boot(tmp_path, manifests=manifests_with_memory())
     assert caught.value.code is ErrorCode.CAPABILITY_MISSING
     assert caught.value.detail["field"] == "/memory/provider"

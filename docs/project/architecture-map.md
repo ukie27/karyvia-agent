@@ -71,7 +71,7 @@ runtime/
   selection.py      从有效能力中做显式选择
   plugin_context.py 生产 PluginContext
   access/            文件、HTTP、进程等受控资源门面
-  cli/               nm 命令外壳
+  cli/               karyvia 命令外壳
 ```
 
 判断所有权时以“谁能解释这条规则”为准。例如模型重试是所有模型共用的 Turn 机制，所以是
@@ -81,7 +81,7 @@ Builtin/Plugin。
 ## 3. 一条入站消息的主链路
 
 ```text
-Channel / nm run
+Channel / karyvia run
        │ InboundMessage
        ▼
 Instance input pump
@@ -128,7 +128,7 @@ OutboundMessage → Channel.deliver / CLI
 ## 4. 插件启动链路
 
 ```text
-~/.nucleamind/plugins.json
+~/.karyvia/plugins.json
        │ 先得到不导入代码也可知的 candidate id
        ▼
 plugins.enabled / plugins.disable 过滤
@@ -161,7 +161,7 @@ Lifecycle activate → ready → reverse-order stop
 任一步失败时先逆序清理这些运行资源，再释放实例锁；成功后所有权一次性交给
 `AgentInstance`。CLI 回落等二次装配也必须先撤销前一次尝试。
 
-安装链路与启动链路分开：`nm plugins install/update/uninstall` 在 Runtime 管理全局代码目录，
+安装链路与启动链路分开：`karyvia plugins install/update/uninstall` 在 Runtime 管理全局代码目录，
 实例只通过 `enabled/disable` 选择已安装候选。全局变更持有管理锁并确认所有实例已停止；默认
 Python 安装还会拒绝同名发行包的多版本集合。卸载不允许破坏仍被依赖的插件，跨实例配置与
 全局目录通过补偿事务一起提交或恢复。
@@ -171,7 +171,7 @@ Python 安装还会拒绝同名发行包的多版本集合。卸载不允许破�
 ```text
 schema.defaults()
       + config.json
-      + NUCLEAMIND_* env
+      + KARYVIA_* env
       + CLI overrides
               │
               ▼
@@ -186,7 +186,7 @@ schema.defaults()
                               runtime 组装具体能力
 ```
 
-Kernel Config 不写磁盘。`nm init` 和配置编辑只在 Runtime 中落盘，并在写回前经过
+Kernel Config 不写磁盘。`karyvia init` 和配置编辑只在 Runtime 中落盘，并在写回前经过
 `prepare_for_write()`。
 
 ## 6. 事件与诊断链路
@@ -210,7 +210,7 @@ producer ── bus.publish(name, correlation, payload, error)
 | 需求 | 首选接缝 | 不应采取的捷径 |
 |---|---|---|
 | 新模型厂商 | `MODEL` 插件 | 在 Kernel 加 provider 分支或猜测表 |
-| 新 Channel | `CHANNEL` 插件 + `nm serve` | 在 Runtime 写平台专用泵 |
+| 新 Channel | `CHANNEL` 插件 + `karyvia serve` | 在 Runtime 写平台专用泵 |
 | 新工具 | `TOOL` 插件和 `PluginContext` 资源服务 | 把 Runtime/Kernel 私有对象交给插件 |
 | 发送 workspace 文件 | `file.send` → `ToolResult.attachments` → Channel | 让工具直接调用平台 SDK |
 | 新 Context 来源 | `CONTEXT` 能力 | 把产品 prompt 写死在 Context Builder |

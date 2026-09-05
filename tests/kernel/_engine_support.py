@@ -17,7 +17,7 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     ChunkKind,
     Concurrency,
     Correlation,
@@ -42,7 +42,7 @@ from nucleamind.contracts import (
     ToolSpec,
     TurnId,
 )
-from nucleamind.kernel.turn import TERMINAL_EVENTS, CancelToken, TurnEvent
+from karyvia.kernel.turn import TERMINAL_EVENTS, CancelToken, TurnEvent
 
 __all__ = [
     "CORRELATION",

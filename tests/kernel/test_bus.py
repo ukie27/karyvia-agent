@@ -13,19 +13,19 @@ import json
 from datetime import UTC, datetime
 from typing import Final
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Correlation,
     ErrorCode,
     EventName,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     RuntimeEvent,
     SecretStr,
     SessionKey,
     TurnId,
 )
-from nucleamind.contracts.errors import MASK
-from nucleamind.kernel.observability import DEFAULT_MAX_STRIKES, EventBus
+from karyvia.contracts.errors import MASK
+from karyvia.kernel.observability import DEFAULT_MAX_STRIKES, EventBus
 
 INSTANCE: Final = InstanceId("inst-1")
 CORRELATION: Final = Correlation(
@@ -33,7 +33,7 @@ CORRELATION: Final = Correlation(
     session_key=SessionKey("cli", "local"),
     turn_id=TurnId("turn-1"),
 )
-SENTINEL: Final = "nm-sentinel-1c77e3aa-do-not-leak"
+SENTINEL: Final = "karyvia-sentinel-1c77e3aa-do-not-leak"
 
 
 class FakeClock:
@@ -293,7 +293,7 @@ def test_a_subscriber_may_cancel_another_mid_dispatch() -> None:
 
 def test_errors_ride_along_with_the_event() -> None:
     bus = _bus()
-    error = NucleaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "上游挂了。")
+    error = KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "上游挂了。")
     event = bus.publish(
         EventName.MODEL_REQUEST_FAILED, correlation=CORRELATION, error=error
     )

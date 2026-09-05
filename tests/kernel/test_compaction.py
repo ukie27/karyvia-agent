@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from nucleamind.contracts import ModelMessage, Role, SessionKey, SessionMessage, SessionSnapshot
-from nucleamind.kernel.turn.compaction import SessionCompactionTracker
-from nucleamind.kernel.turn.context_builder import replay_history
+from karyvia.contracts import ModelMessage, Role, SessionKey, SessionMessage, SessionSnapshot
+from karyvia.kernel.turn.compaction import SessionCompactionTracker
+from karyvia.kernel.turn.context_builder import replay_history
 
 NOW = datetime(2026, 8, 18, tzinfo=UTC)
 KEY = SessionKey("cli", "local")

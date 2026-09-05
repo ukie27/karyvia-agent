@@ -1,4 +1,4 @@
-# `nm` 命令参考
+# `karyvia` 命令参考
 
 八个子命令的完整参数、退出码，以及每条命令**不做**什么。
 
@@ -6,18 +6,18 @@
 [`getting-started.md`](./getting-started.md)。
 
 > 这份文档列出的子命令由 `tests/e2e/test_user_docs.py` 与
-> `src/nucleamind/runtime/cli/main.py` 的派发分支逐项比对，漏一条会让测试失败。
+> `src/karyvia/runtime/cli/main.py` 的派发分支逐项比对，漏一条会让测试失败。
 
 ## 顶层
 
 ```text
-nm <命令> [参数...]
+karyvia <命令> [参数...]
 ```
 
 | 选项 | 作用 |
 | --- | --- |
-| `--instance <名字>` | 选实例，默认 `default`（对应 `NUCLEAMIND_INSTANCE`） |
-| `--instance-dir <目录>` | 直接指定实例目录，**压过** `--instance`（对应 `NUCLEAMIND_INSTANCE_DIR`） |
+| `--instance <名字>` | 选实例，默认 `default`（对应 `KARYVIA_INSTANCE`） |
+| `--instance-dir <目录>` | 直接指定实例目录，**压过** `--instance`（对应 `KARYVIA_INSTANCE_DIR`） |
 | `--set <小节>.<字段>=<值>` | 本次运行的临时配置覆盖，可重复；值按 JSON 解一次 |
 | `-V`, `--version` | 打印版本 |
 | `-h`, `--help` | 打印总说明 |
@@ -29,18 +29,18 @@ nm <命令> [参数...]
 | 码 | 含义 |
 | --- | --- |
 | `0` | 成功 |
-| `1` | 命令跑完了但结论是失败（例如 `nm serve` 没有可服务的 Channel、`nm run -p` 的那一轮失败） |
-| `2` | 参数错、配置错、未知命令——任何 `NucleaError` 都折成这个码，并打印 `user_message` 与 `detail`（两者都已脱敏） |
-| `3` | 「无事可做」：`nm init` 时配置已存在、`nm plugins enable` 时本来就已启用、`purge` 没带 `--confirm` |
+| `1` | 命令跑完了但结论是失败（例如 `karyvia serve` 没有可服务的 Channel、`karyvia run -p` 的那一轮失败） |
+| `2` | 参数错、配置错、未知命令——任何 `KaryviaError` 都折成这个码，并打印 `user_message` 与 `detail`（两者都已脱敏） |
+| `3` | 「无事可做」：`karyvia init` 时配置已存在、`karyvia plugins enable` 时本来就已启用、`purge` 没带 `--confirm` |
 | `130` | 被 `Ctrl-C` 中断 |
 
 **用户看到的不该是 traceback**：启动失败最常见的原因是配置写错或凭据没导出，
 而那两件事的补救办法都写在错误的 `detail` 里。
 
-## `nm init`
+## `karyvia init`
 
 ```text
-nm init
+karyvia init
 ```
 
 在实例目录里生成 `config.json` 与 `config.schema.json`。
@@ -48,15 +48,15 @@ nm init
 - **既有 `config.json` 一个字节都不动**，这时退出码是 `3`——一个已经有配置的实例不需要
   被初始化，退让并把路径印出来比什么都不说有用。
 - 用 `O_CREAT|O_EXCL` 建文件，因此**没有 `--force`**：一个能覆盖用户配置的旋钮就是那条
-  需求的反面；两个 `nm init` 同时跑也不会有一个把另一个刚写的盖掉。
+  需求的反面；两个 `karyvia init` 同时跑也不会有一个把另一个刚写的盖掉。
 - `config.schema.json` 是**我们生成的**，不是你的资产：内容与当前字段表不一致就会被刷新
-  （内容相同则一个字节都不写，免得每次 `nm init` 都改一次 mtime）。
+  （内容相同则一个字节都不写，免得每次 `karyvia init` 都改一次 mtime）。
 - **不取实例锁**：生成配置与「另一个实例正在跑」无关。
 
-## `nm run`
+## `karyvia run`
 
 ```text
-nm run [-p 提示词] [--reasoning]
+karyvia run [-p 提示词] [--reasoning]
 ```
 
 装配实例并把进程交给 CLI 入口能力。
@@ -79,12 +79,12 @@ nm run [-p 提示词] [--reasoning]
 **首次运行只生成配置就退出**（退出码 `0`）：紧接着进会话看起来更顺手，却会让同一条命令
 有两种结局，取决于你有没有提前 export 那个环境变量。首次运行恰恰是最需要确定性的时刻。
 
-`-p` / `--reasoning` 由 **CLI 入口能力**解析，不是 `nm` 本身——那条能力可以被插件覆盖。
+`-p` / `--reasoning` 由 **CLI 入口能力**解析，不是 `karyvia` 本身——那条能力可以被插件覆盖。
 
-## `nm serve`
+## `karyvia serve`
 
 ```text
-nm serve [--host <地址>] [--port <端口>]
+karyvia serve [--host <地址>] [--port <端口>]
 ```
 
 无头模式：装配实例 → `start()` → 等信号 → `stop()`。它启动**全部已启用的 Channel 能力**
@@ -95,15 +95,15 @@ nm serve [--host <地址>] [--port <端口>]
   （等价于 `--set plugins.openai-api.config.port=...`）。这条命令本身不认识任何协议，
   但这两个参数是网络 Channel 的公分母、而 `--set` 的完整路径写起来太长。
   别的 Channel 的监听参数一律走 `--set`。
-- 没有任何可服务的 Channel 时退出码 `1` 并指路 `nm plugins list`。
+- 没有任何可服务的 Channel 时退出码 `1` 并指路 `karyvia plugins list`。
 - `Ctrl-C` **只有一档**（这里没有阻塞在 `readline()` 的线程）：按一次就干净地走完
   `stop()`，在跑的 turn 先被请求取消、已产生的内容因此落库。停止过程中再按一次才强制退出。
-- 配置文件不存在时与 `nm run` 走完全同一条首次运行分支：只生成、只指路。
+- 配置文件不存在时与 `karyvia run` 走完全同一条首次运行分支：只生成、只指路。
 
-## `nm config show`
+## `karyvia config show`
 
 ```text
-nm config show [--origins] [--json]
+karyvia config show [--origins] [--json]
 ```
 
 | 选项 | 作用 |
@@ -116,11 +116,11 @@ nm config show [--origins] [--json]
 明文凭据**结构性地**不在输出里：配置树自始至终持有 `${VAR}` 字面量，
 所以你会看到 `${OPENAI_API_KEY}` 而不是 `***`。
 
-## `nm session`
+## `karyvia session`
 
 ```text
-nm session list
-nm session show <会话 id>
+karyvia session list
+karyvia session show <会话 id>
 ```
 
 会话 id 就是 `SessionKey.storage_id()`，形如 `cli~local~default`；`list` 会把它印出来。
@@ -130,34 +130,34 @@ nm session show <会话 id>
 - 读的是**生效的** `SessionStore`——被插件覆盖过就读插件那份。
 - **没有删除或压缩**：那是有副作用的操作，要单独的确认流程。
 
-## `nm plugins`
+## `karyvia plugins`
 
 ```text
-nm plugins install   <包名、路径或 URL>
-nm plugins update    <插件 id>
-nm plugins uninstall <插件 id>
-nm plugins list [--json]
-nm plugins enable    <插件 id>
-nm plugins disable   <插件 id>
-nm plugins purge     <插件 id> --confirm
+karyvia plugins install   <包名、路径或 URL>
+karyvia plugins update    <插件 id>
+karyvia plugins uninstall <插件 id>
+karyvia plugins list [--json]
+karyvia plugins enable    <插件 id>
+karyvia plugins disable   <插件 id>
+karyvia plugins purge     <插件 id> --confirm
 ```
 
 | 子命令 | 做什么 |
 | --- | --- |
-| `install` | 把插件全局安装到 `~/.nucleamind/plugin-packages/<id>/`，验证逻辑依赖和 Python 发行包版本集合，不自动为任何实例启用 |
+| `install` | 把插件全局安装到 `~/.karyvia/plugin-packages/<id>/`，验证逻辑依赖和 Python 发行包版本集合，不自动为任何实例启用 |
 | `update` | 从安装记录里的来源更新全局插件；依赖集合不兼容时保持旧版本 |
 | `uninstall` | 无其他插件依赖它时删除全局代码，并事务性清除所有已知实例中的配置引用；实例状态目录默认保留 |
-| `list` | 列出已发现的插件、状态、版本与能力（内建不在这张表里，看 `nm capabilities`） |
+| `list` | 列出已发现的插件、状态、版本与能力（内建不在这张表里，看 `karyvia capabilities`） |
 | `enable` | 外部插件写入 `plugins.enabled` 并从 `plugins.disable` 移除；内建插件本来就存在，因此只撤销 `disable`，不会伪造成外部安装引用 |
 | `disable` | 写入 `plugins.disable`，**不动 `enabled`**（这样 `enable` 才是它的逆操作）。对内建同样有效 |
 | `purge` | 删除插件的状态目录 |
 
 - `install` / `update` / `uninstall` 是**全局操作**，不接受 `--instance`、
   `--instance-dir` 或 `--set`。执行时必须先停止所有实例；这样运行中的实例不会突然失去
-  已导入代码。全局文件直接位于 `~/.nucleamind/`，没有额外的 `global/` 目录。
+  已导入代码。全局文件直接位于 `~/.karyvia/`，没有额外的 `global/` 目录。
 - 默认安装会记录插件目录中实际解析出的 Python 发行包版本；两个插件需要同一发行包的不同
   版本时，安装或更新会拒绝发布。`install --no-deps` 表示只安装插件自身，其余 Python 依赖
-  由启动 `nm` 的环境负责，而不是由插件管理器检查。
+  由启动 `karyvia` 的环境负责，而不是由插件管理器检查。
 - 外部插件 id 不能冒用内建插件 id；替换内建能力应在 manifest 中声明 `overrides`。
 - 卸载仍被其他已安装插件依赖的插件会被拒绝。卸载写多个实例配置时，任何一步失败都会恢复
   已经修改的配置，并保留全局插件。
@@ -170,13 +170,13 @@ nm plugins purge     <插件 id> --confirm
   不足以让你知道自己将要失去什么。
 - `list` / `enable` / `disable` / `purge` 是实例操作；前三者的改动要等实例重启后生效。
 
-**`nm plugins enable|disable|uninstall` 是 `config.json` 唯一的修改点**
-（`nm init` 是唯一的创建点，加载路径只读）。
+**`karyvia plugins enable|disable|uninstall` 是 `config.json` 唯一的修改点**
+（`karyvia init` 是唯一的创建点，加载路径只读）。
 
-## `nm capabilities`
+## `karyvia capabilities`
 
 ```text
-nm capabilities [--json]
+karyvia capabilities [--json]
 ```
 
 跑一次只读装配，打印覆盖解析报告的四段：**生效 / 被覆盖 / 已禁用 / 冲突**，
@@ -187,12 +187,12 @@ nm capabilities [--json]
   「零条」是一条有价值的结论。
 - **冲突印出来而不是抛出去**：对这条命令来说冲突恰恰是要看的东西，
   把它折成一条退出码 2 的诊断只会少印另外三段。
-- 与 `nm plugins list` / `nm session` 一样走只读诊断路径：不取实例锁、不写业务状态、
+- 与 `karyvia plugins list` / `karyvia session` 一样走只读诊断路径：不取实例锁、不写业务状态、
   不装编排器、不做启动期的「必需能力」判定。
 
 ## 斜杠命令（会话里）
 
-它们**不是** `nm` 的子命令，而是在对话里输入的、由分流器路由的命令。内建六条：
+它们**不是** `karyvia` 的子命令，而是在对话里输入的、由分流器路由的命令。内建六条：
 
 ```text
 /help  /config  /session  /plugins  /capabilities  /cancel

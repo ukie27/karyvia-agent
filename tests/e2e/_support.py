@@ -16,7 +16,7 @@ from collections.abc import Callable, Mapping, Sequence
 
 import httpx
 
-from nucleamind.contracts import JsonValue
+from karyvia.contracts import JsonValue
 
 __all__ = ["say", "sse_response", "use_tool"]
 

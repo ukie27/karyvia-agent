@@ -7,8 +7,8 @@ barrier 会直接死锁，而时序痕迹在慢机器上会给出假阳性。
 
 from __future__ import annotations
 
-from nucleamind.contracts import Concurrency, ToolSpec
-from nucleamind.kernel.turn.scheduling import partition_tool_batches
+from karyvia.contracts import Concurrency, ToolSpec
+from karyvia.kernel.turn.scheduling import partition_tool_batches
 
 from ._engine_support import tool_call, tool_spec
 

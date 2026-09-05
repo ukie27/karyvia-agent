@@ -20,7 +20,7 @@ from typing import Any
 
 import pytest
 
-from nucleamind.runtime.plugin_home import NUCLEAMIND_HOME_ENV
+from karyvia.runtime.plugin_home import KARYVIA_HOME_ENV
 
 #: 允许的目标。事件循环的 self-pipe 只连这几个。
 _LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost", "", None})
@@ -67,5 +67,5 @@ def isolated_plugin_home(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[None]:
     """全局插件目录属于用户数据；Runtime 测试不得读写开发者真实的 home。"""
-    monkeypatch.setenv(NUCLEAMIND_HOME_ENV, str(tmp_path / ".nucleamind"))
+    monkeypatch.setenv(KARYVIA_HOME_ENV, str(tmp_path / ".karyvia"))
     yield

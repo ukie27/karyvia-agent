@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from nucleamind.builtins.context_compact_basic import BasicTurnContextCompactor
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS, CONTEXT_COMPACT_BASIC
-from nucleamind.contracts import CapabilityKind
-from nucleamind.sdk.testing import TurnContextCompactorContract
+from karyvia.builtins.context_compact_basic import BasicTurnContextCompactor
+from karyvia.builtins.registry import BUILTIN_MANIFESTS, CONTEXT_COMPACT_BASIC
+from karyvia.contracts import CapabilityKind
+from karyvia.sdk.testing import TurnContextCompactorContract
 
 
 class TestBasicTurnContextCompactorContract(TurnContextCompactorContract):

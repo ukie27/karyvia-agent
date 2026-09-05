@@ -26,7 +26,7 @@ from dataclasses import replace
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelReason,
     ChunkKind,
     Concurrency,
@@ -35,15 +35,15 @@ from nucleamind.contracts import (
     HookContext,
     HookName,
     HookOutcome,
+    KaryviaError,
     ModelChunk,
-    NucleaError,
     Role,
     SideEffect,
     StopReason,
     ToolResult,
     TurnStatus,
 )
-from nucleamind.kernel.turn import (
+from karyvia.kernel.turn import (
     ENGINE_HOOKS,
     BudgetLedger,
     CancelToken,
@@ -83,7 +83,7 @@ from ._engine_support import (
     user_message,
 )
 
-ENGINE_PATH = pathlib.Path(__file__).resolve().parents[2] / "src/nucleamind/kernel/turn/engine.py"
+ENGINE_PATH = pathlib.Path(__file__).resolve().parents[2] / "src/karyvia/kernel/turn/engine.py"
 
 
 def build_deps(
@@ -614,7 +614,7 @@ def test_terminal_from_error_without_checkpoint() -> None:
     """`raise_if_requested()`（而非 `checkpoint()`）抛出的取消没有检查点，不许乱猜一个。"""
     token = CancelToken()
     token.request(CancelReason.USER)
-    error = pytest.raises(NucleaError, token.raise_if_requested).value
+    error = pytest.raises(KaryviaError, token.raise_if_requested).value
     terminal = terminal_from_error(error, reason=token.reason, iterations=2, tool_calls=1)
 
     assert isinstance(terminal, TurnCancelled)
@@ -624,7 +624,7 @@ def test_terminal_from_error_without_checkpoint() -> None:
 
 def test_terminal_from_error_falls_back_to_the_code_when_reason_is_unknown() -> None:
     """能力实现自己抛的取消错误没有令牌可查，只能按错误码反查。"""
-    error = NucleaError(ErrorCode.CANCELLED_BY_SHUTDOWN, "实例要关了")
+    error = KaryviaError(ErrorCode.CANCELLED_BY_SHUTDOWN, "实例要关了")
     terminal = terminal_from_error(error, reason=None, iterations=0, tool_calls=0)
     assert isinstance(terminal, TurnCancelled)
     assert terminal.reason is CancelReason.SHUTDOWN
@@ -802,7 +802,7 @@ async def test_reject_on_a_hook_that_does_not_support_it_fails_the_turn() -> Non
 
 
 async def test_model_complete_error_becomes_turn_failed() -> None:
-    boom = NucleaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "供应商 500")
+    boom = KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "供应商 500")
     events = await collect(
         run_turn(make_request(), build_deps(ScriptedProvider([boom])), CancelToken())
     )
@@ -812,7 +812,7 @@ async def test_model_complete_error_becomes_turn_failed() -> None:
 
 
 async def test_model_stream_error_becomes_turn_failed() -> None:
-    boom = NucleaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "流断了")
+    boom = KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, "流断了")
     events = await collect(
         run_turn(make_request(stream=True), build_deps(ScriptedProvider([boom])), CancelToken())
     )
@@ -840,7 +840,7 @@ async def test_tool_prepare_error_becomes_turn_failed() -> None:
 
 async def test_hook_error_becomes_turn_failed() -> None:
     hooks = RecordingHookDispatcher(
-        {HookName.BEFORE_MODEL_REQUEST: NucleaError(ErrorCode.PLUGIN_HOOK_FAILED, "插件炸了")}
+        {HookName.BEFORE_MODEL_REQUEST: KaryviaError(ErrorCode.PLUGIN_HOOK_FAILED, "插件炸了")}
     )
     model = ScriptedProvider([text_response()])
     events = await collect(run_turn(make_request(), build_deps(model, hooks=hooks), CancelToken()))
@@ -945,7 +945,7 @@ async def test_provider_error_chunk_fails_the_turn_but_keeps_deltas() -> None:
 
 async def test_max_tokens_turn_is_marked_truncated() -> None:
     """续写上限耗尽后，engine 才把 `TurnCompleted.truncated` 置为 `True`（`EDG-304`）。"""
-    from nucleamind.contracts import ModelResponse
+    from karyvia.contracts import ModelResponse
 
     response = ModelResponse(
         model_id="fake-model", stop_reason=StopReason.MAX_TOKENS, content="被截断的答案"
@@ -962,7 +962,7 @@ async def test_max_tokens_turn_is_marked_truncated() -> None:
 
 async def test_max_tokens_response_is_continued_with_previous_assistant_message() -> None:
     """`MAX_TOKENS` 续写共享 ledger，并把每一段 assistant 消息带回下一次请求。"""
-    from nucleamind.contracts import ModelResponse
+    from karyvia.contracts import ModelResponse
 
     model = ScriptedProvider(
         [
@@ -990,7 +990,7 @@ async def test_max_tokens_response_is_continued_with_previous_assistant_message(
 
 async def test_max_tokens_continuation_does_not_repeat_tool_calls() -> None:
     """续写发生在工具循环之后时，不会从头执行已经完成的工具。"""
-    from nucleamind.contracts import ModelResponse
+    from karyvia.contracts import ModelResponse
 
     model = ScriptedProvider(
         [
@@ -1034,7 +1034,7 @@ async def test_end_turn_is_not_marked_truncated() -> None:
 #: `engine.py` 允许出现的模块级 import 根名。新增一项等于给 engine 开一条新的外部通道，
 #: 必须走评审——这正是这条守卫存在的意义。`asyncio` 不在此列：并发调度在 `scheduling.py`。
 ALLOWED_ENGINE_IMPORTS = frozenset(
-    {"__future__", "collections", "dataclasses", "nucleamind", "typing"}
+    {"__future__", "collections", "dataclasses", "karyvia", "typing"}
 )
 
 #: 只要出现就说明 engine 在自己做 IO。

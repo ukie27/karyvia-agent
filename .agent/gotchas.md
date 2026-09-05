@@ -14,7 +14,7 @@
 `testpaths` 一次收集整个 `plugins/`，而 pytest 按**模块名**去重。两个插件各有一个
 `test_stream.py` 或 `_fakes.py` 时，先被导入的会顶掉后一个，另一棵测试树整体
 `ImportError`。**单独跑各自的目录看不出来，跑全量才炸。**
-照 `plugins/nucleamind-plugin-feishu/tests/` 的命名切。
+照 `plugins/karyvia-plugin-feishu/tests/` 的命名切。
 
 ## 配置的 `${VAR}` 引用
 
@@ -31,7 +31,7 @@ shell 那种带默认值的语法：
 
 ## Windows 兼容
 
-NucleaMind 明确支持 Windows。几处容易踩的：
+Karyvia 明确支持 Windows。几处容易踩的：
 
 - **起子进程必须走 `create_subprocess_shell`**（`builtins/tools_shell/command.py` 的模块
   docstring 是唯一出处）：`cmd.exe` 接在 `/c` 后的是原始命令行尾巴，而 `subprocess` 用
@@ -68,6 +68,6 @@ NucleaMind 明确支持 Windows。几处容易踩的：
 
 签名是 `Callable[[RuntimeEvent], None]`，Kernel 在**发布事件的同一个栈**里调它——任何
 `await` 都会把 turn 的执行卡在回调上。要异步处理就在回调里 `put_nowait` 进自己的**有界**
-队列，再由一条后台任务消费（`plugins/nucleamind-plugin-feishu/` 的 `_drain_hints`）。
+队列，再由一条后台任务消费（`plugins/karyvia-plugin-feishu/` 的 `_drain_hints`）。
 
 连续 5 次失败、或单次投递超过 50 ms 达 5 次，订阅者会被**自动退订**——查 `bus.health()`。

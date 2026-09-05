@@ -23,20 +23,20 @@ import ast
 import inspect
 from pathlib import Path
 
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS
-from nucleamind.contracts import (
+from karyvia.builtins.registry import BUILTIN_MANIFESTS
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     Plugin,
     PluginId,
     ToolSpec,
 )
-from nucleamind.kernel.plugins import SetupFn, model_providers_from
-from nucleamind.kernel.registry import BUILTIN_BASE_PRIORITY, PLUGIN_BASE_PRIORITY
-from nucleamind.runtime import wiring
-from nucleamind.runtime.wiring import to_declaration, to_load_request, wire_capabilities
-from nucleamind.sdk import CapabilityDecl, PluginContext, PluginManifest, parse_manifest
-from nucleamind.sdk.testing import EchoTool, FakeModelProvider, FakePluginContext
+from karyvia.kernel.plugins import SetupFn, model_providers_from
+from karyvia.kernel.registry import BUILTIN_BASE_PRIORITY, PLUGIN_BASE_PRIORITY
+from karyvia.runtime import wiring
+from karyvia.runtime.wiring import to_declaration, to_load_request, wire_capabilities
+from karyvia.sdk import CapabilityDecl, PluginContext, PluginManifest, parse_manifest
+from karyvia.sdk.testing import EchoTool, FakeModelProvider, FakePluginContext
 
 # ------------------------------------------------------------------------------------ 夹具
 
@@ -183,8 +183,8 @@ async def test_a_provider_failure_is_reported_but_still_freezes() -> None:
 def test_the_host_conformance_annotation_is_still_there() -> None:
     """证明由 basedpyright 完成，但测试验不了它（`exclude = ["**/tests"]`）。
 
-    能验的只有「那句 `conformance: NucleaAPI = host` 还在」——有人把它删掉或改成
-    `cast(NucleaAPI, host)`，Host 与 SDK 表面的一致性就再没有任何东西盯着了。
+    能验的只有「那句 `conformance: KaryviaAPI = host` 还在」——有人把它删掉或改成
+    `cast(KaryviaAPI, host)`，Host 与 SDK 表面的一致性就再没有任何东西盯着了。
     """
     source = Path(inspect.getsourcefile(wiring) or "").read_text(encoding="utf-8")
     annotated = [
@@ -192,9 +192,9 @@ def test_the_host_conformance_annotation_is_still_there() -> None:
         for node in ast.walk(ast.parse(source))
         if isinstance(node, ast.AnnAssign)
         and isinstance(node.annotation, ast.Name)
-        and node.annotation.id == "NucleaAPI"
+        and node.annotation.id == "KaryviaAPI"
     ]
-    assert annotated, "runtime/wiring.py 里必须有一句 `x: NucleaAPI = host` 作为一致性证明"
+    assert annotated, "runtime/wiring.py 里必须有一句 `x: KaryviaAPI = host` 作为一致性证明"
     assert "cast" not in source, "一致性证明不得用 cast 绕过——那会让类型检查器闭嘴"
 
 

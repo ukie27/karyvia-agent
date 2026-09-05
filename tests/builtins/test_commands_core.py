@@ -28,7 +28,7 @@ from typing import Final
 
 import pytest
 
-from nucleamind.builtins.commands_core import (
+from karyvia.builtins.commands_core import (
     COMMAND_NAMES,
     CONFIG_DISABLE_KEY,
     CONFIG_MAX_OUTPUT_CHARS_KEY,
@@ -40,14 +40,14 @@ from nucleamind.builtins.commands_core import (
     setup,
     truncate,
 )
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS, COMMANDS_CORE
-from nucleamind.contracts import (
+from karyvia.builtins.registry import BUILTIN_MANIFESTS, COMMANDS_CORE
+from karyvia.contracts import (
     Correlation,
     Disposition,
     ErrorCode,
     InboundMessage,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     Role,
     Sender,
     SessionKey,
@@ -55,9 +55,9 @@ from nucleamind.contracts import (
     SessionSnapshot,
     TurnId,
 )
-from nucleamind.kernel.routing import Dispatcher, build_command_index
-from nucleamind.runtime.wiring import wire_capabilities
-from nucleamind.sdk.testing import (
+from karyvia.kernel.routing import Dispatcher, build_command_index
+from karyvia.runtime.wiring import wire_capabilities
+from karyvia.sdk.testing import (
     FakeInstanceView,
     FakePluginContext,
     FakeTurnControl,
@@ -398,11 +398,11 @@ class TestFailureIsDiagnostic:
         assert SECRET not in repr(error)
         assert error.detail["error_type"] == "RuntimeError"
 
-    async def test_nuclea_error_passes_through_unchanged(self) -> None:
+    async def test_karyvia_error_passes_through_unchanged(self) -> None:
         """实现方给的诊断比 Kernel 能编的更准，原样带出。"""
         class Failing(FakeInstanceView):
             def plugins(self) -> tuple[object, ...]:  # type: ignore[override]
-                raise NucleaError(ErrorCode.PERSISTENCE_READ_FAILED, "插件状态读不出来。")
+                raise KaryviaError(ErrorCode.PERSISTENCE_READ_FAILED, "插件状态读不出来。")
 
         dispatcher, _ = await wire(view=Failing())
         outcome = await run(dispatcher, "/plugins")
@@ -433,7 +433,7 @@ class TestRegistration:
             assert outcome.disposition is not Disposition.MODEL_TURN  # type: ignore[attr-defined]
 
     def test_setup_is_the_documented_entry_point(self) -> None:
-        assert COMMANDS_CORE.setup == "nucleamind.builtins.commands_core:setup"
+        assert COMMANDS_CORE.setup == "karyvia.builtins.commands_core:setup"
         assert callable(setup)
 
 
@@ -456,12 +456,12 @@ class TestSingleCommandDisable:
 
     def test_unknown_name_in_disable_is_rejected(self) -> None:
         """静默忽略拼错的名字，用户会以为自己关掉了 `/config` 而它其实还在。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             enabled_command_names({CONFIG_DISABLE_KEY: ["cnofig"]})
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
     def test_disable_must_be_a_list(self) -> None:
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             enabled_command_names({CONFIG_DISABLE_KEY: "config"})
 
     async def test_forgetting_keep_makes_the_load_fail_loudly(self) -> None:
@@ -491,20 +491,20 @@ class TestSettings:
     @pytest.mark.parametrize("bad", [0, -1, True, "16384", 1.5])
     def test_max_output_chars_rejects_bad_values(self, bad: object) -> None:
         """`bool` 是 `int` 的子类，`True` 会被当成 1——那不是用户的意思。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings({CONFIG_MAX_OUTPUT_CHARS_KEY: bad})
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
     def test_config_is_validated_at_setup_not_at_first_use(self) -> None:
         """一份写错的配置应当在启动时被指出来。"""
         api = _RecordingApi(FakePluginContext("commands-core", config={CONFIG_DISABLE_KEY: ["x"]}))  # type: ignore[arg-type]
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             setup(api)
         assert api.registered == []
 
 
 class _RecordingApi:
-    """最小的 `NucleaAPI` 替身：只记下注册了什么。"""
+    """最小的 `KaryviaAPI` 替身：只记下注册了什么。"""
 
     def __init__(self, ctx: FakePluginContext) -> None:
         self._ctx = ctx

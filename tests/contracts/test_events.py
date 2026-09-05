@@ -7,18 +7,18 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Correlation,
     ErrorCategory,
     ErrorCode,
     EventFamily,
     EventName,
-    NucleaError,
+    KaryviaError,
     RuntimeEvent,
     SessionKey,
 )
-from nucleamind.contracts.errors import MASK
-from nucleamind.contracts.ids import InstanceId, TurnId
+from karyvia.contracts.errors import MASK
+from karyvia.contracts.ids import InstanceId, TurnId
 
 INSTANCE = InstanceId("default")
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
@@ -130,19 +130,19 @@ def test_event_exposes_family() -> None:
 
 
 def test_sequence_must_be_non_negative() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         _event(sequence=-1)
     assert excinfo.value.category is ErrorCategory.KERNEL_INTERNAL
 
 
 def test_timestamp_must_be_timezone_aware() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         _event(occurred_at=datetime(2026, 8, 10, 12, 0))  # noqa: DTZ001
     assert excinfo.value.category is ErrorCategory.KERNEL_INTERNAL
 
 
 def test_correlation_instance_must_match_event_instance() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         _event(instance_id=InstanceId("other"))
     assert excinfo.value.category is ErrorCategory.KERNEL_INTERNAL
 
@@ -187,7 +187,7 @@ def test_payload_snapshot_is_detached_from_caller() -> None:
 
 
 def test_event_can_carry_an_error() -> None:
-    error = NucleaError(ErrorCode.TIMEOUT_MODEL_REQUEST, "模型请求超时", retryable=True)
+    error = KaryviaError(ErrorCode.TIMEOUT_MODEL_REQUEST, "模型请求超时", retryable=True)
     event = _event(name=EventName.MODEL_REQUEST_FAILED, error=error)
     assert event.error is error
     assert event.family is EventFamily.MODEL

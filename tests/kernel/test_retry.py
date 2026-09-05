@@ -19,20 +19,20 @@ from collections.abc import AsyncIterator, Sequence
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelReason,
     ChunkKind,
     ErrorCode,
     EventName,
+    KaryviaError,
     ModelChunk,
     ModelRequest,
     ModelResponse,
-    NucleaError,
     OpaqueBlock,
     StopReason,
 )
-from nucleamind.kernel.observability import EventBus
-from nucleamind.kernel.turn import (
+from karyvia.kernel.observability import EventBus
+from karyvia.kernel.turn import (
     MAX_HELD_CHUNKS,
     BudgetLedger,
     CancelToken,
@@ -58,15 +58,15 @@ FAST = RetryPolicy(max_attempts=3, base_delay_ms=1, max_delay_ms=1)
 STEADY = 1.0  # 常量 jitter：系数恒为 (0.5 + 0.5*1.0) = 1.0，延迟因此等于计算出的上界。
 
 
-def flaky(message: str = "上游抖了一下", **detail: int) -> NucleaError:
+def flaky(message: str = "上游抖了一下", **detail: int) -> KaryviaError:
     """一个如实标了 `retryable=True` 的外部故障，形状同 `model_openai/faults.py`。"""
-    return NucleaError(
+    return KaryviaError(
         ErrorCode.EXTERNAL_MODEL_PROVIDER, message, detail=dict(detail), retryable=True
     )
 
 
-def fatal(message: str = "参数不对") -> NucleaError:
-    return NucleaError(ErrorCode.INPUT_MALFORMED, message)
+def fatal(message: str = "参数不对") -> KaryviaError:
+    return KaryviaError(ErrorCode.INPUT_MALFORMED, message)
 
 
 def empty_stream(stop: StopReason = StopReason.END_TURN) -> list[ModelChunk]:
@@ -123,7 +123,7 @@ class TestRetryDecision:
         token.request(CancelReason.USER)
         try:
             token.raise_if_requested()
-        except NucleaError as cancelled:
+        except KaryviaError as cancelled:
             assert cancelled.retryable is True, "前提变了：取消错误不再自称可重试"
             assert retry_delay_ms(cancelled, 1, FAST, jitter=lambda: STEADY) is None
 
@@ -160,7 +160,7 @@ class TestRetryDecision:
     def test_a_malformed_hint_falls_back_to_the_computed_backoff(self) -> None:
         """`detail` 是自由载荷，形状不对时不能让整条判定崩掉。"""
         policy = RetryPolicy(max_attempts=2, base_delay_ms=100, max_delay_ms=100)
-        broken = NucleaError(
+        broken = KaryviaError(
             ErrorCode.EXTERNAL_MODEL_PROVIDER, "限流", detail={"retry_after_ms": "soon"}, retryable=True
         )
         assert retry_delay_ms(broken, 1, policy, jitter=lambda: STEADY) == 100
@@ -169,14 +169,14 @@ class TestRetryDecision:
 class TestRetryPolicy:
     def test_the_three_numbers_must_be_positive(self) -> None:
         for field in ("max_attempts", "base_delay_ms", "max_delay_ms"):
-            with pytest.raises(NucleaError) as excinfo:
+            with pytest.raises(KaryviaError) as excinfo:
                 RetryPolicy(**{field: 0})  # type: ignore[arg-type]  # boundary: 故意的坏值
             assert excinfo.value.code is ErrorCode.CONFIG_INVALID
             assert excinfo.value.detail["field"] == field
 
     def test_a_bool_is_not_an_int_here(self) -> None:
         """`True == 1` 在 Python 里成立，而「重试 True 次」不是一个配置。"""
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             RetryPolicy(max_attempts=True)  # type: ignore[arg-type]  # boundary: 故意的坏值
 
 
@@ -233,7 +233,7 @@ class TestComplete:
         """抛的是供应商那条错误而不是一条「重试失败了」——用户要看到真正的原因。"""
         wrapped = Wrapped([flaky("模型供应商限流。"), flaky("模型供应商限流。"), flaky("模型供应商限流。")])
 
-        with pytest.raises(NucleaError) as excinfo:
+        with pytest.raises(KaryviaError) as excinfo:
             await wrapped.model.complete(make_request(), CancelToken())
 
         assert excinfo.value.code is ErrorCode.EXTERNAL_MODEL_PROVIDER
@@ -244,7 +244,7 @@ class TestComplete:
     async def test_a_non_retryable_error_is_raised_on_the_first_try(self) -> None:
         wrapped = Wrapped([fatal()])
 
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             await wrapped.model.complete(make_request(), CancelToken())
 
         assert wrapped.inner.call_count == 1
@@ -257,7 +257,7 @@ class TestComplete:
             limits=TurnLimits(turn_timeout_ms=1_000),
         )
 
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             await wrapped.model.complete(make_request(), CancelToken())
 
         assert wrapped.inner.call_count == 1
@@ -315,7 +315,7 @@ class TestStream:
         )
 
         seen: list[ModelChunk] = []
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             async for chunk in model.stream(make_request(stream=True), CancelToken()):
                 seen.append(chunk)
 
@@ -407,7 +407,7 @@ class TestEmptyResponse:
         """三次都空 → turn `FAILED`，而 `_finish` 会把这句话当正文发出去。"""
         wrapped = Wrapped([text_response(""), text_response(""), text_response("")])
 
-        with pytest.raises(NucleaError) as excinfo:
+        with pytest.raises(KaryviaError) as excinfo:
             await wrapped.model.complete(make_request(), CancelToken())
 
         assert excinfo.value.code is ErrorCode.EXTERNAL_MODEL_PROVIDER
@@ -465,7 +465,7 @@ class TestCancellation:
         token = CancelToken()
         token.request(CancelReason.USER)
 
-        with pytest.raises(NucleaError) as excinfo:
+        with pytest.raises(KaryviaError) as excinfo:
             await wrapped.model.complete(make_request(), token)
 
         assert excinfo.value.code is ErrorCode.CANCELLED_BY_USER

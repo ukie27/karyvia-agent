@@ -7,8 +7,8 @@ x-bwrap-security: &bwrap-security
 
 # 服务名与 docker-compose.yml 同步（`D31` 起只剩两个）。
 services:
-  nucleamind-serve:
+  karyvia-serve:
     <<: *bwrap-security
 
-  nucleamind-cli:
+  karyvia-cli:
     <<: *bwrap-security

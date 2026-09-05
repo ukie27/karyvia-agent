@@ -6,17 +6,17 @@
 命令参数见 [`cli.md`](./cli.md)。
 
 > 这份文档里的字段表由 `tests/e2e/test_user_docs.py` 直接与
-> `src/nucleamind/kernel/config/schema.py::SECTION_SPECS` 逐项比对——那张表是
+> `src/karyvia/kernel/config/schema.py::SECTION_SPECS` 逐项比对——那张表是
 > `extra="forbid"` 的唯一依据，也是这里每一行的来源。漂移会让测试失败。
 
 ## 1. 实例布局
 
 一个**实例**是一份配置 + 一份数据。命名实例统一落在
-`~/.nucleamind/instances/<实例名>/`：
+`~/.karyvia/instances/<实例名>/`：
 
 ```text
-~/.nucleamind/instances/default/
-├── config.json            # 你的配置（nm init 建，nm plugins enable 改，加载路径只读）
+~/.karyvia/instances/default/
+├── config.json            # 你的配置（karyvia init 建，karyvia plugins enable 改，加载路径只读）
 ├── config.schema.json     # 派生 JSON Schema，供编辑器补全，运行期忽略
 ├── instance.lock          # 实例锁，同一实例目录同时只跑一个进程
 ├── sessions/              # 内建会话存储（见 session-storage.md）
@@ -25,16 +25,16 @@
 └── workspace/             # 工作区：文件工具与 ctx.fs 的根
 ```
 
-`NUCLEAMIND_HOME` 可以改变数据根本身；它直接指向原本的 `~/.nucleamind/` 这一层，命名
+`KARYVIA_HOME` 可以改变数据根本身；它直接指向原本的 `~/.karyvia/` 这一层，命名
 实例仍统一放在其 `instances/` 子目录。
 
 选实例的三种方式，优先级从高到低：
 
 | 方式 | 例子 |
 | --- | --- |
-| `--instance-dir <目录>` / `NUCLEAMIND_INSTANCE_DIR` | 直接指定目录，跳过命名实例目录的推导 |
-| `--instance <名字>` / `NUCLEAMIND_INSTANCE` | 目录落在 `~/.nucleamind/instances/` 下 |
-| 都不给 | `~/.nucleamind/instances/default/` |
+| `--instance-dir <目录>` / `KARYVIA_INSTANCE_DIR` | 直接指定目录，跳过命名实例目录的推导 |
+| `--instance <名字>` / `KARYVIA_INSTANCE` | 目录落在 `~/.karyvia/instances/` 下 |
+| 都不给 | `~/.karyvia/instances/default/` |
 
 **布局在配置之前解析**：要先知道 `config.json` 在哪才能读它。因此 `workspace.root`
 只能改 workspace，永远改不了实例目录本身。实例名会成为一段路径分量，长度上限 64。
@@ -50,7 +50,7 @@ default  <  config.json  <  env  <  cli
 的答案，而不是「查不到来源」：
 
 ```bash
-nm config show --origins
+karyvia config show --origins
 ```
 
 三种覆盖方式：
@@ -58,11 +58,11 @@ nm config show --origins
 | 层 | 怎么写 | 例子 |
 | --- | --- | --- |
 | `config.json` | 直接编辑 | `{"turn": {"max_iterations": 32}}` |
-| `env` | `NUCLEAMIND_CFG_<小节>__<字段>`，双下划线分层 | `NUCLEAMIND_CFG_TURN__MAX_ITERATIONS=32` |
-| `cli` | `--set <小节>.<字段>=<值>`，可重复 | `nm run --set turn.max_iterations=32` |
+| `env` | `KARYVIA_CFG_<小节>__<字段>`，双下划线分层 | `KARYVIA_CFG_TURN__MAX_ITERATIONS=32` |
+| `cli` | `--set <小节>.<字段>=<值>`，可重复 | `karyvia run --set turn.max_iterations=32` |
 
 环境变量用**双下划线**分层是因为字段名本身就含下划线（`max_tool_calls_per_turn`），
-单下划线分不出「层级」与「词间」。前缀 `NUCLEAMIND_CFG_` 是通用形式，不为每个字段登记
+单下划线分不出「层级」与「词间」。前缀 `KARYVIA_CFG_` 是通用形式，不为每个字段登记
 一个专名——字段是会长的，而每加一个字段就要改一张映射表的设计注定会漏。
 环境变量名统一转小写（环境变量惯例是大写，而配置字段是 snake_case）。
 
@@ -71,12 +71,12 @@ nm config show --origins
 `sources.py` 不认识字段表，先试 JSON 再退化成字符串是唯一不需要提前知道目标类型的做法。
 
 **`config.json` 永远不被加载路径回写**：你手写的键序与格式里有信息，任何「顺手规范化
-一下」都会毁掉它。建它的是 `nm init`（`O_CREAT|O_EXCL`，没有 `--force`），
-改它的只有 `nm plugins enable|disable|uninstall`。
+一下」都会毁掉它。建它的是 `karyvia init`（`O_CREAT|O_EXCL`，没有 `--force`），
+改它的只有 `karyvia plugins enable|disable|uninstall`。
 
 ## 3. `$schema`
 
-`nm init` 生成的配置第一行是 `"$schema": "./config.schema.json"`。它**不是配置字段**：
+`karyvia init` 生成的配置第一行是 `"$schema": "./config.schema.json"`。它**不是配置字段**：
 编辑器读它做补全与校验，运行期忽略。它是顶层唯一被放行的非小节键，而且是**具名的一条**
 ——不是「`$` 开头就放行」，否则一个拼错成 `$turn` 的小节会静默消失。
 
@@ -93,7 +93,7 @@ nm config show --origins
 配置里的任何字符串值只要出现 `${VAR}`（整串或内嵌，如 `Bearer ${TOKEN}`），
 整个值就是**密钥**：明文只活在 `SecretStr` 里，配置树自始至终持有 `${VAR}` 字面量。
 
-因此 `nm config show` 与 `/config` 印出来的是 `${OPENAI_API_KEY}` 而不是 `***`——
+因此 `karyvia config show` 与 `/config` 印出来的是 `${OPENAI_API_KEY}` 而不是 `***`——
 它告诉你去哪个变量里找，比一串星号有用。
 
 四条硬规则：
@@ -170,8 +170,8 @@ Session 的等待上限。保留旧字段会按未知配置拒绝启动，避免
 | `disable` | 字符串数组 | `[]` | 显式禁用的提供方 id。压过 `enabled`，**对内建同样有效** |
 | `stop_timeout_ms` | 正整数 | `5000` | 单个插件的停止预算。**按插件各算一份**；超时是放弃等待而不是等它结束 |
 
-插件代码不属于实例配置。安装、更新和卸载由全局 `nm plugins` 命令管理，文件直接位于
-`~/.nucleamind/`；实例只保存启用、禁用、配置和状态。
+插件代码不属于实例配置。安装、更新和卸载由全局 `karyvia plugins` 命令管理，文件直接位于
+`~/.karyvia/`；实例只保存启用、禁用、配置和状态。
 
 ### `hooks` —— Hook 分发超时
 
@@ -209,7 +209,7 @@ usage 时，Kernel 会把实际请求保存为相同 Session 的计量锚点；�
 **`provider = null` 是默认，含义是「不启用 kernel 侧召回」而不是「自动挑一个」**：
 自动挑会让「装上一个记忆插件」悄悄改变每一轮请求的内容。
 
-⚠️ **它与插件自带的 Context Provider 会叠加。** `nucleamind-plugin-memory` 同时注册了
+⚠️ **它与插件自带的 Context Provider 会叠加。** `karyvia-plugin-memory` 同时注册了
 `MEMORY:jsonl` 与 `CONTEXT:memory`，后者默认已经召回 `agent` 范围——两边都开着会让同一条
 记忆在一轮里出现两次。要用 kernel 侧召回就把那个插件的 `enabled_scopes` 去掉 `agent`，
 或者干脆别写这一节。两条路径**都是对的**，只是不该同时开。
@@ -230,7 +230,7 @@ usage 时，Kernel 会把实际请求保存为相同 Session 的计量锚点；�
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `provider` | 字符串或 `null` | `null` | `MODEL` 能力的名字（内建是 `"openai"`，Anthropic 插件是 `"anthropic"`）。`null` = 不指名，由 registry 交出的第一条生效；写了却没注册是启动失败 |
-| `name` | 字符串或 `null` | `null` | 模型名，例如 `"gpt-4o-mini"`，交给 provider 解释。默认值虽是 `null`，但**它实际上必填**——没有它启动会失败并指向 `/model/name`，`nm init` 已经写好了一条 |
+| `name` | 字符串或 `null` | `null` | 模型名，例如 `"gpt-4o-mini"`，交给 provider 解释。默认值虽是 `null`，但**它实际上必填**——没有它启动会失败并指向 `/model/name`，`karyvia init` 已经写好了一条 |
 
 **凭据不在这里**，走 `plugins.<provider 插件 id>.secrets`（见第 7 节）。
 
@@ -296,4 +296,4 @@ usage 时，Kernel 会把实际请求保存为相同 Session 的计量锚点；�
 
 `plugins.disable` 压过 `plugins.enabled`。一个外部插件同时出现在两张表中时，Runtime
 不会读取或加载它，它声明的覆盖关系也不会进入本次启动；原本未被单独禁用的内建能力因此
-正常生效。要重新启用插件，使用 `nm plugins enable <id>`，它会从 `disable` 中移除该 id。
+正常生效。要重新启用插件，使用 `karyvia plugins enable <id>`，它会从 `disable` 中移除该 id。

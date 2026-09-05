@@ -20,7 +20,7 @@
 
 from __future__ import annotations
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     Plugin,
@@ -29,14 +29,14 @@ from nucleamind.contracts import (
     ToolCall,
     TurnStatus,
 )
-from nucleamind.kernel.plugins import (
+from karyvia.kernel.plugins import (
     cli_entry_from,
     model_providers_from,
     session_store_from,
 )
-from nucleamind.runtime.wiring import wire_capabilities
-from nucleamind.sdk import PluginContext, parse_manifest
-from nucleamind.sdk.testing import (
+from karyvia.runtime.wiring import wire_capabilities
+from karyvia.sdk import PluginContext, parse_manifest
+from karyvia.sdk.testing import (
     EchoTool,
     FakeCliEntry,
     FakeModelProvider,

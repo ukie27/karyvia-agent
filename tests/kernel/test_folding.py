@@ -11,15 +11,15 @@ from dataclasses import replace
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     UNTRUSTED_DATA_PREFIX,
     CancelReason,
     ChunkKind,
     ErrorCategory,
     ErrorCode,
+    KaryviaError,
     ModelChunk,
     ModelResponse,
-    NucleaError,
     OpaqueBlock,
     Role,
     SideEffect,
@@ -29,7 +29,7 @@ from nucleamind.contracts import (
     ToolResult,
     TrustLevel,
 )
-from nucleamind.kernel.turn import (
+from karyvia.kernel.turn import (
     EMPTY_TOOL_RESULT_TEXT,
     StreamFolder,
     TurnLimits,
@@ -97,7 +97,7 @@ def test_done_error_becomes_retryable_provider_error() -> None:
     folder = StreamFolder("m")
     folder.push(ModelChunk(kind=ChunkKind.TEXT, text="半句"))
     folder.push(ModelChunk(kind=ChunkKind.DONE, stop_reason=StopReason.ERROR))
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         folder.finish()
     error = excinfo.value
     assert error.code is ErrorCode.EXTERNAL_MODEL_PROVIDER
@@ -109,7 +109,7 @@ def test_done_error_becomes_retryable_provider_error() -> None:
 def test_done_cancelled_becomes_cancelled_error() -> None:
     folder = StreamFolder("m")
     folder.push(ModelChunk(kind=ChunkKind.DONE, stop_reason=StopReason.CANCELLED))
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         folder.finish()
     assert excinfo.value.category is ErrorCategory.CANCELLED
 
@@ -149,7 +149,7 @@ def test_tool_calls_stop_without_any_call_is_provider_error() -> None:
     """声明有工具调用却一个分片都没给：交给契约层报不变量违规不如在这里直接指名。"""
     folder = StreamFolder("m")
     folder.push(ModelChunk(kind=ChunkKind.DONE, stop_reason=StopReason.TOOL_CALLS))
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         folder.finish()
     assert excinfo.value.code is ErrorCode.EXTERNAL_MODEL_PROVIDER
 
@@ -158,7 +158,7 @@ def test_finish_is_single_use() -> None:
     folder = StreamFolder("m")
     folder.push(ModelChunk(kind=ChunkKind.DONE, stop_reason=StopReason.END_TURN))
     folder.finish()
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         folder.finish()
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -167,7 +167,7 @@ def test_push_after_finish_is_rejected() -> None:
     folder = StreamFolder("m")
     folder.push(ModelChunk(kind=ChunkKind.DONE, stop_reason=StopReason.END_TURN))
     folder.finish()
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         folder.push(ModelChunk(kind=ChunkKind.TEXT, text="迟到"))
 
 
@@ -304,7 +304,7 @@ def test_synthesised_results_are_not_ok_and_have_no_side_effect(
 
 
 def test_skipped_result_uses_cancel_reason_code() -> None:
-    from nucleamind.contracts import CancelReason
+    from karyvia.contracts import CancelReason
 
     result = skipped_result(tool_call("echo"), CancelReason.SHUTDOWN)
     assert result.side_effect is SideEffect.NONE
@@ -322,9 +322,9 @@ def test_escaped_result_marks_side_effect_unknown() -> None:
     assert "RuntimeError" in result.content
 
 
-def test_escaped_result_keeps_nuclea_error_code() -> None:
+def test_escaped_result_keeps_karyvia_error_code() -> None:
     """执行器给出的码（超时、权限）比这里能猜的准，不要用 KERNEL_UNEXPECTED 盖掉它。"""
-    original = NucleaError(ErrorCode.TIMEOUT_TOOL_CALL, "超时了")
+    original = KaryviaError(ErrorCode.TIMEOUT_TOOL_CALL, "超时了")
     result = escaped_result(tool_call("echo"), original)
     assert result.error is original
     assert result.side_effect is SideEffect.UNKNOWN

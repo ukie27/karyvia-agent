@@ -11,17 +11,17 @@ from __future__ import annotations
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     CapabilityRef,
     ErrorCategory,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
     Plugin,
     PluginId,
 )
-from nucleamind.kernel.registry import (
+from karyvia.kernel.registry import (
     BUILTIN_BASE_PRIORITY,
     PLUGIN_BASE_PRIORITY,
     BatchState,
@@ -113,12 +113,12 @@ def test_empty_batch_commits_cleanly() -> None:
 
 
 def test_add_after_commit_is_invariant_violation() -> None:
-    """`NucleaAPI` 的异常约定：批次已提交后再注册抛 `KERNEL_INVARIANT_VIOLATED`。"""
+    """`KaryviaAPI` 的异常约定：批次已提交后再注册抛 `KERNEL_INVARIANT_VIOLATED`。"""
     registry = CapabilityRegistry()
     batch = registry.batch(ACME)
     batch.commit()
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         batch.add(CapabilityKind.TOOL, "fs.read", "impl")
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -130,7 +130,7 @@ def test_committed_batch_cannot_roll_back() -> None:
     batch = registry.batch(ACME)
     batch.commit()
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         batch.rollback()
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -152,7 +152,7 @@ def test_duplicate_slot_within_one_batch_is_rejected() -> None:
     batch = registry.batch(ACME)
     batch.add(CapabilityKind.TOOL, "fs.read", "first")
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         batch.add(CapabilityKind.TOOL, "fs.read", "second")
 
     assert excinfo.value.code is ErrorCode.PLUGIN_REGISTRATION_CONFLICT
@@ -175,7 +175,7 @@ def test_write_after_freeze_raises_kernel_internal() -> None:
     """`D06` 验收表第 8 行：冻结后写入抛 `KERNEL_INTERNAL` 类错误。"""
     registry = frozen_registry()
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         registry.batch(ACME)
 
     assert excinfo.value.category is ErrorCategory.KERNEL_INTERNAL
@@ -187,7 +187,7 @@ def test_absorb_after_freeze_raises() -> None:
     registry = frozen_registry()
     registration = Registration(ref=TOOL_REF, payload="impl")
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         registry.absorb([registration])
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -196,7 +196,7 @@ def test_absorb_after_freeze_raises() -> None:
 def test_double_freeze_raises() -> None:
     registry = frozen_registry()
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         resolve_into(registry)
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -208,7 +208,7 @@ def test_lookup_before_freeze_raises() -> None:
     with registry.batch(Builtin()) as batch:
         batch.add(CapabilityKind.TOOL, "fs.read", "impl")
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         registry.lookup(CapabilityKind.TOOL, "fs.read")
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -237,7 +237,7 @@ def test_lookup_rejects_multi_kinds() -> None:
     """MULTI 类能力用只取第一个的接口访问必然静默丢实现，因此直接拒绝。"""
     registry = frozen_registry()
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         registry.lookup(CapabilityKind.CONTEXT, "anything")
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -256,7 +256,7 @@ def test_of_kind_and_iteration() -> None:
 
 
 def test_negative_priority_is_rejected() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         Registration(ref=TOOL_REF, payload="impl", priority=-1)
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -264,7 +264,7 @@ def test_negative_priority_is_rejected() -> None:
 
 def test_self_override_is_rejected() -> None:
     """覆盖自身在解析阶段会变成「目标存在但也是自己」的死结，因此在构造时就拦掉。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         Registration(ref=TOOL_REF, payload="impl", overrides=TOOL_REF.target)
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED

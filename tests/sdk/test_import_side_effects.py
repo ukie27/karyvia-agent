@@ -52,7 +52,7 @@ print(json.dumps({
     "writes": writes,
     "network": network,
     "elapsed_ms": elapsed_ms,
-    "modules": sorted(m for m in sys.modules if m.startswith("nucleamind")),
+    "modules": sorted(m for m in sys.modules if m.startswith("karyvia")),
 }))
 """
 
@@ -71,7 +71,7 @@ def _probe(module: str, *, cwd: Path | None = None) -> dict[str, object]:
 @pytest.fixture(scope="module")
 def manifest_probe() -> dict[str, object]:
     """一次子进程，多条断言——每条断言都起一个解释器太慢。"""
-    return _probe("nucleamind.sdk.manifest")
+    return _probe("karyvia.sdk.manifest")
 
 
 def test_importing_manifest_writes_no_files(manifest_probe: dict[str, object]) -> None:
@@ -97,7 +97,7 @@ def test_importing_manifest_pulls_in_only_contracts_and_sdk(
     forbidden = [
         name
         for name in modules
-        if name.startswith(("nucleamind.kernel", "nucleamind.builtins"))
+        if name.startswith(("karyvia.kernel", "karyvia.builtins"))
     ]
     assert not forbidden, f"导入 manifest 顺带拉起了：{forbidden}"
 

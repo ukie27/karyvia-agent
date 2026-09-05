@@ -2,7 +2,7 @@
 
 ## 定位
 
-`references/pi` 是 NucleaMind 研究极简 Agent Runtime 和扩展设计的主要参考项目。Pi 更偏 coding agent，因此重点借鉴扩展机制、Session、Context 和 Runtime 边界，不直接照搬 coding-specific 功能。
+`references/pi` 是 Karyvia 研究极简 Agent Runtime 和扩展设计的主要参考项目。Pi 更偏 coding agent，因此重点借鉴扩展机制、Session、Context 和 Runtime 边界，不直接照搬 coding-specific 功能。
 
 ## 优先入口
 
@@ -25,4 +25,4 @@
 
 ## 读取提示
 
-先看 `README.md` 和扩展示例，再进入 Runtime 实现。研究个人 AI 助手场景时，需要明确区分 Pi 的 coding-agent 假设与 NucleaMind 的通用个人助手目标。
+先看 `README.md` 和扩展示例，再进入 Runtime 实现。研究个人 AI 助手场景时，需要明确区分 Pi 的 coding-agent 假设与 Karyvia 的通用个人助手目标。

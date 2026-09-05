@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.sdk import NucleaAPI
+from karyvia.sdk import KaryviaAPI
 
 DOC = Path(__file__).resolve().parents[2] / "docs" / "plugin-development.md"
 
@@ -72,7 +72,7 @@ def test_the_doc_lists_exactly_the_ten_registration_methods() -> None:
     这句话在文档里是一条承诺，不是修辞。
     """
     listed = {name for name in re.findall(r"`(register_\w+|on)`", DOC.read_text(encoding="utf-8"))}
-    actual = {name for name in dir(NucleaAPI) if name.startswith("register_")} | {"on"}
+    actual = {name for name in dir(KaryviaAPI) if name.startswith("register_")} | {"on"}
     assert len(actual) == 10
     assert actual <= listed, f"文档漏掉了：{sorted(actual - listed)}"
 
@@ -81,8 +81,8 @@ def test_the_override_example_matches_the_shipped_plugin() -> None:
     """文档里那个 `overrides` 串与示例插件用的是同一个。"""
     source = (
         DOC.parent.parent
-        / "examples/plugins/nucleamind-plugin-session-memory/src"
-        / "nucleamind_plugin_session_memory/__init__.py"
+        / "examples/plugins/karyvia-plugin-session-memory/src"
+        / "karyvia_plugin_session_memory/__init__.py"
     )
     tree = ast.parse(source.read_text(encoding="utf-8"))
     target = next(

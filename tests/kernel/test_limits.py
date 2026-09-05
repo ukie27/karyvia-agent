@@ -22,15 +22,15 @@ from dataclasses import fields
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelReason,
     ErrorCategory,
     ErrorCode,
+    KaryviaError,
     ModelInfo,
-    NucleaError,
     TurnStatus,
 )
-from nucleamind.kernel.turn import (
+from karyvia.kernel.turn import (
     DEFAULT_MAX_ITERATIONS,
     DEFAULT_MAX_TOOL_CALLS_PER_TURN,
     DEFAULT_TOOL_RESULT_MAX_BYTES,
@@ -119,7 +119,7 @@ def test_every_limit_is_configurable() -> None:
 @pytest.mark.parametrize("bad", [0, -1])
 def test_non_positive_limits_are_rejected(field_name: str, bad: int) -> None:
     """0 不是「不限制」而是「立刻越界」，静默接受它等于把 turn 变成不可用。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         TurnLimits(**{field_name: bad})
     assert excinfo.value.code is ErrorCode.CONFIG_INVALID
     assert excinfo.value.category is ErrorCategory.CONFIG
@@ -128,7 +128,7 @@ def test_non_positive_limits_are_rejected(field_name: str, bad: int) -> None:
 
 def test_bool_is_not_an_acceptable_limit() -> None:
     """`True` 是 `int` 的子类，放行它会让 `max_iterations=True` 变成「只跑一轮」。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         TurnLimits(max_iterations=True)  # pyright: ignore[reportArgumentType]
     assert excinfo.value.code is ErrorCode.CONFIG_INVALID
 
@@ -184,7 +184,7 @@ def test_pending_batch_is_counted_before_execution() -> None:
 
 
 def test_negative_tool_call_count_is_rejected() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         BudgetLedger().record_tool_calls(-1)
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -314,7 +314,7 @@ def test_context_budget_falls_back_when_model_is_silent() -> None:
 def test_contradictory_model_declaration_raises() -> None:
     """`MOD-005`：不得静默降级。整个窗口都留给输出，模型就没有地方读输入了。"""
     model = ModelInfo("m", "p", context_window_tokens=4_096, max_output_tokens=4_096)
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         TurnLimits().resolve_context_max_tokens(model)
     assert excinfo.value.code is ErrorCode.CONFIG_INVALID
 

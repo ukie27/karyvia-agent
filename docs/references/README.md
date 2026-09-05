@@ -1,12 +1,12 @@
 # 参考项目导航
 
-本目录保存 NucleaMind 维护的参考项目文档。参考项目源码本身位于根目录的 `references/`，该目录被 Git 忽略，换设备时重新克隆即可。
+本目录保存 Karyvia 维护的参考项目文档。参考项目源码本身位于根目录的 `references/`，该目录被 Git 忽略，换设备时重新克隆即可。
 
 ## 参考项目
 
 | 项目 | 用途 | 导航 |
 | --- | --- | --- |
-| nanobot | 确认 NucleaMind fork 前的原始行为和迁移基线 | [nanobot.md](./nanobot.md) |
+| nanobot | 确认 Karyvia fork 前的原始行为和迁移基线 | [nanobot.md](./nanobot.md) |
 | OpenClaw | 研究插件 SDK、宿主与插件边界，以及未来的插件生态兼容 | [openclaw.md](./openclaw.md) |
 | Pi | 研究极简 Agent Runtime、扩展点、Session、Context 和 coding-agent 设计 | [pi.md](./pi.md) |
 
@@ -44,7 +44,7 @@
 
 ## 维护原则
 
-- 本目录的文档是 NucleaMind 的设计研究资料，应提交并接受版本控制。
-- `references/` 内只放本地克隆的参考源码，不在其中新增 NucleaMind 文档。
+- 本目录的文档是 Karyvia 的设计研究资料，应提交并接受版本控制。
+- `references/` 内只放本地克隆的参考源码，不在其中新增 Karyvia 文档。
 - 导航文档记录“从哪里开始读”，不复制参考项目的大段源码。
 - 参考项目版本变化时，更新 `catalog.json` 中的版本或 commit 信息，并检查受影响的导航路径。

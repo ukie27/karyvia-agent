@@ -19,16 +19,16 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     ErrorCode,
     InboundMessage,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     Sender,
     SessionKey,
     TurnId,
 )
-from nucleamind.kernel.routing import (
+from karyvia.kernel.routing import (
     DEFAULT_QUEUE_MAX_SIZE,
     ConcurrencyPolicy,
     SessionScheduler,
@@ -372,19 +372,19 @@ async def test_running_turn_is_visible_while_the_run_is_in_flight() -> None:
 
 
 def test_non_positive_queue_bound_is_rejected() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         SessionScheduler(queue_max_size=0)
 
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
 def test_outcome_requires_an_error_exactly_when_rejected() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         SubmitOutcome(status=SubmitStatus.REJECTED)
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         SubmitOutcome(
             status=SubmitStatus.EXECUTED,
-            error=NucleaError(ErrorCode.INPUT_SESSION_BUSY, "忙"),
+            error=KaryviaError(ErrorCode.INPUT_SESSION_BUSY, "忙"),
         )
 
 

@@ -139,5 +139,5 @@ compact(through=2, summary=S)
 一个想**写**的实现，额外要遵守 §4 的写入顺序。不遵守也能产生可读的文件，
 但会丢掉整批原子性——崩溃时留下的半批会被后来的读者当成历史的一部分。
 
-同一目录同时只应有一个写者。NucleaMind 靠实例锁（`<instance_dir>/instance.lock`）
+同一目录同时只应有一个写者。Karyvia 靠实例锁（`<instance_dir>/instance.lock`）
 保证这一点，本格式**不**包含任何跨进程互斥机制。

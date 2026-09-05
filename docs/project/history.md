@@ -33,8 +33,8 @@ Transcript/事件/出站消息。
 - **D17–D21**：依次交付 JSONL Session、基础 Context、OpenAI-compatible Model、文件工具和
   Shell 工具。
 - **D22**：核心命令和 Runtime introspection，`PluginContext` 增加实例观察与 Turn 控制。
-- **D23**：CLI、组装根、实例生命周期、embed 门面和唯一 `nm` 入口，阶段 5 收口。
-- **D24**：首次运行 scaffold、JSON Schema、`nm init` 与 E2E，阶段 6 收口。
+- **D23**：CLI、组装根、实例生命周期、embed 门面和唯一 `karyvia` 入口，阶段 5 收口。
+- **D24**：首次运行 scaffold、JSON Schema、`karyvia init` 与 E2E，阶段 6 收口。
 
 至此项目不再只是库结构，而是能够初始化实例、执行 turn 并诊断有效能力的独立程序。
 
@@ -44,12 +44,12 @@ Transcript/事件/出站消息。
 - **D26**：权限声明、账本和生产 `PluginContext` 资源门面。
 - **D27**：两阶段加载、依赖计划和事务注册；Builtin/Plugin 合并到同一次 wiring。
 - **D28**：六阶段插件生命周期、反向停止和每插件停止预算。
-- **D29**：`nm plugins`、`nm capabilities`、配置原子编辑与诊断输出。
+- **D29**：`karyvia plugins`、`karyvia capabilities`、配置原子编辑与诊断输出。
 - **D30**：两个独立示例插件、插件开发文档、runtime E2E 和真正的能力 disable，阶段 7 收口。
 
 ## D31–D40：移除旧实现，能力全面插件化
 
-- **D31**：删除旧 Agent/CLI/WebUI/Gateway/API 等路径，以 OpenAI API 插件和通用 `nm serve`
+- **D31**：删除旧 Agent/CLI/WebUI/Gateway/API 等路径，以 OpenAI API 插件和通用 `karyvia serve`
   替代，阶段 8 收口。
 - **D32**：Anthropic 原生 Model 插件，移除宿主 anthropic 依赖。
 - **D33**：Channel fanout 放开跨 conversation 并发，曾交付 Discord 插件并删除旧实现；

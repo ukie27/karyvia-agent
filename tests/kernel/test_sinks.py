@@ -13,18 +13,18 @@ from typing import Final
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Correlation,
     ErrorCode,
     EventName,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     RuntimeEvent,
     SecretStr,
     SessionKey,
     TurnId,
 )
-from nucleamind.kernel.observability import (
+from karyvia.kernel.observability import (
     DEFAULT_RING_CAPACITY,
     EventBus,
     JsonlFileSink,
@@ -33,7 +33,7 @@ from nucleamind.kernel.observability import (
 )
 
 INSTANCE: Final = InstanceId("inst-1")
-SENTINEL: Final = "nm-sentinel-6b30fe95-do-not-leak"
+SENTINEL: Final = "karyvia-sentinel-6b30fe95-do-not-leak"
 
 
 def _correlation(turn: str = "turn-1") -> Correlation:
@@ -217,7 +217,7 @@ def test_no_sentinel_reaches_any_sink(tmp_path: Path) -> None:
     bus.publish(
         EventName.MODEL_REQUEST_FAILED,
         correlation=_correlation(),
-        error=NucleaError(
+        error=KaryviaError(
             ErrorCode.EXTERNAL_MODEL_PROVIDER,
             f"调用失败，用的是 {SENTINEL}",
             detail={"api_key": SENTINEL},
@@ -240,7 +240,7 @@ def test_no_sentinel_reaches_any_sink(tmp_path: Path) -> None:
 
 def test_config_error_is_appended_as_jsonl(tmp_path: Path) -> None:
     path = tmp_path / "logs" / "config-errors-2026-08-11.jsonl"
-    error = NucleaError(
+    error = KaryviaError(
         ErrorCode.CONFIG_INVALID, "未知字段 modl。", detail={"pointer": "/model/modl"}
     )
     stamp = datetime(2026, 8, 11, 9, tzinfo=UTC)
@@ -259,7 +259,7 @@ def test_config_error_is_appended_as_jsonl(tmp_path: Path) -> None:
 
 def test_config_error_does_not_leak_secrets(tmp_path: Path) -> None:
     path = tmp_path / "config-errors.jsonl"
-    error = NucleaError(
+    error = KaryviaError(
         ErrorCode.CONFIG_SECRET_MISSING,
         f"解析失败：{SENTINEL}",
         detail={"api_key": SENTINEL},
@@ -272,5 +272,5 @@ def test_config_error_write_failure_returns_false(tmp_path: Path) -> None:
     """在一条已经失败的启动路径上再抛一次，只会把真正的原因盖掉。"""
     blocker = tmp_path / "blocker"
     blocker.write_text("不是目录", encoding="utf-8")
-    error = NucleaError(ErrorCode.CONFIG_INVALID, "坏了。")
+    error = KaryviaError(ErrorCode.CONFIG_INVALID, "坏了。")
     assert write_config_error(blocker / "nested" / "errors.jsonl", error) is False

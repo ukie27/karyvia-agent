@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from typing import Final
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     CapabilityRef,
@@ -20,20 +20,20 @@ from nucleamind.contracts import (
     ErrorCode,
     EventName,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     Plugin,
     PluginId,
     SessionKey,
     TurnId,
 )
-from nucleamind.kernel.observability import (
+from karyvia.kernel.observability import (
     Diagnostics,
     EventBus,
     MemoryRingSink,
     PluginState,
     PluginStatus,
 )
-from nucleamind.kernel.registry import Registration, ResolutionReport, resolve
+from karyvia.kernel.registry import Registration, ResolutionReport, resolve
 
 INSTANCE: Final = InstanceId("inst-1")
 ACME: Final = Plugin(PluginId("acme"))
@@ -93,7 +93,7 @@ def test_plugins_is_empty_before_the_plugin_runtime_lands() -> None:
 
 
 def test_plugin_status_carries_state_capabilities_and_failure() -> None:
-    failure = NucleaError(
+    failure = KaryviaError(
         ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED, "manifest 有问题。", detail={"field": "sdk_range"}
     )
     status = PluginStatus(

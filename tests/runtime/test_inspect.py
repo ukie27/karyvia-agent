@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.kernel.config import InstanceLayout, InstanceLock
-from nucleamind.kernel.observability import PluginState
-from nucleamind.runtime.inspect import inspect_capabilities, inspect_plugins
+from karyvia.kernel.config import InstanceLayout, InstanceLock
+from karyvia.kernel.observability import PluginState
+from karyvia.runtime.inspect import inspect_capabilities, inspect_plugins
 
 from ._support import SCRIPT, TEST_MANIFESTS, text_response, write_config
 from .test_plugin_plan import write_plugin
@@ -81,7 +81,7 @@ def test_a_failing_plugin_does_not_kill_the_query(tmp_path: Path) -> None:
 
 
 def test_the_queries_do_not_take_the_instance_lock(tmp_path: Path) -> None:
-    """看一眼装了什么，不该与正在跑的实例互斥（`nm config show` 立的规矩）。"""
+    """看一眼装了什么，不该与正在跑的实例互斥（`karyvia config show` 立的规矩）。"""
     _instance(tmp_path)
     layout = InstanceLayout.resolve(instance_dir=tmp_path)
     layout.ensure()

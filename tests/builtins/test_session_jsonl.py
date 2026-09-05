@@ -32,8 +32,8 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS, SESSION_JSONL
-from nucleamind.builtins.session_jsonl import (
+from karyvia.builtins.registry import BUILTIN_MANIFESTS, SESSION_JSONL
+from karyvia.builtins.session_jsonl import (
     CAPABILITY_NAME,
     CONFIG_DIRECTORY_KEY,
     HISTORY_SUFFIX,
@@ -46,20 +46,20 @@ from nucleamind.builtins.session_jsonl import (
     encode_record,
     resolve_directory,
 )
-from nucleamind.builtins.session_jsonl.codec import _unfreeze
-from nucleamind.contracts import (
+from karyvia.builtins.session_jsonl.codec import _unfreeze
+from karyvia.contracts import (
     SESSION_SCHEMA_VERSION,
     AttachmentRef,
     AttachmentSource,
     CapabilityKind,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
     Role,
     SessionKey,
     SessionMessage,
 )
-from nucleamind.kernel.config import InstanceLayout
-from nucleamind.sdk.testing import FakePluginContext, SessionStoreContract
+from karyvia.kernel.config import InstanceLayout
+from karyvia.sdk.testing import FakePluginContext, SessionStoreContract
 
 DOC_PATH = Path(__file__).resolve().parents[2] / "docs" / "session-storage.md"
 
@@ -121,7 +121,7 @@ class TestBasics:
     async def test_the_directory_is_created_on_first_write_not_on_construction(
         self, tmp_path: Path
     ) -> None:
-        """只读命令（`nm capabilities`）不该因为一个从未用过的会话目录而留下痕迹。"""
+        """只读命令（`karyvia capabilities`）不该因为一个从未用过的会话目录而留下痕迹。"""
         store = self.store(tmp_path)
         assert not store.directory.exists()
         assert (await store.load(KEY)).messages == ()
@@ -190,14 +190,14 @@ class TestBasics:
         store = self.store(tmp_path)
         await store.append(KEY, [message(f"m{index}") for index in range(4)])
         await store.compact(KEY, 2, summary())
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.compact(KEY, 1, summary("更早的摘要"))
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
     async def test_an_out_of_range_watermark_is_rejected(self, tmp_path: Path) -> None:
         store = self.store(tmp_path)
         await store.append(KEY, [message("m1")])
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.compact(KEY, 9, summary())
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -206,7 +206,7 @@ def test_filenames_match_the_instance_layout(tmp_path: Path) -> None:
     """存储层与实例布局对同一个会话必须给出同一对路径。
 
     `InstanceLayout.session_paths()`（`D10`）是实例目录的唯一来源，本模块是唯一的写入方。
-    两边各写一份后缀，对不上时 `nm session` 会在一个空目录里找文件——而两处都「自洽」，
+    两边各写一份后缀，对不上时 `karyvia session` 会在一个空目录里找文件——而两处都「自洽」，
     没有任何单元测试会失败。所以对照断言只能写在这里。
     """
     layout = InstanceLayout(root=tmp_path)
@@ -221,8 +221,8 @@ def test_filenames_match_the_instance_layout(tmp_path: Path) -> None:
 _CHILD_APPEND = """
 import asyncio, sys
 from datetime import UTC, datetime
-from nucleamind.builtins.session_jsonl import JsonlSessionStore
-from nucleamind.contracts import Role, SessionKey, SessionMessage
+from karyvia.builtins.session_jsonl import JsonlSessionStore
+from karyvia.contracts import Role, SessionKey, SessionMessage
 
 store = JsonlSessionStore(sys.argv[1])
 key = SessionKey(channel_id="cli", conversation_id="local")
@@ -341,7 +341,7 @@ class TestCorruption:
         broken = "x" * len(lines[0])
         history.write_text("\n".join([broken, lines[1]]) + "\n", encoding="utf-8")
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -354,7 +354,7 @@ class TestCorruption:
         raw = history.read_bytes()
         history.write_bytes(raw[: len(raw) // 2])
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -366,7 +366,7 @@ class TestCorruption:
         history, _ = store.paths_for(KEY)
         history.unlink()
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -375,7 +375,7 @@ class TestCorruption:
         history, _ = store.paths_for(KEY)
         history.write_bytes(b"\xff\xfe" * (history.stat().st_size // 2))
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -386,7 +386,7 @@ class TestCorruption:
         record["schema_version"] = SESSION_SCHEMA_VERSION + 1
         meta_path.write_text(json.dumps(record), encoding="utf-8")
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
         assert caught.value.detail["schema_version"] == SESSION_SCHEMA_VERSION + 1
@@ -407,7 +407,7 @@ class TestCorruption:
         mutate(record)  # type: ignore[operator]
         meta_path.write_text(json.dumps(record), encoding="utf-8")
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -416,7 +416,7 @@ class TestCorruption:
         _, meta_path = store.paths_for(KEY)
         meta_path.write_bytes(b'{"schema_version": \xff}')
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -428,7 +428,7 @@ class TestCorruption:
         record["compacted_through"] = 99
         meta_path.write_text(json.dumps(record), encoding="utf-8")
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -443,7 +443,7 @@ class TestCorruption:
                 "tool_call_id": "call-1",
             }
         )
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             decode_record(raw)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -494,7 +494,7 @@ class TestCorruption:
         ],
     )
     def test_broken_record_shapes_raise(self, raw: str) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             decode_record(raw)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -515,7 +515,7 @@ class TestCorruption:
         ],
     )
     def test_broken_meta_json_raises(self, raw: str) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             decode_meta(raw)
         assert caught.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -678,7 +678,7 @@ class TestIoFailures:
             raise OSError(13, "denied")
 
         monkeypatch.setattr(Path, "mkdir", boom)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await self.store(tmp_path).append(KEY, [message("m1")])
         assert caught.value.code is ErrorCode.PERSISTENCE_WRITE_FAILED
 
@@ -691,8 +691,8 @@ class TestIoFailures:
         def boom(*_: object, **__: object) -> None:
             raise OSError(28, "no space")
 
-        monkeypatch.setattr("nucleamind.builtins.session_jsonl.store.open", boom, raising=False)
-        with pytest.raises(NucleaError) as caught:
+        monkeypatch.setattr("karyvia.builtins.session_jsonl.store.open", boom, raising=False)
+        with pytest.raises(KaryviaError) as caught:
             await store.append(KEY, [message("m1")])
         assert caught.value.code is ErrorCode.PERSISTENCE_WRITE_FAILED
 
@@ -706,7 +706,7 @@ class TestIoFailures:
             raise OSError(5, "io error")
 
         monkeypatch.setattr(Path, "read_text", boom)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_READ_FAILED
 
@@ -720,7 +720,7 @@ class TestIoFailures:
             raise OSError(5, "io error")
 
         monkeypatch.setattr(Path, "read_bytes", boom)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.load(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_READ_FAILED
 
@@ -734,7 +734,7 @@ class TestIoFailures:
             raise OSError(13, "denied")
 
         monkeypatch.setattr(Path, "unlink", boom)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.delete(KEY)
         assert caught.value.code is ErrorCode.PERSISTENCE_WRITE_FAILED
 
@@ -748,7 +748,7 @@ class TestIoFailures:
             raise OSError(5, "io error")
 
         monkeypatch.setattr(Path, "glob", boom)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await store.list_keys()
         assert caught.value.code is ErrorCode.PERSISTENCE_READ_FAILED
 
@@ -761,8 +761,8 @@ class TestIoFailures:
         def boom(*_: object, **__: object) -> None:
             raise OSError(28, "no space")
 
-        monkeypatch.setattr("nucleamind.builtins.session_jsonl.store._atomic_write", boom)
-        with pytest.raises(NucleaError) as caught:
+        monkeypatch.setattr("karyvia.builtins.session_jsonl.store._atomic_write", boom)
+        with pytest.raises(KaryviaError) as caught:
             await store.append(KEY, [message("m1")])
         assert caught.value.code is ErrorCode.PERSISTENCE_WRITE_FAILED
 
@@ -779,8 +779,8 @@ class TestIoFailures:
         def boom(*_: object, **__: object) -> None:
             raise OSError(28, "no space")
 
-        monkeypatch.setattr("nucleamind.builtins.session_jsonl.store.open", boom, raising=False)
-        with pytest.raises(NucleaError) as caught:
+        monkeypatch.setattr("karyvia.builtins.session_jsonl.store.open", boom, raising=False)
+        with pytest.raises(KaryviaError) as caught:
             await store.compact(KEY, 1, summary())
         assert caught.value.code is ErrorCode.PERSISTENCE_WRITE_FAILED
         # 原子写失败不得留下临时文件。
@@ -811,6 +811,6 @@ class TestRegistration:
     def test_a_bad_directory_setting_is_a_config_error(self, configured: object) -> None:
         """静默忽略一个写错类型的路径，会让会话安静地写到别处去。"""
         ctx = FakePluginContext(config={CONFIG_DIRECTORY_KEY: configured})  # type: ignore[dict-item]
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_directory(ctx)
         assert caught.value.code is ErrorCode.CONFIG_INVALID

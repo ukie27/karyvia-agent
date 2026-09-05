@@ -1,4 +1,4 @@
-# NucleaMind Technical Documentation
+# Karyvia Agent Technical Documentation
 
 本目录只放**当前实现**的文档。`D35` 删掉 `legacy/` 的同一个 PR 里，21 篇描述被继承的
 nanobot 实现的文档一并删除——它们教人跑的是 `nanobot onboard`、`nanobot webui` 这类
@@ -15,7 +15,7 @@ nanobot 实现的文档一并删除——它们教人跑的是 `nanobot onboard`
 |---|---|
 | 第一次把它跑起来 | [`getting-started.md`](./getting-started.md) |
 | 查配置字段与优先级 | [`configuration.md`](./configuration.md) |
-| 查 `nm` 的参数与退出码 | [`cli.md`](./cli.md) |
+| 查 `karyvia` 的参数与退出码 | [`cli.md`](./cli.md) |
 | 部署成常驻服务 | [`deployment.md`](./deployment.md) |
 | 了解项目方向 | [`project/开发背景.md`](./project/开发背景.md) |
 | 遵循仓库开发规则 | [`../AGENTS.md`](../AGENTS.md) |
@@ -45,7 +45,7 @@ nanobot 实现的文档一并删除——它们教人跑的是 `nanobot onboard`
 
 ## 文档规则
 
-- 不把 NucleaMind 用户指向上游 nanobot 的安装器、PyPI 包、issue、PR、release
+- 不把 Karyvia 用户指向上游 nanobot 的安装器、PyPI 包、issue、PR、release
   或社区渠道。
 - 上游归属记在 `LICENSE`、`THIRD_PARTY_NOTICES.md` 或明确的历史说明里，
   不作为本项目的当前归属。

@@ -15,7 +15,7 @@ from typing import Final
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelReason,
     CancelSignal,
     Channel,
@@ -58,7 +58,7 @@ from nucleamind.contracts import (
     TurnControl,
     TurnId,
 )
-from nucleamind.contracts.tool import SideEffect
+from karyvia.contracts.tool import SideEffect
 
 #: 公开表面快照：Protocol -> 成员名集合。新增或删除方法必须同步改这里（`NFR-104`）。
 #: `CancelSignal` / `InstanceView` / `TurnControl` 单列在 `SUPPORT_PROTOCOLS`：它们是
@@ -104,7 +104,7 @@ def _members(protocol: type) -> frozenset[str]:
 
 
 def test_capability_protocol_count_is_ten() -> None:
-    """`SDK-001` 的扩展类型数；它与 `sdk.NucleaAPI` 的注册方法一一对应。
+    """`SDK-001` 的扩展类型数；它与 `sdk.KaryviaAPI` 的注册方法一一对应。
 
     可注册能力与 `CapabilityKind` 保持一一对应。
     """
@@ -135,7 +135,7 @@ def test_every_protocol_is_runtime_checkable(protocol: type) -> None:
 
 def test_module_contains_no_implementation() -> None:
     """契约层不出现 IO：本模块的每个函数体只允许是 docstring 与 `...`。"""
-    from nucleamind.contracts import protocols
+    from karyvia.contracts import protocols
 
     source = Path(inspect.getfile(protocols)).read_text(encoding="utf-8")
     offenders: list[str] = []

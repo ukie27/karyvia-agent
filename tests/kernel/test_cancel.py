@@ -20,14 +20,14 @@ import gc
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelReason,
     CancelSignal,
     ErrorCategory,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
 )
-from nucleamind.kernel.turn import (
+from karyvia.kernel.turn import (
     CANCEL_REASON_CODES,
     CHECKPOINT_OWNERS,
     DEFAULT_TOOL_CANCEL_GRACE_MS,
@@ -130,7 +130,7 @@ def test_cancel_reason_codes_table() -> None:
 def test_raise_if_requested_uses_cancelled_category(reason: CancelReason) -> None:
     token = CancelToken()
     token.request(reason)
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         token.raise_if_requested()
     error = excinfo.value
     assert error.code is CANCEL_REASON_CODES[reason]
@@ -145,9 +145,9 @@ def test_shutdown_is_not_retryable() -> None:
     shutdown.request(CancelReason.SHUTDOWN)
     user = CancelToken()
     user.request(CancelReason.USER)
-    with pytest.raises(NucleaError) as shutdown_err:
+    with pytest.raises(KaryviaError) as shutdown_err:
         shutdown.raise_if_requested()
-    with pytest.raises(NucleaError) as user_err:
+    with pytest.raises(KaryviaError) as user_err:
         user.raise_if_requested()
     assert shutdown_err.value.retryable is False
     assert user_err.value.retryable is True
@@ -190,7 +190,7 @@ def test_engine_owns_four_checkpoints() -> None:
 def test_checkpoint_reports_where_it_stopped(where: Checkpoint) -> None:
     token = CancelToken()
     token.request(CancelReason.USER)
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         token.checkpoint(where)
     detail = excinfo.value.detail
     assert detail["checkpoint"] == where.value
@@ -308,7 +308,7 @@ def test_partial_output_survives_cancellation() -> None:
             produced.append(chunk)
             if index == 1:  # 第二段之后用户按下 Ctrl-C。
                 token.request(CancelReason.USER)
-    except NucleaError as error:
+    except KaryviaError as error:
         interrupted = True
         assert error.code is ErrorCode.CANCELLED_BY_USER
 

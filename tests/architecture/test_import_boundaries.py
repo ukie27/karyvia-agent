@@ -47,28 +47,28 @@ def test_empty_layers_pass() -> None:
 _INJECTED_VIOLATIONS: list[tuple[str, str, str]] = [
     (
         "R1",
-        "nucleamind/contracts/message.py",
-        "from nucleamind.kernel.registry import Registry\n",
+        "karyvia/contracts/message.py",
+        "from karyvia.kernel.registry import Registry\n",
     ),
     (
         "R2",
-        "nucleamind/kernel/turn/engine.py",
-        "from nucleamind.builtins.model_openai import Provider\n",
+        "karyvia/kernel/turn/engine.py",
+        "from karyvia.builtins.model_openai import Provider\n",
     ),
     (
         "R3",
-        "nucleamind/sdk/api.py",
-        "from nucleamind.kernel.config import load\n",
+        "karyvia/sdk/api.py",
+        "from karyvia.kernel.config import load\n",
     ),
     (
         "R4",
-        "nucleamind/builtins/tools_fs/read.py",
-        "from nucleamind.kernel.registry import Registry\n",
+        "karyvia/builtins/tools_fs/read.py",
+        "from karyvia.kernel.registry import Registry\n",
     ),
     (
         "R5",
-        "nucleamind/embed/instance.py",
-        "from nucleamind.kernel import turn\nfrom nucleamind.builtins import tools_fs\n",
+        "karyvia/embed/instance.py",
+        "from karyvia.kernel import turn\nfrom karyvia.builtins import tools_fs\n",
     ),
 ]
 
@@ -100,11 +100,11 @@ def test_inject_plugin_importing_kernel_is_rejected(tmp_path: Path) -> None:
     """外部插件与 `builtins/` 同规则（`R4`）：只能 import sdk/ 与 contracts/。"""
     make_package_tree(tmp_path)
     plugin = tmp_path / "plugins" / "memory-sqlite"
-    write_module(plugin, "nucleamind_plugin_memory_sqlite/__init__.py", "")
+    write_module(plugin, "karyvia_plugin_memory_sqlite/__init__.py", "")
     write_module(
         plugin,
-        "nucleamind_plugin_memory_sqlite/store.py",
-        "from nucleamind.kernel.registry import Registry\n",
+        "karyvia_plugin_memory_sqlite/store.py",
+        "from karyvia.kernel.registry import Registry\n",
     )
 
     violations = collect_violations(
@@ -116,8 +116,8 @@ def test_inject_plugin_importing_kernel_is_rejected(tmp_path: Path) -> None:
 def test_relative_imports_are_resolved(tmp_path: Path) -> None:
     """相对导入必须解析为绝对路径，否则 `from ...builtins import x` 会绕过所有规则。"""
     src = make_package_tree(tmp_path, layers=("kernel", "builtins"))
-    write_module(src, "nucleamind/kernel/turn/__init__.py", "")
-    write_module(src, "nucleamind/kernel/turn/engine.py", "from ...builtins.tools_fs import read\n")
+    write_module(src, "karyvia/kernel/turn/__init__.py", "")
+    write_module(src, "karyvia/kernel/turn/engine.py", "from ...builtins.tools_fs import read\n")
 
     violations = collect_violations(src_dir=src, repo_root=tmp_path)
     assert [v.rule for v in violations] == ["R2"], violations

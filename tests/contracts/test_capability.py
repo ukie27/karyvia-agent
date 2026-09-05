@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CAPABILITY_ARITY,
     HOOK_KINDS,
     HOOK_REQUIRED_SLOTS,
@@ -31,9 +31,9 @@ from nucleamind.contracts import (
     HookOutcome,
     InboundMessage,
     InstanceId,
+    KaryviaError,
     ModelRequest,
     ModelResponse,
-    NucleaError,
     Plugin,
     PluginId,
     Role,
@@ -51,8 +51,8 @@ from nucleamind.contracts import (
     parse_provider,
     provider_sort_key,
 )
-from nucleamind.contracts.model import ModelMessage
-from nucleamind.contracts.tool import SideEffect
+from karyvia.contracts.model import ModelMessage
+from karyvia.contracts.tool import SideEffect
 
 CORRELATION = Correlation(InstanceId("default"), SessionKey("cli", "local"), TurnId("t-1"))
 NOW = datetime(2026, 8, 11, tzinfo=UTC)
@@ -132,7 +132,7 @@ def outcome() -> TurnOutcome:
 
 
 def test_capability_kind_has_exactly_ten_values() -> None:
-    """10 个 kind 与 `sdk.NucleaAPI` 的 10 个注册方法一一对应（技术方案 §7.5）。"""
+    """10 个 kind 与 `sdk.KaryviaAPI` 的 10 个注册方法一一对应（技术方案 §7.5）。"""
     assert len(CapabilityKind) == 10
 
 
@@ -173,13 +173,13 @@ def test_builtin_sorts_before_any_plugin() -> None:
 
 @pytest.mark.parametrize("text", ["", "builtin:", "plugin", "plugin:", "other:x", "Builtin"])
 def test_parse_provider_rejects_malformed(text: str) -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         parse_provider(text)
     assert excinfo.value.code is ErrorCode.INPUT_MALFORMED
 
 
 def test_plugin_id_shape_is_validated() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         Plugin(PluginId("Memory_SQLite"))
 
 
@@ -200,13 +200,13 @@ def test_capability_ref_exposes_arity_and_sort_key() -> None:
 
 @pytest.mark.parametrize("name", ["FS.read", "-fs", "fs read", ".fs"])
 def test_capability_ref_rejects_malformed_names(name: str) -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         CapabilityRef(CapabilityKind.TOOL, name, Builtin())
 
 
 @pytest.mark.parametrize("text", ["fs.read", "builtin", "plugin:memory-sqlite"])
 def test_parse_capability_target_rejects_incomplete(text: str) -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         parse_capability_target(text)
 
 
@@ -215,10 +215,10 @@ def test_capability_ref_is_frozen() -> None:
         CapabilityRef(CapabilityKind.TOOL, "fs.read", Builtin()).name = "x"
 
 
-def test_nuclea_error_carries_capability() -> None:
+def test_karyvia_error_carries_capability() -> None:
     """`errors.py` 里承诺随 `D04` 补上的字段（`PLG-006`：谁的问题要能一眼看出）。"""
     ref = CapabilityRef(CapabilityKind.MODEL, "openai-compat", Plugin(PluginId("acme")))
-    error = NucleaError(ErrorCode.CAPABILITY_MISSING, "能力缺失。", capability=ref)
+    error = KaryviaError(ErrorCode.CAPABILITY_MISSING, "能力缺失。", capability=ref)
     assert error.capability is ref
     assert error.with_correlation(CORRELATION).capability is ref
 
@@ -248,14 +248,14 @@ def test_four_observers_and_five_interceptors() -> None:
 
 
 def test_hook_context_requires_its_slots() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         HookContext(HookName.BEFORE_TOOL_CALL, correlation=CORRELATION)
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
     assert excinfo.value.detail["missing"] == ["invocation"]
 
 
 def test_hook_context_reports_every_missing_slot() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         HookContext(HookName.AFTER_TOOL_CALL)
     assert excinfo.value.detail["missing"] == ["correlation", "invocation", "result"]
 
@@ -296,7 +296,7 @@ def test_hook_context_is_frozen() -> None:
 
 def test_continue_carries_no_payload() -> None:
     assert HookOutcome(HookAction.CONTINUE).reason == ""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         HookOutcome(HookAction.CONTINUE, fragments=(fragment(),))
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -316,14 +316,14 @@ def test_replace_accepts_exactly_one_payload(payload: dict[str, object]) -> None
 
 
 def test_replace_rejects_zero_or_two_payloads() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         HookOutcome(HookAction.REPLACE)
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         HookOutcome(HookAction.REPLACE, fragments=(fragment(),), result=tool_result())
 
 
 @pytest.mark.parametrize("action", [HookAction.REJECT, HookAction.BLOCK])
 def test_reject_and_block_require_a_reason(action: HookAction) -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         HookOutcome(action)
     assert HookOutcome(action, reason="策略不允许").reason == "策略不允许"

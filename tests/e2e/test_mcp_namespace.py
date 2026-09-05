@@ -2,7 +2,7 @@
 
 职责：验「远端工具名在 manifest 里一个字都没写，却真的进了 registry、真的转发到远端原名、
 参数 schema 真的是远端那份」。
-不负责：插件自身的线格式与命名规则（`plugins/nucleamind-plugin-mcp/tests/`）、
+不负责：插件自身的线格式与命名规则（`plugins/karyvia-plugin-mcp/tests/`）、
 机制本身的单元判定（`tests/kernel/test_host.py`）。
 
 **这里唯一的替身是 `Connector`**（一个不碰 `mcp` SDK、也不开任何连接的假连接器）：
@@ -11,7 +11,7 @@
 
 因此本文件要求 mcp 插件已经装进当前环境：
 
-    nm plugins install --no-deps plugins/nucleamind-plugin-mcp
+    karyvia plugins install --no-deps plugins/karyvia-plugin-mcp
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ import json
 from collections.abc import Mapping, Sequence
 from contextlib import AsyncExitStack
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     JsonValue,
@@ -29,11 +29,11 @@ from nucleamind.contracts import (
     ToolInvocation,
     ToolSpec,
 )
-from nucleamind.kernel.registry import CapabilityRegistry
-from nucleamind.kernel.turn import tools_from
-from nucleamind.runtime.plugin_home import GlobalPluginHome
-from nucleamind.runtime.wiring import wire_capabilities
-from nucleamind.sdk.testing import FakePluginContext, ManualCancel, make_correlation
+from karyvia.kernel.registry import CapabilityRegistry
+from karyvia.kernel.turn import tools_from
+from karyvia.runtime.plugin_home import GlobalPluginHome
+from karyvia.runtime.wiring import wire_capabilities
+from karyvia.sdk.testing import FakePluginContext, ManualCancel, make_correlation
 
 MCP_PLUGIN = "mcp"
 
@@ -42,7 +42,7 @@ class _Session:
     """两条远端工具，名字与 schema 都只有连上之后才知道。"""
 
     async def list_tools(self) -> Sequence[object]:
-        from nucleamind_plugin_mcp import RemoteTool
+        from karyvia_plugin_mcp import RemoteTool
 
         return (
             RemoteTool(
@@ -61,7 +61,7 @@ class _Session:
     async def call_tool(
         self, name: str, arguments: Mapping[str, JsonValue], *, timeout_ms: int
     ) -> object:
-        from nucleamind_plugin_mcp import RemoteResult
+        from karyvia_plugin_mcp import RemoteResult
 
         del timeout_ms
         return RemoteResult(text=f"{name} 收到 {json.dumps(dict(arguments), ensure_ascii=False)}")
@@ -103,7 +103,7 @@ async def _drive(awaitable: object) -> None:
 
 async def _wire() -> tuple[CapabilityRegistry, _Context]:
     """走生产装配路径把插件装进一个 registry。"""
-    from nucleamind_plugin_mcp import MANIFEST, register
+    from karyvia_plugin_mcp import MANIFEST, register
 
     ctx = _Context()
 
@@ -128,13 +128,13 @@ def test_the_mcp_plugin_is_installed_as_an_entry_point() -> None:
     """整套用例的前提。**单独成一条**：装漏了要看到一句能照做的话。"""
     names = {item.plugin_id for item in GlobalPluginHome.resolve().catalog()}
     assert MCP_PLUGIN in names, (
-        "mcp 插件没装。请先跑 `nm plugins install --no-deps plugins/nucleamind-plugin-mcp`"
+        "mcp 插件没装。请先跑 `karyvia plugins install --no-deps plugins/karyvia-plugin-mcp`"
     )
 
 
 def test_the_manifest_declares_names_it_cannot_know() -> None:
     """整条机制的出发点：manifest 里只有一个前缀，两条远端工具名一个字都没写。"""
-    from nucleamind_plugin_mcp import MANIFEST
+    from karyvia_plugin_mcp import MANIFEST
 
     declared = [(decl.kind, decl.name, decl.namespace) for decl in MANIFEST.capabilities]
     assert declared == [(CapabilityKind.TOOL, "mcp", True)]

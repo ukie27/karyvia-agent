@@ -25,13 +25,13 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, Plugin, PluginId, ToolSpec
-from nucleamind.kernel.observability import PluginState
-from nucleamind.kernel.plugins import STATE_FILE
-from nucleamind.runtime.bootstrap import bootstrap
-from nucleamind.runtime.instance import AgentInstance
-from nucleamind.sdk import NucleaAPI
-from nucleamind.sdk.testing import EchoTool
+from karyvia.contracts import ErrorCode, Plugin, PluginId, ToolSpec
+from karyvia.kernel.observability import PluginState
+from karyvia.kernel.plugins import STATE_FILE
+from karyvia.runtime.bootstrap import bootstrap
+from karyvia.runtime.instance import AgentInstance
+from karyvia.sdk import KaryviaAPI
+from karyvia.sdk.testing import EchoTool
 
 from ._support import (
     SCRIPT,
@@ -56,7 +56,7 @@ def _reset() -> None:
 # ------------------------------------------------------------------------ 外部插件的 setup
 
 
-def _register(api: NucleaAPI, plugin_id: str) -> None:
+def _register(api: KaryviaAPI, plugin_id: str) -> None:
     SETUP_ORDER.append(plugin_id)
     api.register_tool(
         ToolSpec(
@@ -68,19 +68,19 @@ def _register(api: NucleaAPI, plugin_id: str) -> None:
     )
 
 
-def setup_alpha(api: NucleaAPI) -> None:
+def setup_alpha(api: KaryviaAPI) -> None:
     _register(api, "alpha")
 
 
-def setup_beta(api: NucleaAPI) -> None:
+def setup_beta(api: KaryviaAPI) -> None:
     _register(api, "beta")
 
 
-def setup_gamma(api: NucleaAPI) -> None:
+def setup_gamma(api: KaryviaAPI) -> None:
     _register(api, "gamma")
 
 
-def setup_explodes(api: NucleaAPI) -> None:
+def setup_explodes(api: KaryviaAPI) -> None:
     """先注册、再抛：这正是 `EDG-103` 要挡住的那半个批次。"""
     _register(api, "boom")
     raise RuntimeError("插件自己炸了")

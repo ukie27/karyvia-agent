@@ -15,13 +15,13 @@ from typing import Final
 
 import pytest
 
-import nucleamind.sdk as sdk
-import nucleamind.sdk.testing as sdk_testing
-from nucleamind.contracts import CAPABILITY_ARITY, CapabilityKind
-from nucleamind.sdk import NucleaAPI, PluginContext
-from nucleamind.sdk.api import EventSubscriber, FileAccess, HttpAccess, ShellAccess
+import karyvia.sdk as sdk
+import karyvia.sdk.testing as sdk_testing
+from karyvia.contracts import CAPABILITY_ARITY, CapabilityKind
+from karyvia.sdk import KaryviaAPI, PluginContext
+from karyvia.sdk.api import EventSubscriber, FileAccess, HttpAccess, ShellAccess
 
-#: `nucleamind.sdk` 的规范性清单。改这张表 = 改兼容承诺。
+#: `karyvia.sdk` 的规范性清单。改这张表 = 改兼容承诺。
 SDK_PUBLIC_NAMES: Final[tuple[str, ...]] = (
     "SDK_VERSION",
     "CapabilityDecl",
@@ -30,11 +30,11 @@ SDK_PUBLIC_NAMES: Final[tuple[str, ...]] = (
     "FileAccess",
     "HttpAccess",
     "HttpResponse",
+    "KaryviaAPI",
     # `D41` 新增：manifest 的 `config_schema` 所用的 JSON Schema 类型。它**必须**在这张
     # 表里——`contracts.JsonSchema` 进不了 pydantic 模型（见 `sdk/manifest.py`），
     # 而插件写 `CONFIG_SCHEMA` 时需要一个有兼容承诺的名字可标注。
     "ManifestJsonSchema",
-    "NucleaAPI",
     "PluginContext",
     "PluginManifest",
     "ShellAccess",
@@ -43,7 +43,7 @@ SDK_PUBLIC_NAMES: Final[tuple[str, ...]] = (
     "parse_manifest",
 )
 
-#: `nucleamind.sdk.testing` 同样是公开面：它是插件作者的验收工具（§12.3）。
+#: `karyvia.sdk.testing` 同样是公开面：它是插件作者的验收工具（§12.3）。
 SDK_TESTING_PUBLIC_NAMES: Final[tuple[str, ...]] = (
     "ECHO_SPEC",
     "FAKE_MODEL_ID",
@@ -91,7 +91,7 @@ REGISTRATION_METHODS: Final[dict[CapabilityKind, str]] = {
 
 #: `sdk/api.py` 里的 Protocol 与其成员快照。
 API_PROTOCOLS: Final[dict[type, frozenset[str]]] = {
-    NucleaAPI: frozenset({"ctx", *REGISTRATION_METHODS.values()}),
+    KaryviaAPI: frozenset({"ctx", *REGISTRATION_METHODS.values()}),
     PluginContext: frozenset(
         {"plugin_id", "config", "state_dir", "logger", "events", "on_start", "add_cleanup",
          "spawn_task", "fs", "net", "shell", "secret", "instance", "turns"}
@@ -149,7 +149,7 @@ def test_all_follows_the_repository_ordering_convention() -> None:
 
 
 def test_contract_types_are_not_re_exported() -> None:
-    """契约类型只有一个进口：`nucleamind.contracts`（`R4` 允许插件直接依赖它）。
+    """契约类型只有一个进口：`karyvia.contracts`（`R4` 允许插件直接依赖它）。
 
     转发一份会让「同一个类型有两个进口」，还会让 SDK 快照跟着契约层漂移。
     """
@@ -157,7 +157,7 @@ def test_contract_types_are_not_re_exported() -> None:
     assert not leaked, f"契约类型被转发到 sdk：{leaked}"
 
 
-# -------------------------------------------------------------------------- NucleaAPI
+# -------------------------------------------------------------------------- KaryviaAPI
 
 
 def test_registration_method_count_is_ten() -> None:
@@ -167,13 +167,13 @@ def test_registration_method_count_is_ten() -> None:
     assert set(REGISTRATION_METHODS) == set(CAPABILITY_ARITY)
 
 
-def test_nuclea_api_surface_is_exactly_ctx_plus_ten_methods() -> None:
-    assert _members(NucleaAPI) == frozenset({"ctx", *REGISTRATION_METHODS.values()})
+def test_karyvia_api_surface_is_exactly_ctx_plus_ten_methods() -> None:
+    assert _members(KaryviaAPI) == frozenset({"ctx", *REGISTRATION_METHODS.values()})
 
 
 def test_register_cli_entry_exists() -> None:
     """CLI 入口可被插件覆盖（`BAS-010`），因此它必须有注册路径。"""
-    assert hasattr(NucleaAPI, "register_cli_entry")
+    assert hasattr(KaryviaAPI, "register_cli_entry")
 
 
 @pytest.mark.parametrize(
@@ -198,7 +198,7 @@ def test_every_api_method_documents_its_exception_contract() -> None:
     只读属性豁免——它们没有异常可抛，约定写在所属 Protocol 的 docstring 里。
     """
     readonly_properties = {
-        "NucleaAPI.ctx",
+        "KaryviaAPI.ctx",
         "PluginContext.plugin_id",
         "PluginContext.config",
         "PluginContext.state_dir",
@@ -227,7 +227,7 @@ def test_api_module_contains_no_implementation() -> None:
     （`HttpResponse` / `ShellResult`）都没有方法，因此白名单是空集——`allowed` 里再出现
     名字，就说明有实现漏进了这一层。
     """
-    from nucleamind.sdk import api
+    from karyvia.sdk import api
 
     allowed: set[str] = set()
     source = Path(inspect.getfile(api)).read_text(encoding="utf-8")
@@ -263,8 +263,8 @@ def _is_ellipsis(stmt: ast.stmt) -> bool:
 def test_importing_sdk_does_not_pull_in_the_testing_kit() -> None:
     """夹具只在测试期需要；包根导入它等于让每个插件启动都付这份开销（`NFR-401`）。"""
     probe = (
-        "import sys; import nucleamind.sdk; "
-        "print('nucleamind.sdk.testing' in sys.modules)"
+        "import sys; import karyvia.sdk; "
+        "print('karyvia.sdk.testing' in sys.modules)"
     )
     result = subprocess.run(
         [sys.executable, "-B", "-c", probe], capture_output=True, text=True, check=True

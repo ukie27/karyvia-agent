@@ -10,8 +10,8 @@ from types import MappingProxyType
 
 import pytest
 
-from nucleamind.contracts import ErrorCategory, ErrorCode, NucleaError, normalize_metadata
-from nucleamind.contracts.metadata import (
+from karyvia.contracts import ErrorCategory, ErrorCode, KaryviaError, normalize_metadata
+from karyvia.contracts.metadata import (
     MAX_METADATA_BYTES,
     MAX_METADATA_DEPTH,
     MAX_METADATA_ENTRIES,
@@ -54,7 +54,7 @@ def test_bool_is_not_treated_as_int() -> None:
     ],
 )
 def test_size_limits_reject(label: str, payload: dict[str, object]) -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         normalize_metadata(payload)
     assert exc.value.code is ErrorCode.INPUT_TOO_LARGE, label
     assert exc.value.category is ErrorCategory.INVALID_INPUT
@@ -64,7 +64,7 @@ def test_depth_limit_rejects() -> None:
     payload: dict[str, object] = {"leaf": 1}
     for _ in range(MAX_METADATA_DEPTH + 1):
         payload = {"nest": payload}
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         normalize_metadata(payload)
     assert exc.value.code is ErrorCode.INPUT_TOO_LARGE
 
@@ -88,13 +88,13 @@ def test_depth_at_limit_is_accepted() -> None:
 )
 def test_non_json_values_are_rejected(label: str, payload: dict[object, object]) -> None:
     """静默 `str()` 会让问题推迟到持久化层才炸，因此这里直接失败（`MSG-004`）。"""
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         normalize_metadata(payload)  # pyright: ignore[reportArgumentType]
     assert exc.value.code is ErrorCode.INPUT_MALFORMED, label
 
 
 def test_field_name_reaches_detail() -> None:
     """`detail` 必须指出是哪个字段的元数据出了问题，否则四处 metadata 无从定位。"""
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         normalize_metadata({"x": _SdkObject()}, field="tool_result.data")
     assert exc.value.detail["field"] == "tool_result.data"

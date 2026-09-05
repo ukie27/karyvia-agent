@@ -17,10 +17,10 @@ import asyncio
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError
-from nucleamind.kernel.config.defaults import DEFAULT_PLUGIN_STOP_TIMEOUT_MS
-from nucleamind.kernel.observability import PluginState
-from nucleamind.kernel.plugins import (
+from karyvia.contracts import ErrorCode, KaryviaError
+from karyvia.kernel.config.defaults import DEFAULT_PLUGIN_STOP_TIMEOUT_MS
+from karyvia.kernel.observability import PluginState
+from karyvia.kernel.plugins import (
     DEFAULT_STOP_TIMEOUT_MS,
     PHASE_STATES,
     PHASE_TRANSITIONS,
@@ -68,7 +68,7 @@ def test_the_happy_path_walks_the_whole_state_machine() -> None:
 def test_an_illegal_transition_is_refused(phase: PluginPhase, target: PluginPhase) -> None:
     """非法转换抛 `KERNEL_INVARIANT_VIOLATED` 并说清楚当前允许去哪。"""
     lifecycle = PluginLifecycle(plugin_id="acme", phase=phase)
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         lifecycle.advance(target)
     assert caught.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
     assert caught.value.detail["from"] == phase.value
@@ -80,7 +80,7 @@ def test_a_failure_records_the_phase_it_happened_in() -> None:
     """`任意阶段可进 FAILED 并记录阶段与原因`（§7.4 的原文）。"""
     lifecycle = PluginLifecycle(plugin_id="acme")
     lifecycle.advance(PluginPhase.VALIDATED)
-    error = NucleaError(ErrorCode.PLUGIN_LOAD_FAILED, "setup 执行失败。")
+    error = KaryviaError(ErrorCode.PLUGIN_LOAD_FAILED, "setup 执行失败。")
     lifecycle.fail(error)
     assert lifecycle.phase is PluginPhase.FAILED
     assert lifecycle.failed_phase is PluginPhase.VALIDATED
@@ -99,9 +99,9 @@ def test_a_failed_plugin_can_still_be_cleaned_up() -> None:
 def test_failing_twice_is_refused() -> None:
     """第二条错误会盖掉第一条，而第一条才是根因。"""
     lifecycle = PluginLifecycle(plugin_id="acme")
-    lifecycle.fail(NucleaError(ErrorCode.PLUGIN_LOAD_FAILED, "第一次"))
-    with pytest.raises(NucleaError):
-        lifecycle.fail(NucleaError(ErrorCode.PLUGIN_LOAD_FAILED, "第二次"))
+    lifecycle.fail(KaryviaError(ErrorCode.PLUGIN_LOAD_FAILED, "第一次"))
+    with pytest.raises(KaryviaError):
+        lifecycle.fail(KaryviaError(ErrorCode.PLUGIN_LOAD_FAILED, "第二次"))
     assert lifecycle.error is not None
     assert lifecycle.error.user_message == "第一次"
 

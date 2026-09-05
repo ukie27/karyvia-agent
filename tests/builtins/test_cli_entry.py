@@ -17,7 +17,7 @@ from collections.abc import AsyncIterator
 
 import pytest
 
-from nucleamind.builtins.cli_entry import (
+from karyvia.builtins.cli_entry import (
     CONFIG_INSTANCE_ID_KEY,
     CONFIG_PROMPT_KEY,
     DROPPED_ATTACHMENTS_KEY,
@@ -28,21 +28,21 @@ from nucleamind.builtins.cli_entry import (
     resolve_settings,
     setup,
 )
-from nucleamind.builtins.registry import CLI_ENTRY
-from nucleamind.contracts import (
+from karyvia.builtins.registry import CLI_ENTRY
+from karyvia.contracts import (
     AttachmentRef,
     AttachmentSource,
     Channel,
     ErrorCode,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     OutboundMessage,
     SessionKey,
     StreamState,
     TurnId,
 )
-from nucleamind.kernel.turn import CancelToken
-from nucleamind.sdk.testing import ChannelContract, FakePluginContext
+from karyvia.kernel.turn import CancelToken
+from karyvia.sdk.testing import ChannelContract, FakePluginContext
 
 INSTANCE = InstanceId("test-instance")
 
@@ -177,7 +177,7 @@ async def test_dropped_attachments_are_reported_rather_than_silently_lost() -> N
 
 def test_the_dropped_key_matches_the_kernel_constant() -> None:
     """`R4` 逼得这个键名在两处各写一份（内建够不着 `kernel/`），这里把它们钉在一起。"""
-    from nucleamind.kernel.turn import orchestration
+    from karyvia.kernel.turn import orchestration
 
     assert DROPPED_ATTACHMENTS_KEY == orchestration.DROPPED_ATTACHMENTS_KEY
 
@@ -314,7 +314,7 @@ async def test_help_returns_zero() -> None:
     out = io.StringIO()
     code = await StdioCliEntry(make_console(out)).run(["--help"], CancelToken())
     assert code == 0
-    assert "nm run" in out.getvalue()
+    assert "karyvia run" in out.getvalue()
 
 
 # ------------------------------------------------------------------------ 配置与注册
@@ -350,7 +350,7 @@ def test_settings_come_from_the_config_block() -> None:
 def test_a_bad_config_fails_at_setup_time() -> None:
     """配置错误在 setup 时暴露，而不是第一次输入时才失败。"""
     ctx = FakePluginContext("cli-entry", config={"show_reasoning": "yes"})
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         resolve_settings(ctx)
     assert caught.value.code is ErrorCode.CONFIG_INVALID
 

@@ -9,9 +9,9 @@ from typing import Any
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError
-from nucleamind.kernel.config import InstanceLock
-from nucleamind.runtime import plugin_home as subject
+from karyvia.contracts import ErrorCode, KaryviaError
+from karyvia.kernel.config import InstanceLock
+from karyvia.runtime import plugin_home as subject
 
 
 def _fake_install(target: Path, *, version: str = "1.2.3") -> None:
@@ -29,22 +29,22 @@ def _fake_install(target: Path, *, version: str = "1.2.3") -> None:
 
 def _distribution(version: str = "1.2.3") -> SimpleNamespace:
     return SimpleNamespace(
-        metadata={"Name": "nucleamind-plugin-alpha"},
+        metadata={"Name": "karyvia-plugin-alpha"},
         version=version,
         entry_points=[
             EntryPoint(
                 name="alpha",
                 value="alpha_plugin:MANIFEST",
-                group="nucleamind.plugins",
+                group="karyvia.plugins",
             )
         ],
     )
 
 
-def test_layout_lives_directly_under_nucleamind_home(tmp_path: Path) -> None:
+def test_layout_lives_directly_under_karyvia_home(tmp_path: Path) -> None:
     home = subject.GlobalPluginHome.resolve(home=tmp_path, env={})
 
-    assert home.root == tmp_path / ".nucleamind"
+    assert home.root == tmp_path / ".karyvia"
     assert home.catalog_path == home.root / "plugins.json"
     assert home.packages_dir == home.root / "plugin-packages"
     assert home.named_instances_dir == home.root / "instances"
@@ -52,8 +52,8 @@ def test_layout_lives_directly_under_nucleamind_home(tmp_path: Path) -> None:
 
 
 def test_environment_value_is_the_home_itself(tmp_path: Path) -> None:
-    data_root = tmp_path / "nm-data"
-    home = subject.GlobalPluginHome.resolve(env={"NUCLEAMIND_HOME": str(data_root)})
+    data_root = tmp_path / "karyvia-data"
+    home = subject.GlobalPluginHome.resolve(env={"KARYVIA_HOME": str(data_root)})
 
     assert home.root == data_root.resolve()
     assert home.catalog_path == data_root.resolve() / "plugins.json"
@@ -114,7 +114,7 @@ def test_mutation_rejects_a_running_registered_instance(tmp_path: Path) -> None:
     lock = InstanceLock(instance / "instance.lock").acquire()
     home.register_instance(instance)
     try:
-        with pytest.raises(NucleaError) as caught, home.mutation():
+        with pytest.raises(KaryviaError) as caught, home.mutation():
             pass
     finally:
         lock.release()
@@ -146,10 +146,10 @@ def test_failed_install_does_not_publish_a_catalog_record(
         source: str, target: Path, *, upgrade: bool, with_dependencies: bool
     ) -> Any:
         del source, target, upgrade, with_dependencies
-        raise NucleaError(ErrorCode.PLUGIN_LOAD_FAILED, "broken")
+        raise KaryviaError(ErrorCode.PLUGIN_LOAD_FAILED, "broken")
 
     monkeypatch.setattr(subject, "_run_pip", fail)
-    with pytest.raises(NucleaError), home.mutation():
+    with pytest.raises(KaryviaError), home.mutation():
         subject.install_plugin(home, "broken-source")
 
     assert home.catalog() == ()
@@ -165,7 +165,7 @@ def test_install_set_rejects_missing_logical_dependencies() -> None:
         dependencies=("missing",),
     )
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         subject._validate_install_set((alpha,))
 
     assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
@@ -190,7 +190,7 @@ def test_install_set_rejects_two_versions_of_one_python_distribution() -> None:
         resolved_distributions=("shared_lib==2.0",),
     )
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         subject._validate_install_set((alpha, beta))
 
     assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
@@ -233,7 +233,7 @@ def test_uninstall_refuses_to_break_an_installed_dependent(tmp_path: Path) -> No
     )
     home.package_dir("alpha").mkdir(parents=True)
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         subject.uninstall_plugin(home, "alpha")
 
     assert caught.value.detail["dependents"] == ["beta"]
@@ -259,7 +259,7 @@ def test_install_rejects_an_external_plugin_using_a_builtin_id(
         ),
     )
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         subject.install_plugin(home, "source")
 
     assert caught.value.code is ErrorCode.PLUGIN_REGISTRATION_CONFLICT

@@ -1,13 +1,13 @@
-"""记录 `nm` 的启动开销指标（技术方案 §12.4 第 6 步、`NFR-405`）。
+"""记录 `karyvia` 的启动开销指标（技术方案 §12.4 第 6 步、`NFR-405`）。
 
 常驻脚本。测量三件事：
 
-    import_ms      `import nucleamind` 的耗时（必须保持零副作用、零子模块导入）
-    version_ms     `nm --version` 全流程耗时（进程启动 + argv 解析）
+    import_ms      `import karyvia` 的耗时（必须保持零副作用、零子模块导入）
+    version_ms     `karyvia --version` 全流程耗时（进程启动 + argv 解析）
     startup_ms     无插件冷启动到**可接受输入**：装配根 import + bootstrap() + start()
-    imported       `import nucleamind` 之后进入 sys.modules 的本项目模块清单
+    imported       `import karyvia` 之后进入 sys.modules 的本项目模块清单
 
-第四项是最有价值的：`nucleamind/__init__.py` 承诺「零依赖、零副作用」，一旦有人
+第四项是最有价值的：`karyvia/__init__.py` 承诺「零依赖、零副作用」，一旦有人
 在包根加了便利导入，清单会立刻变长，而耗时可能还看不出来。
 
 `startup_ms` **只告警不失败**（`NFR-405` 的原文：「超出阈值 20% 触发告警而非直接失败」）。
@@ -43,21 +43,21 @@ STARTUP_BUDGET_MS = 300.0
 #: 告警容差。超过 `预算 × (1 + 容差)` 才出声，免得贴着线抖动时天天告警。
 STARTUP_WARN_RATIO = 0.20
 
-# `import nucleamind` 之后允许出现在 sys.modules 里的本项目模块。
+# `import karyvia` 之后允许出现在 sys.modules 里的本项目模块。
 # 包根之外任何东西被拉进来，都说明有人在 __init__.py 加了便利导入。
-ALLOWED_EAGER_MODULES = frozenset({"nucleamind"})
+ALLOWED_EAGER_MODULES = frozenset({"karyvia"})
 
 _MEASURE_IMPORT = textwrap.dedent(
     """
     import json, sys, time
 
     start = time.perf_counter()
-    import nucleamind  # noqa: F401
+    import karyvia  # noqa: F401
     elapsed_ms = (time.perf_counter() - start) * 1000
 
     imported = sorted(
         name for name in sys.modules
-        if name == "nucleamind" or name.startswith("nucleamind.")
+        if name == "karyvia" or name.startswith("karyvia.")
     )
     json.dump({"import_ms": elapsed_ms, "imported": imported}, sys.stdout)
     """
@@ -66,8 +66,8 @@ _MEASURE_IMPORT = textwrap.dedent(
 #: 冷启动测量。刻意在**干净子进程**里跑：同进程测量会拿到已经暖好的 import 缓存，
 #: 而「冷启动」问的正是那笔钱。
 #:
-#: 三个刻意的选择：① 实例目录是临时的，配置由 `nm init` 那条同一路径生成——测的必须是
-#: 用户第二次 `nm run` 真正走的路，不是一份手搓的最小配置；② 凭据用一个假值导出，
+#: 三个刻意的选择：① 实例目录是临时的，配置由 `karyvia init` 那条同一路径生成——测的必须是
+#: 用户第二次 `karyvia run` 真正走的路，不是一份手搓的最小配置；② 凭据用一个假值导出，
 #: `model-openai` 只在 setup 时读它，**不发任何请求**（没有网络参与这次测量）；
 #: ③ 计时分两段，import 与 bootstrap 各自可归因。
 _MEASURE_STARTUP = textwrap.dedent(
@@ -75,13 +75,13 @@ _MEASURE_STARTUP = textwrap.dedent(
     import asyncio, json, os, shutil, sys, tempfile, time
     from pathlib import Path
 
-    root = Path(tempfile.mkdtemp(prefix="nm-startup-"))
+    root = Path(tempfile.mkdtemp(prefix="karyvia-startup-"))
     os.environ["OPENAI_API_KEY"] = "startup-cost-probe-not-a-real-key"
 
     start = time.perf_counter()
-    from nucleamind.kernel.config import InstanceLayout
-    from nucleamind.runtime.bootstrap import bootstrap
-    from nucleamind.runtime.first_run import ensure_initial_config
+    from karyvia.kernel.config import InstanceLayout
+    from karyvia.runtime.bootstrap import bootstrap
+    from karyvia.runtime.first_run import ensure_initial_config
     import_ms = (time.perf_counter() - start) * 1000
 
     layout = InstanceLayout.resolve(instance_dir=root)
@@ -123,15 +123,15 @@ def _run_python(code: str) -> str:
 
 
 def measure_import() -> dict[str, object]:
-    """在干净子进程中测量 `import nucleamind`（同进程测量会被已导入模块污染）。"""
+    """在干净子进程中测量 `import karyvia`（同进程测量会被已导入模块污染）。"""
     return json.loads(_run_python(_MEASURE_IMPORT))
 
 
 def measure_version() -> float:
-    """测量 `nm --version` 全流程；走 `python -m` 以免依赖 console script 已安装。"""
+    """测量 `karyvia --version` 全流程；走 `python -m` 以免依赖 console script 已安装。"""
     start = time.perf_counter()
     completed = subprocess.run(
-        [sys.executable, "-m", "nucleamind.runtime.cli.main", "--version"],
+        [sys.executable, "-m", "karyvia.runtime.cli.main", "--version"],
         cwd=_ROOT,
         capture_output=True,
         text=True,
@@ -140,7 +140,7 @@ def measure_version() -> float:
     elapsed_ms = (time.perf_counter() - start) * 1000
     if completed.returncode != 0:
         raise SystemExit(
-            f"[startup-cost] `nm --version` 失败（{completed.returncode}）：\n{completed.stderr}"
+            f"[startup-cost] `karyvia --version` 失败（{completed.returncode}）：\n{completed.stderr}"
         )
     return elapsed_ms
 
@@ -195,17 +195,17 @@ def check(data: dict[str, object]) -> list[str]:
 
     import_ms = float(data["import_ms"])  # type: ignore[arg-type]
     if import_ms > IMPORT_BUDGET_MS:
-        problems.append(f"import nucleamind 耗时 {import_ms}ms > {IMPORT_BUDGET_MS}ms")
+        problems.append(f"import karyvia 耗时 {import_ms}ms > {IMPORT_BUDGET_MS}ms")
 
     version_ms = float(data["version_ms"])  # type: ignore[arg-type]
     if version_ms > VERSION_BUDGET_MS:
-        problems.append(f"nm --version 耗时 {version_ms}ms > {VERSION_BUDGET_MS}ms")
+        problems.append(f"karyvia --version 耗时 {version_ms}ms > {VERSION_BUDGET_MS}ms")
 
     imported = set(data["imported"])  # type: ignore[arg-type]
     unexpected = sorted(imported - ALLOWED_EAGER_MODULES)
     if unexpected:
         problems.append(
-            "`import nucleamind` 拉入了额外子模块（包根必须零副作用）："
+            "`import karyvia` 拉入了额外子模块（包根必须零副作用）："
             + ", ".join(unexpected)
         )
 
@@ -215,10 +215,10 @@ def check(data: dict[str, object]) -> list[str]:
 def _print_table(data: dict[str, object]) -> None:
     imported = data["imported"]
     assert isinstance(imported, list)
-    print("nm 启动开销")
+    print("karyvia 启动开销")
     print("=" * 46)
-    print(f"  import nucleamind   {data['import_ms']:>8} ms   (预算 {IMPORT_BUDGET_MS} ms)")
-    print(f"  nm --version        {data['version_ms']:>8} ms   (预算 {VERSION_BUDGET_MS} ms)")
+    print(f"  import karyvia   {data['import_ms']:>8} ms   (预算 {IMPORT_BUDGET_MS} ms)")
+    print(f"  karyvia --version        {data['version_ms']:>8} ms   (预算 {VERSION_BUDGET_MS} ms)")
     print(f"  冷启动到可接受输入  {data['startup_ms']:>8} ms   (目标 {STARTUP_BUDGET_MS} ms，仅告警)")
     print(f"    ├ import          {data['startup_import_ms']:>8} ms")
     print(f"    └ bootstrap+start {data['startup_bootstrap_ms']:>8} ms")
@@ -226,7 +226,7 @@ def _print_table(data: dict[str, object]) -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="记录 nm 启动开销")
+    parser = argparse.ArgumentParser(description="记录 karyvia 启动开销")
     parser.add_argument("--json", action="store_true", help="输出 JSON")
     parser.add_argument("--out", type=Path, help="把 JSON 写入文件（隐含 --json）")
     parser.add_argument("--check", action="store_true", help="越过阈值以非零码退出")

@@ -29,8 +29,8 @@ from typing import Final
 
 import pytest
 
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS, TOOLS_FS
-from nucleamind.builtins.tools_fs import (
+from karyvia.builtins.registry import BUILTIN_MANIFESTS, TOOLS_FS
+from karyvia.builtins.tools_fs import (
     CONFIG_DISABLE_KEY,
     CONFIG_MAX_ENTRIES_KEY,
     CONFIG_MAX_MATCHES_KEY,
@@ -57,13 +57,13 @@ from nucleamind.builtins.tools_fs import (
     setup,
     truncate,
 )
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     Concurrency,
     ErrorCode,
     JsonValue,
-    NucleaError,
+    KaryviaError,
     ProviderId,
     RiskLevel,
     SideEffect,
@@ -72,11 +72,11 @@ from nucleamind.contracts import (
     ToolInvocation,
     ToolSpec,
 )
-from nucleamind.contracts.tool import MAX_TOOL_RESULT_LENGTH
-from nucleamind.kernel.turn.invoker import tools_from
-from nucleamind.runtime.wiring import wire_capabilities
-from nucleamind.sdk import PluginContext
-from nucleamind.sdk.testing import (
+from karyvia.contracts.tool import MAX_TOOL_RESULT_LENGTH
+from karyvia.kernel.turn.invoker import tools_from
+from karyvia.runtime.wiring import wire_capabilities
+from karyvia.sdk import PluginContext
+from karyvia.sdk.testing import (
     FakePluginContext,
     ManualCancel,
     ToolContract,
@@ -320,7 +320,7 @@ class TestFsWrite(_FsToolContract):
         assert not (tmp_path.parent / "x.txt").exists()
 
     async def test_no_temporary_file_survives_a_successful_write(self, tmp_path: Path) -> None:
-        """留下一个 `.nm-tmp` 残骸会让下一次 `fs.list` 把它当成用户的文件列出来。"""
+        """留下一个 `.karyvia-tmp` 残骸会让下一次 `fs.list` 把它当成用户的文件列出来。"""
         root = tmp_path / "fresh"
         root.mkdir()
         await run(make_tool(WriteTool, root), "fs.write", path="c.txt", content="x")
@@ -400,7 +400,7 @@ class TestWorkspaceEscape:
         ids=["bare", "parent", "through-sub", "mixed"],
     )
     def test_dot_dot_cannot_climb_out(self, tmp_path: Path, raw: str) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             self.guard(make_workspace(tmp_path / "ws")).resolve(raw)
         assert caught.value.code is ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
 
@@ -415,7 +415,7 @@ class TestWorkspaceEscape:
         secret = tmp_path / "secret.txt"
         secret.write_text("s3cret", encoding="utf-8")
         try_symlink(root / "link.txt", secret)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             self.guard(root).resolve("link.txt")
         assert caught.value.code is ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
 
@@ -427,7 +427,7 @@ class TestWorkspaceEscape:
         elsewhere.mkdir()
         (elsewhere / "file.txt").write_text("x", encoding="utf-8")
         try_symlink(root / "door", elsewhere, directory=True)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             self.guard(root).resolve("door/file.txt")
         assert caught.value.code is ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
 
@@ -445,7 +445,7 @@ class TestWorkspaceEscape:
         elsewhere.mkdir()
         (elsewhere / "file.txt").write_bytes(b"x")
         try_junction(root / "door", elsewhere)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             self.guard(root).resolve("door/file.txt")
         assert caught.value.code is ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
 
@@ -473,7 +473,7 @@ class TestWorkspaceEscape:
         self, tmp_path: Path, name: str
     ) -> None:
         """两个平台一律拒绝——为它开一个平台分支就破坏了 `NFR-605`。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             self.guard(tmp_path).resolve(name)
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -483,7 +483,7 @@ class TestWorkspaceEscape:
         assert self.guard(root).resolve(str(root / "notes.txt")) == (root / "notes.txt").resolve()
 
     def test_an_absolute_path_outside_the_root_is_rejected(self, tmp_path: Path) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             self.guard(tmp_path / "ws").resolve(str(tmp_path / "other.txt"))
         assert caught.value.code is ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
 
@@ -491,12 +491,12 @@ class TestWorkspaceEscape:
         """`/x/ws-evil` 不是 `/x/ws` 的后代——前缀比较必须落在分隔符边界上。"""
         (tmp_path / "ws").mkdir()
         (tmp_path / "ws-evil").mkdir()
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             self.guard(tmp_path / "ws").resolve(str(tmp_path / "ws-evil" / "x.txt"))
 
     @pytest.mark.parametrize("raw", ["", "   ", "a\x00b"], ids=["empty", "blank", "nul"])
     def test_malformed_path_strings_are_rejected(self, tmp_path: Path, raw: str) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             self.guard(tmp_path).resolve(raw)
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -504,7 +504,7 @@ class TestWorkspaceEscape:
         """错误是模型可见的：里面不该出现宿主机的绝对路径。"""
         root = tmp_path / "ws"
         root.mkdir()
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             self.guard(root).resolve("../secret.txt")
         assert caught.value.detail == {"path": "../secret.txt"}
 
@@ -610,7 +610,7 @@ class TestTruncation:
 
     def test_a_result_limit_above_the_contract_ceiling_is_refused(self) -> None:
         ctx = FakePluginContext(config={CONFIG_MAX_RESULT_CHARS_KEY: MAX_TOOL_RESULT_LENGTH + 1})
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings(ctx)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -677,7 +677,7 @@ class TestSingleToolDisable:
 
     def test_an_unknown_name_is_refused_rather_than_ignored(self) -> None:
         """一句本意是「关掉写工具」的配置被静默忽略，代价是模型仍然能写盘。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             enabled_tool_names({CONFIG_DISABLE_KEY: ["fs.wirte"]})
         assert caught.value.code is ErrorCode.CONFIG_INVALID
         assert caught.value.detail["unknown"] == ["fs.wirte"]
@@ -808,7 +808,7 @@ class TestRegistration:
             def register_tool(self, spec: ToolSpec, handler: ToolHandler) -> None:
                 raise AssertionError("配置非法时不该注册任何东西")
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             setup(RecordingApi())  # type: ignore[arg-type]
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -818,7 +818,7 @@ class TestRegistration:
         assert settings.workspace == tmp_path
 
     def test_setup_touches_no_disk(self, tmp_path: Path) -> None:
-        """`nm capabilities` 这类只读命令不该因为一个从未用过的 workspace 留下痕迹。"""
+        """`karyvia capabilities` 这类只读命令不该因为一个从未用过的 workspace 留下痕迹。"""
         target = tmp_path / "never-created"
 
         class RecordingApi:

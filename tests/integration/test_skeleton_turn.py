@@ -24,7 +24,7 @@ import time
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     UNTRUSTED_DATA_PREFIX,
     CancelReason,
     Concurrency,
@@ -34,8 +34,8 @@ from nucleamind.contracts import (
     HookAction,
     HookName,
     HookOutcome,
+    KaryviaError,
     ModelResponse,
-    NucleaError,
     Role,
     SideEffect,
     StopReason,
@@ -45,9 +45,9 @@ from nucleamind.contracts import (
     TrustLevel,
     TurnStatus,
 )
-from nucleamind.kernel.observability import event_to_json
-from nucleamind.kernel.turn import RegisteredContextProvider, RegisteredHook, TurnLimits
-from nucleamind.sdk.testing import (
+from karyvia.kernel.observability import event_to_json
+from karyvia.kernel.turn import RegisteredContextProvider, RegisteredHook, TurnLimits
+from karyvia.sdk.testing import (
     FAKE_MODEL_ID,
     RecordingHook,
     StaticTurnContextCompactor,
@@ -73,7 +73,7 @@ READ_CALL = ToolCall(call_id="call-1", name="fs.read", arguments={"path": "notes
 
 def _basic_context() -> tuple[str, RegisteredContextProvider]:
     return "context-skeleton", RegisteredContextProvider(
-        provider=StaticContextProvider(fragment("你是 NucleaMind 的骨架助手。"))
+        provider=StaticContextProvider(fragment("你是 Karyvia 的骨架助手。"))
     )
 
 
@@ -624,7 +624,7 @@ async def test_a_persistence_failure_is_not_disguised_as_success() -> None:
 
     async def boom(key: object, messages: object) -> None:
         del key, messages
-        raise NucleaError(ErrorCode.PERSISTENCE_WRITE_FAILED, "磁盘满了。")
+        raise KaryviaError(ErrorCode.PERSISTENCE_WRITE_FAILED, "磁盘满了。")
 
     skeleton.sessions.append = boom  # type: ignore[method-assign]  # boundary: 注入故障
 

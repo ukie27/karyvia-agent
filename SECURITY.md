@@ -2,7 +2,7 @@
 
 ## 项目定位
 
-NucleaMind 基于 HKUDS/nanobot（MIT 协议）独立开发。本项目目前处于重构阶段，
+Karyvia 基于 HKUDS/nanobot（MIT 协议）独立开发。本项目目前处于重构阶段，
 不作为公共基础设施运营；安全修复按本仓库的常规 git 提交进行。
 
 ## 安全最佳实践（开发与部署均适用）

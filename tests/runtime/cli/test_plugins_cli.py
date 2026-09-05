@@ -1,13 +1,13 @@
-"""`nm plugins` 与 `nm capabilities`（`D29`；技术方案 §10.4、§10.5，需求 `EDG-505`、`NFR-502`）。
+"""`karyvia plugins` 与 `karyvia capabilities`（`D29`；技术方案 §10.4、§10.5，需求 `EDG-505`、`NFR-502`）。
 
 职责：逐条对着开发方案 `D29` 的验收表——`enable`/`disable` 只改配置不在当前进程生效、
 `uninstall` 后状态目录仍在、`purge` 无 `--confirm` 拒绝执行且事先打印路径与体积、
-`nm capabilities` 的 shadowed 关系可读且含 provider 标识。
+`karyvia capabilities` 的 shadowed 关系可读且含 provider 标识。
 不负责：验编辑器本身（`tests/runtime/test_config_edit.py`）、验只读路径的三条承诺
 （`tests/runtime/test_inspect.py`）。
 
 **退出码同样是主角**（`test_cli.py` 立的规矩）：0 成功、2 用法或配置错、
-3「没事可做 / 没确认」。第三档与 `nm init` 已有的形态一致。
+3「没事可做 / 没确认」。第三档与 `karyvia init` 已有的形态一致。
 """
 
 from __future__ import annotations
@@ -19,12 +19,12 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import CapabilityKind, ErrorCode, JsonValue, NucleaError, ToolSpec
-from nucleamind.runtime.cli.commands import plugins as plugins_subject
-from nucleamind.runtime.cli.main import app
-from nucleamind.runtime.plugin_home import GlobalPluginHome, InstalledPlugin
-from nucleamind.sdk import NucleaAPI, parse_manifest
-from nucleamind.sdk.testing import EchoTool, InMemorySessionStore
+from karyvia.contracts import CapabilityKind, ErrorCode, JsonValue, KaryviaError, ToolSpec
+from karyvia.runtime.cli.commands import plugins as plugins_subject
+from karyvia.runtime.cli.main import app
+from karyvia.runtime.plugin_home import GlobalPluginHome, InstalledPlugin
+from karyvia.sdk import KaryviaAPI, parse_manifest
+from karyvia.sdk.testing import EchoTool, InMemorySessionStore
 
 from .._support import SCRIPT, text_response, write_config
 from ..test_plugin_plan import write_plugin
@@ -44,11 +44,11 @@ overrides = "builtin:jsonl"
 """
 
 
-def setup_shadow(api: NucleaAPI) -> None:
+def setup_shadow(api: KaryviaAPI) -> None:
     api.register_session_store("memory", InMemorySessionStore())
 
 
-def setup_extra_tool(api: NucleaAPI) -> None:
+def setup_extra_tool(api: KaryviaAPI) -> None:
     api.register_tool(
         ToolSpec(
             name="alpha.ping",
@@ -66,7 +66,7 @@ def _script() -> None:
 
 @pytest.fixture
 def instance(tmp_path: Path) -> Path:
-    """一份带凭据引用的最小配置。`nm capabilities` 会真的跑内建的 `setup()`。"""
+    """一份带凭据引用的最小配置。`karyvia capabilities` 会真的跑内建的 `setup()`。"""
     write_config(
         tmp_path,
         plugins={
@@ -121,7 +121,7 @@ def _install_test_plugin(root: Path, plugin_id: str, **kwargs: object) -> Path:
 
 def test_usage_and_unknown_subcommands(instance: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert app(_args(instance, "plugins")) == 0
-    assert "nm plugins" in capsys.readouterr().out
+    assert "karyvia plugins" in capsys.readouterr().out
     assert app(_args(instance, "plugins", "nope")) == 2
     assert app(_args(instance, "plugins", "list", "--wat")) == 2
     assert app(["plugins", "install", "demo", "--instance", "work"]) == 2
@@ -225,7 +225,7 @@ def test_disabling_twice_reports_nothing_to_do(instance: Path) -> None:
 
 
 def test_a_missing_config_points_at_nm_init(tmp_path: Path) -> None:
-    """还没 `nm init` 就 `enable`：报错指路，而不是造一份半截配置。"""
+    """还没 `karyvia init` 就 `enable`：报错指路，而不是造一份半截配置。"""
     assert app(_args(tmp_path, "plugins", "enable", "alpha")) == 2
 
 
@@ -302,7 +302,7 @@ def test_global_uninstall_rolls_back_configs_when_a_later_write_fails(
         nonlocal failed
         if path == second / "config.json" and not failed:
             failed = True
-            raise NucleaError(
+            raise KaryviaError(
                 ErrorCode.PERSISTENCE_WRITE_FAILED,
                 "simulated",
             )
@@ -437,7 +437,7 @@ def test_capabilities_rejects_unknown_options(instance: Path) -> None:
 
 def test_capabilities_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert app(["capabilities", "--help"]) == 0
-    assert "nm capabilities" in capsys.readouterr().out
+    assert "karyvia capabilities" in capsys.readouterr().out
 
 
 def test_list_prints_a_failed_plugin_with_its_reason(

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "karyvia-plugin-web"
+version = "0.1.0"
+description = "Karyvia 官方插件：web.fetch 与 web.search 两条工具能力"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.11"
+license = { text = "MIT" }
+# 插件只依赖 SDK 与契约（`R4`）。`httpx` 是宿主已有的依赖，本插件的 `web.search` 直接用它
+# （见 README「两个工具走两条出网路径」一节）；`web.fetch` 一个字节都不碰它，走 `ctx.net`。
+dependencies = ["karyvia>=0.3.0", "httpx>=0.28.0,<1.0.0"]
+
+# 发现的唯一入口（技术方案 §7.1）。name 必须等于 manifest 里的 `id`。
+[project.entry-points."karyvia.plugins"]
+web = "karyvia_plugin_web:MANIFEST"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/karyvia_plugin_web"]

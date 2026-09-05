@@ -10,18 +10,18 @@ import dataclasses
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     ChunkKind,
     Correlation,
     ErrorCode,
     InstanceId,
+    KaryviaError,
     ModelCapability,
     ModelChunk,
     ModelInfo,
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    NucleaError,
     OpaqueBlock,
     Role,
     SamplingParams,
@@ -87,7 +87,7 @@ def test_capability_values_are_complete() -> None:
 
 
 def test_negative_window_is_rejected() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         ModelInfo("m", "fake", context_window_tokens=-1)
     assert exc.value.code is ErrorCode.CONFIG_INVALID
 
@@ -105,7 +105,7 @@ def test_negative_window_is_rejected() -> None:
     ],
 )
 def test_out_of_range_params_are_rejected(field: str, value: float) -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         SamplingParams(**{field: value})  # pyright: ignore[reportArgumentType]
     assert exc.value.code is ErrorCode.CONFIG_INVALID
 
@@ -120,19 +120,19 @@ def test_boundary_params_are_accepted() -> None:
 def test_tool_calls_only_on_assistant() -> None:
     call = ToolCall("c-1", "fs.read")
     assert ModelMessage(Role.ASSISTANT, tool_calls=(call,)).tool_calls == (call,)
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         ModelMessage(Role.USER, "x", tool_calls=(call,))
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
 def test_tool_call_id_only_on_tool_role() -> None:
     assert ModelMessage(Role.TOOL, "结果", tool_call_id="c-1").tool_call_id == "c-1"
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         ModelMessage(Role.TOOL, "结果")
 
 
 def test_empty_message_is_rejected() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         ModelMessage(Role.USER)
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -141,7 +141,7 @@ def test_empty_message_is_rejected() -> None:
 
 
 def test_request_requires_messages() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         request(messages=())
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -152,7 +152,7 @@ def test_request_rejects_duplicate_tool_names() -> None:
         ToolSpec("fs.read", "读", {}),
         ToolSpec("fs.read", "又一个读", {}),
     )
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         request(tools=duplicate)
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -166,7 +166,7 @@ def test_request_carries_correlation() -> None:
 
 
 def test_tool_calls_stop_reason_requires_calls() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         response(stop_reason=StopReason.TOOL_CALLS)
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -174,7 +174,7 @@ def test_tool_calls_stop_reason_requires_calls() -> None:
 def test_duplicate_call_ids_are_rejected() -> None:
     """`EDG-303`：重复 Tool Call 必须受控终止，而不是让执行器按 id 覆盖结果。"""
     calls = (ToolCall("c-1", "fs.read"), ToolCall("c-1", "fs.list"))
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         response(stop_reason=StopReason.TOOL_CALLS, tool_calls=calls)
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -195,7 +195,7 @@ def test_only_end_turn_is_a_complete_answer(reason: StopReason, complete: bool) 
 
 def test_provider_metadata_rejects_sdk_objects() -> None:
     """§10.6 末段：Provider 私有响应对象不得直接越过 Provider 边界。"""
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         response(provider_metadata={"raw": object()})
 
 
@@ -211,7 +211,7 @@ def test_provider_metadata_is_frozen_snapshot() -> None:
 
 def test_usage_field_names_survive_redaction() -> None:
     """脱敏按整词判定，`input_tokens` 这类统计字段必须能原样进事件与日志。"""
-    from nucleamind.contracts import redact
+    from karyvia.contracts import redact
 
     usage = TokenUsage(input_tokens=10, output_tokens=5)
     redacted, _ = redact(dataclasses.asdict(usage))
@@ -224,7 +224,7 @@ def test_total_tokens_sums_input_and_output() -> None:
 
 
 def test_negative_usage_is_rejected() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         TokenUsage(input_tokens=-1)
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -259,7 +259,7 @@ def test_chunk_accepts_its_own_payload(label: str, chunk: dict[str, object]) -> 
 )
 def test_chunk_without_its_payload_is_rejected(kind: ChunkKind) -> None:
     """一个 chunk 同时带多种载荷，下游就得靠猜决定先处理哪个。"""
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         ModelChunk(kind)
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -277,7 +277,7 @@ def test_an_opaque_block_still_refuses_sdk_objects() -> None:
     放宽这一条，一个 SDK 对象就能顺着 assistant 消息一路回放，而切换 Provider 之后没人
     认识它——那正是 `provider_metadata` 那条强制要防的事。
     """
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         OpaqueBlock(provider="anthropic", kind="thinking", payload={"obj": object()})  # type: ignore[dict-item]
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -292,7 +292,7 @@ def test_ownership_is_how_a_provider_decides_to_skip_a_block() -> None:
 def test_only_an_assistant_message_can_carry_provider_blocks() -> None:
     """它们是模型这一轮说的话的一部分——与 `tool_calls` 同一条规则。"""
     for role in (Role.USER, Role.SYSTEM):
-        with pytest.raises(NucleaError) as exc:
+        with pytest.raises(KaryviaError) as exc:
             ModelMessage(role=role, content="x", provider_blocks=(block(),))
         assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -302,7 +302,7 @@ def test_provider_blocks_are_not_content() -> None:
 
     放行它会让「消息非空」这条不变量退化成「有某种东西就行」。
     """
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         ModelMessage(role=Role.ASSISTANT, provider_blocks=(block(),))
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -310,10 +310,10 @@ def test_provider_blocks_are_not_content() -> None:
 def test_too_many_opaque_blocks_is_rejected() -> None:
     """上界防的是**累积**：opaque 块随 assistant 消息一路回放，一个每轮多产几个块的
     Provider 会让请求体单调增长。"""
-    from nucleamind.contracts.model import MAX_OPAQUE_BLOCKS
+    from karyvia.contracts.model import MAX_OPAQUE_BLOCKS
 
     blocks = tuple(block(kind=f"thinking{index}") for index in range(MAX_OPAQUE_BLOCKS + 1))
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         ModelMessage(role=Role.ASSISTANT, content="x", provider_blocks=blocks)
     assert exc.value.code is ErrorCode.INPUT_TOO_LARGE
 

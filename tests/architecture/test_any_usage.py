@@ -108,7 +108,7 @@ def test_new_layers_and_plugins_have_no_unannotated_any() -> None:
 
 
 def test_empty_tree_passes(tmp_path: Path) -> None:
-    assert scan(tmp_path / "nucleamind", repo_root=tmp_path) == []
+    assert scan(tmp_path / "karyvia", repo_root=tmp_path) == []
 
 
 @pytest.mark.parametrize(
@@ -121,7 +121,7 @@ def test_empty_tree_passes(tmp_path: Path) -> None:
 )
 def test_inject_unannotated_any_is_rejected(label: str, source: str, tmp_path: Path) -> None:
     """注入无标注 `Any` 必须失败——证明守卫真的会拦。"""
-    package = tmp_path / "nucleamind"
+    package = tmp_path / "karyvia"
     write_module(package, "kernel/turn/engine.py", source)
     assert scan(package, repo_root=tmp_path), f"{label} 的样例没有被拦下"
 
@@ -144,13 +144,13 @@ def test_inject_unannotated_any_is_rejected(label: str, source: str, tmp_path: P
     ],
 )
 def test_annotated_any_passes(label: str, source: str, tmp_path: Path) -> None:
-    package = tmp_path / "nucleamind"
+    package = tmp_path / "karyvia"
     write_module(package, "builtins/model_openai/stream.py", source)
     assert scan(package, repo_root=tmp_path) == [], label
 
 
 def test_import_line_alone_needs_no_marker(tmp_path: Path) -> None:
     """`from typing import Any` 本身不是使用点。"""
-    package = tmp_path / "nucleamind"
+    package = tmp_path / "karyvia"
     write_module(package, "kernel/x.py", "from typing import Any  # noqa: F401\n")
     assert scan(package, repo_root=tmp_path) == []

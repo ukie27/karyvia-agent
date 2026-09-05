@@ -17,11 +17,11 @@ from pathlib import Path
 import httpx
 import pytest
 
-from nucleamind.builtins.tools_fs.paths import WorkspaceGuard
-from nucleamind.builtins.tools_shell.environ import BASELINE_NAMES as TOOL_BASELINE
-from nucleamind.builtins.tools_shell.process import DEFAULT_GRACE_MS as TOOL_GRACE_MS
-from nucleamind.contracts import ErrorCode, NucleaError
-from nucleamind.runtime.access import (
+from karyvia.builtins.tools_fs.paths import WorkspaceGuard
+from karyvia.builtins.tools_shell.environ import BASELINE_NAMES as TOOL_BASELINE
+from karyvia.builtins.tools_shell.process import DEFAULT_GRACE_MS as TOOL_GRACE_MS
+from karyvia.contracts import ErrorCode, KaryviaError
+from karyvia.runtime.access import (
     BASELINE_NAMES,
     DEFAULT_GRACE_MS,
     MAX_OUTPUT_CHARS,
@@ -65,7 +65,7 @@ def test_absolute_paths_are_rejected_unlike_the_tool_guard(tmp_path: Path) -> No
     inside.write_bytes(b"x")
 
     assert WorkspaceGuard(root).resolve(str(inside)) == inside.resolve()
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         PathGuard(root).resolve(str(inside))
     assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -73,7 +73,7 @@ def test_absolute_paths_are_rejected_unlike_the_tool_guard(tmp_path: Path) -> No
 def test_the_error_detail_never_leaks_the_host_path(tmp_path: Path) -> None:
     root = tmp_path / "ws"
     root.mkdir()
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         PathGuard(root).resolve("../outside.txt")
     assert caught.value.detail == {"path": "../outside.txt"}
 
@@ -96,7 +96,7 @@ async def test_reading_and_writing_round_trip(tmp_path: Path) -> None:
 
 async def test_a_missing_file_reports_only_the_relative_path(tmp_path: Path) -> None:
     access = _fs(tmp_path)
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.read_text("nope.txt")
     assert caught.value.code is ErrorCode.PERSISTENCE_READ_FAILED
     assert caught.value.detail["path"] == "nope.txt"
@@ -134,7 +134,7 @@ async def test_read_bytes_is_the_only_way_to_get_the_original_bytes(tmp_path: Pa
 
 async def test_bytes_writes_are_guarded_by_the_same_path_rules(tmp_path: Path) -> None:
     access = _fs(tmp_path)
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.write_bytes("../escape.bin", b"x")
     assert caught.value.code is ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
 
@@ -143,7 +143,7 @@ async def test_a_failed_bytes_write_leaves_no_temporary_file(tmp_path: Path) -> 
     """写失败不得留下半份文件——目标是个目录，替换必然失败。"""
     access = _fs(tmp_path)
     (tmp_path / "ws" / "taken").mkdir()
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.write_bytes("taken", b"x")
     assert caught.value.code is ErrorCode.PERSISTENCE_WRITE_FAILED
     assert [p.name for p in (tmp_path / "ws").iterdir()] == ["taken"]
@@ -214,13 +214,13 @@ async def test_the_default_cwd_is_the_root_and_cwd_is_guarded(tmp_path: Path) ->
     here = await access.run([sys.executable, "-c", "import os; print(os.getcwd())"])
     assert Path(here.stdout.strip()).resolve() == root
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.run([sys.executable, "-c", "pass"], cwd="..")
     assert caught.value.code is ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE
 
 
 async def test_an_empty_command_is_rejected(tmp_path: Path) -> None:
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _shell(tmp_path).run([])
     assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -306,7 +306,7 @@ async def test_without_a_cap_nothing_is_truncated() -> None:
 
 async def test_a_non_positive_cap_is_rejected() -> None:
     """`0` 不是「不限」——那是 `None`。静默把它当成不限就是无声地取消一道防线。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _net(handler=lambda request: httpx.Response(200)).request(
             "GET", "https://example.com/", max_bytes=0
         )
@@ -339,14 +339,14 @@ async def test_the_cap_survives_a_redirect() -> None:
 async def test_private_targets_are_denied(url: str) -> None:
     """守卫判的是**解析之后**的地址，因此域名伪装（`127.0.0.1.nip.io`）同样挡得住。"""
     access = _net(handler=lambda request: httpx.Response(200), resolver=_never_called)
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.request("GET", url)
     assert caught.value.code is ErrorCode.PERMISSION_DENIED
 
 
 async def test_a_hostname_resolving_inside_is_denied() -> None:
     access = _net(handler=lambda request: httpx.Response(200), resolver=lambda h, p: ("10.0.0.5",))
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.request("GET", "http://127.0.0.1.nip.io/")
     assert "私有网段" in str(caught.value.detail["reason"])
 
@@ -357,7 +357,7 @@ async def test_one_public_address_does_not_excuse_a_private_one() -> None:
         handler=lambda request: httpx.Response(200),
         resolver=lambda h, p: ("93.184.216.34", "127.0.0.1"),
     )
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         await access.request("GET", "https://example.com/")
 
 
@@ -369,7 +369,7 @@ async def test_a_redirect_into_the_private_range_is_denied() -> None:
             return httpx.Response(302, headers={"location": "http://169.254.169.254/latest/"})
         raise AssertionError("第二跳不该被发出去")
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _net(handler=handler).request("GET", "https://example.com/")
     assert caught.value.code is ErrorCode.PERMISSION_DENIED
 
@@ -407,7 +407,7 @@ async def test_a_redirect_loop_is_cut_off() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(302, headers={"location": "/next"})
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _net(handler=handler).request("GET", "https://example.com/a")
     assert str(MAX_REDIRECTS) in str(caught.value.detail["reason"])
 
@@ -418,7 +418,7 @@ async def test_a_redirect_loop_is_cut_off() -> None:
 )
 async def test_malformed_or_credential_bearing_urls_are_denied(url: str) -> None:
     access = _net(handler=lambda request: httpx.Response(200), resolver=_never_called)
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.request("GET", url)
     assert caught.value.code is ErrorCode.PERMISSION_DENIED
 
@@ -426,7 +426,7 @@ async def test_malformed_or_credential_bearing_urls_are_denied(url: str) -> None
 async def test_the_error_url_drops_the_query_string() -> None:
     """query 常常带着签名与一次性凭据，而 `detail` 会进事件流与日志。"""
     access = _net(handler=lambda request: httpx.Response(200), resolver=_never_called)
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.request("GET", f"http://127.0.0.1/a?token={SENTINEL}")
     assert caught.value.detail["url"] == "http://127.0.0.1/a"
     assert SENTINEL not in repr(dict(caught.value.detail))
@@ -436,7 +436,7 @@ async def test_a_transport_failure_is_retryable_and_external() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ConnectError("boom", request=request)
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _net(handler=handler).request("GET", "https://example.com/")
     assert caught.value.code is ErrorCode.EXTERNAL_HTTP_REQUEST
     assert caught.value.retryable
@@ -446,7 +446,7 @@ async def test_a_timeout_maps_to_the_timeout_category() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("slow", request=request)
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await _net(handler=handler).request("GET", "https://example.com/")
     assert caught.value.code is ErrorCode.TIMEOUT_HTTP_REQUEST
 
@@ -463,7 +463,7 @@ def _outcome(run: object) -> object:
     """
     try:
         run()  # pyright: ignore[reportCallIssue]
-    except NucleaError as error:
+    except KaryviaError as error:
         return error.code
     return True
 
@@ -478,7 +478,7 @@ def test_relative_renders_posix_paths_and_rejects_outsiders(tmp_path: Path) -> N
 
     assert guard.relative(guard.resolve("sub/a.txt")) == "sub/a.txt"
     assert guard.relative(root.resolve()) == "."
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         guard.relative(tmp_path / "elsewhere")
     # 递进来一个根外路径是本包内部的编程错误，不是用户输入问题。
     assert caught.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -514,7 +514,7 @@ async def test_a_write_failure_is_reported_without_the_host_path(tmp_path: Path)
     """把一个目录当文件写：失败在落盘之前，且错误里只有插件自己给的那个相对串。"""
     access = _fs(tmp_path)
     (tmp_path / "ws" / "adir").mkdir()
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.write_text("adir", "x")
     assert caught.value.code is ErrorCode.PERSISTENCE_WRITE_FAILED
     assert caught.value.detail["path"] == "adir"
@@ -524,7 +524,7 @@ async def test_a_write_failure_is_reported_without_the_host_path(tmp_path: Path)
 async def test_listing_a_file_is_a_read_failure(tmp_path: Path) -> None:
     access = _fs(tmp_path)
     (tmp_path / "ws" / "a.txt").write_bytes(b"x")
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await access.list_dir("a.txt")
     assert caught.value.code is ErrorCode.PERSISTENCE_READ_FAILED
 
@@ -534,7 +534,7 @@ def test_an_unresolvable_hostname_is_treated_as_blocked(monkeypatch: pytest.Monk
     放行等于把判定推给运气。"""
     import socket as socket_module
 
-    from nucleamind.runtime.access import net as net_module
+    from karyvia.runtime.access import net as net_module
 
     def boom(*args: object, **kwargs: object) -> object:
         raise OSError("no such host")

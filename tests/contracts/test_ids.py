@@ -11,8 +11,8 @@ import itertools
 
 import pytest
 
-from nucleamind.contracts import Correlation, ErrorCategory, NucleaError, SessionKey
-from nucleamind.contracts.ids import MAX_COMPONENT_LENGTH, InstanceId, TurnId
+from karyvia.contracts import Correlation, ErrorCategory, KaryviaError, SessionKey
+from karyvia.contracts.ids import MAX_COMPONENT_LENGTH, InstanceId, TurnId
 
 #: 专挑会撞车的分量：分隔符、转义符、空白、非 ASCII、以及互为前缀后缀的组合。
 TRICKY_COMPONENTS: tuple[str, ...] = (
@@ -94,7 +94,7 @@ def test_storage_id_is_stable_across_calls() -> None:
     ["only~two", "a~b~c~d", "a~b%~c", "a~b%ZZ~c", "a~%FF~c"],
 )
 def test_from_storage_id_rejects_broken_encoding(storage_id: str) -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         SessionKey.from_storage_id(storage_id)
     assert excinfo.value.category is ErrorCategory.INVALID_INPUT
 
@@ -112,13 +112,13 @@ def test_from_storage_id_rejects_broken_encoding(storage_id: str) -> None:
 def test_session_key_rejects_malformed_components(
     channel_id: str, conversation_id: str, scope: str
 ) -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         SessionKey(channel_id, conversation_id, scope)
     assert excinfo.value.category is ErrorCategory.INVALID_INPUT
 
 
 def test_session_key_rejects_oversized_component() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         SessionKey("cli", "x" * (MAX_COMPONENT_LENGTH + 1))
     assert excinfo.value.detail["limit"] == MAX_COMPONENT_LENGTH
 
@@ -156,14 +156,14 @@ def test_correlation_derive_can_switch_session() -> None:
 
 
 def test_correlation_rejects_self_parent() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         _correlation(parent_turn_id=TurnId("t-1"))
     assert excinfo.value.category is ErrorCategory.KERNEL_INTERNAL
 
 
 @pytest.mark.parametrize("field", ["instance_id", "turn_id"])
 def test_correlation_rejects_empty_identifiers(field: str) -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         _correlation(**{field: ""})
     assert excinfo.value.category is ErrorCategory.INVALID_INPUT
 

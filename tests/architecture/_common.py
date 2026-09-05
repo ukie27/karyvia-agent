@@ -12,7 +12,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = REPO_ROOT / "src"
-PACKAGE_DIR = SRC_DIR / "nucleamind"
+PACKAGE_DIR = SRC_DIR / "karyvia"
 
 #: 五层 + `embed`。`D35` 删掉 `legacy/` 之后，这就是包里的全部内容。
 NEW_LAYERS: tuple[str, ...] = (
@@ -46,8 +46,8 @@ def iter_modules(root: Path) -> list[Path]:
 def dotted_path(path: Path, *, src_dir: Path) -> str:
     """把模块文件换算成导入路径，`__init__.py` 归属为包自身。
 
-    `src/nucleamind/kernel/turn/engine.py` -> `nucleamind.kernel.turn.engine`
-    `src/nucleamind/kernel/__init__.py`    -> `nucleamind.kernel`
+    `src/karyvia/kernel/turn/engine.py` -> `karyvia.kernel.turn.engine`
+    `src/karyvia/kernel/__init__.py`    -> `karyvia.kernel`
     """
     parts = list(path.resolve().relative_to(src_dir.resolve()).with_suffix("").parts)
     if parts and parts[-1] == "__init__":
@@ -91,9 +91,9 @@ def write_module(root: Path, relative: str, source: str) -> Path:
 
 
 def make_package_tree(root: Path, layers: tuple[str, ...] = NEW_LAYERS) -> Path:
-    """在 `root` 下构造 `src/nucleamind/<layer>/__init__.py` 骨架，返回 `src/`。"""
+    """在 `root` 下构造 `src/karyvia/<layer>/__init__.py` 骨架，返回 `src/`。"""
     src = root / "src"
-    write_module(src, "nucleamind/__init__.py", '"""fixture package."""\n')
+    write_module(src, "karyvia/__init__.py", '"""fixture package."""\n')
     for layer in layers:
-        write_module(src, f"nucleamind/{layer}/__init__.py", f'"""fixture {layer}."""\n')
+        write_module(src, f"karyvia/{layer}/__init__.py", f'"""fixture {layer}."""\n')
     return src

@@ -11,14 +11,14 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     AttachmentRef,
     AttachmentSource,
     CancelReason,
     Correlation,
     ErrorCode,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     Role,
     SessionKey,
     SessionMessage,
@@ -27,7 +27,7 @@ from nucleamind.contracts import (
     TurnOutcome,
     TurnStatus,
 )
-from nucleamind.contracts.session import SESSION_SCHEMA_VERSION
+from karyvia.contracts.session import SESSION_SCHEMA_VERSION
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
 CORRELATION = Correlation(InstanceId("default"), SessionKey("cli", "local"), TurnId("t-1"))
@@ -67,13 +67,13 @@ def test_instances_are_frozen() -> None:
 
 def test_tool_call_id_only_on_tool_role() -> None:
     assert message(role=Role.TOOL, tool_call_id="c-1").tool_call_id == "c-1"
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         message(role=Role.ASSISTANT, tool_call_id="c-1")
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
 def test_tool_role_requires_tool_call_id() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         message(role=Role.TOOL)
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -96,7 +96,7 @@ def test_attachment_references_are_part_of_the_session_record() -> None:
 
 
 def test_naive_created_at_is_rejected() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         message(created_at=datetime(2026, 8, 10))  # noqa: DTZ001
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -117,14 +117,14 @@ def test_live_messages_skips_compacted_prefix() -> None:
 @pytest.mark.parametrize("compacted_through", [-1, 3])
 def test_compaction_watermark_must_stay_in_range(compacted_through: int) -> None:
     records = (message(),)
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         SessionSnapshot(SessionKey("cli", "local"), records, compacted_through=compacted_through)
     assert exc.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
 
 @pytest.mark.parametrize("schema_version", [0, 1, SESSION_SCHEMA_VERSION + 1])
 def test_snapshot_only_accepts_the_current_schema_version(schema_version: int) -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         SessionSnapshot(SessionKey("cli", "local"), schema_version=schema_version)
     assert exc.value.code is ErrorCode.PERSISTENCE_RECORD_CORRUPT
 
@@ -143,20 +143,20 @@ def test_turn_status_has_exactly_four_terminal_states() -> None:
 
 
 def test_failed_turn_requires_error() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         outcome(status=TurnStatus.FAILED)
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
 def test_completed_turn_rejects_error() -> None:
-    failure = NucleaError(ErrorCode.KERNEL_UNEXPECTED, "boom")
-    with pytest.raises(NucleaError) as exc:
+    failure = KaryviaError(ErrorCode.KERNEL_UNEXPECTED, "boom")
+    with pytest.raises(KaryviaError) as exc:
         outcome(error=failure)
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
 def test_cancelled_turn_requires_reason() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         outcome(status=TurnStatus.CANCELLED)
     assert outcome(
         status=TurnStatus.CANCELLED, cancel_reason=CancelReason.USER
@@ -164,16 +164,16 @@ def test_cancelled_turn_requires_reason() -> None:
 
 
 def test_non_cancelled_turn_rejects_reason() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         outcome(cancel_reason=CancelReason.TIMEOUT)
 
 
 def test_counters_and_clock_must_be_sane() -> None:
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         outcome(iterations=-1)
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         outcome(tool_calls=-1)
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         outcome(finished_at=NOW - timedelta(seconds=1))
 
 

@@ -16,9 +16,9 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import JsonValue
-from nucleamind.contracts.errors import ErrorCode, NucleaError
-from nucleamind.kernel.config import (
+from karyvia.contracts import JsonValue
+from karyvia.contracts.errors import ErrorCode, KaryviaError
+from karyvia.kernel.config import (
     CLI_ORIGIN,
     DEFAULT_ORIGIN,
     ENV_ORIGIN,
@@ -41,8 +41,8 @@ from nucleamind.kernel.config import (
     read_config_file,
     validate_config,
 )
-from nucleamind.kernel.config.fields import FieldKind, FieldSpec
-from nucleamind.kernel.config.sources import MAX_CONFIG_BYTES
+from karyvia.kernel.config.fields import FieldKind, FieldSpec
+from karyvia.kernel.config.sources import MAX_CONFIG_BYTES
 
 
 def write_config(root: Path, payload: object) -> Path:
@@ -117,14 +117,14 @@ class TestFileSource:
     def test_malformed_json_reports_config_invalid(self, tmp_path: Path) -> None:
         path = tmp_path / "config.json"
         path.write_text("{not json", encoding="utf-8")
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             read_config_file(path)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
     def test_top_level_must_be_an_object(self, tmp_path: Path) -> None:
         path = tmp_path / "config.json"
         path.write_text("[1, 2]", encoding="utf-8")
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             read_config_file(path)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -132,7 +132,7 @@ class TestFileSource:
         """误把配置指向一个大文件时，报错而不是把它整个读进内存再解析。"""
         path = tmp_path / "config.json"
         path.write_bytes(b'{"x": "' + b"a" * (MAX_CONFIG_BYTES + 16) + b'"}')
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             read_config_file(path)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
         assert caught.value.detail["limit"] == MAX_CONFIG_BYTES
@@ -141,7 +141,7 @@ class TestFileSource:
         """配置文件必须是 UTF-8；GBK 存盘的中文路径会走到这里。"""
         path = tmp_path / "config.json"
         path.write_bytes(b'{"workspace": {"root": "\xd6\xd0\xce\xc4"}}')
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             read_config_file(path)
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -149,14 +149,14 @@ class TestFileSource:
         """目录占了 config.json 的位置：这是 IO 故障，不是「配置内容不对」。"""
         path = tmp_path / "config.json"
         path.mkdir()
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             read_config_file(path)
         assert caught.value.code is ErrorCode.PERSISTENCE_READ_FAILED
 
 
 class TestEnvSource:
     def test_double_underscore_nests_and_key_lowercases(self) -> None:
-        layer = env_layer({"NUCLEAMIND_CFG_TURN__MAX_ITERATIONS": "32"})
+        layer = env_layer({"KARYVIA_CFG_TURN__MAX_ITERATIONS": "32"})
         assert layer.data == {"turn": {"max_iterations": 32}}
         assert layer.origin == ENV_ORIGIN
 
@@ -164,26 +164,26 @@ class TestEnvSource:
         """`32` 要成 int（schema 要 int），`openai` 必须留成字符串。"""
         layer = env_layer(
             {
-                "NUCLEAMIND_CFG_MODEL__PROVIDER": "openai",
-                "NUCLEAMIND_CFG_LOGGING__FILE_ENABLED": "false",
+                "KARYVIA_CFG_MODEL__PROVIDER": "openai",
+                "KARYVIA_CFG_LOGGING__FILE_ENABLED": "false",
             }
         )
         assert layer.data == {"model": {"provider": "openai"}, "logging": {"file_enabled": False}}
 
     def test_unprefixed_vars_ignored(self) -> None:
-        assert env_layer({"PATH": "/usr/bin", "NUCLEAMIND_INSTANCE": "work"}).data == {}
+        assert env_layer({"PATH": "/usr/bin", "KARYVIA_INSTANCE": "work"}).data == {}
 
     def test_bare_prefix_is_ignored(self) -> None:
-        """`NUCLEAMIND_CFG_=1` 没有指向任何字段，不能变成一个空键。"""
-        assert env_layer({"NUCLEAMIND_CFG_": "1", "NUCLEAMIND_CFG___": "2"}).data == {}
+        """`KARYVIA_CFG_=1` 没有指向任何字段，不能变成一个空键。"""
+        assert env_layer({"KARYVIA_CFG_": "1", "KARYVIA_CFG___": "2"}).data == {}
 
     def test_conflicting_paths_in_one_layer_are_rejected(self) -> None:
         """同一层里 `turn=1` 与 `turn.max_iterations=2` 自相矛盾，静默选一个等于替用户猜。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             env_layer(
                 {
-                    "NUCLEAMIND_CFG_TURN": "1",
-                    "NUCLEAMIND_CFG_TURN__MAX_ITERATIONS": "2",
+                    "KARYVIA_CFG_TURN": "1",
+                    "KARYVIA_CFG_TURN__MAX_ITERATIONS": "2",
                 }
             )
         assert caught.value.code is ErrorCode.CONFIG_INVALID
@@ -194,7 +194,7 @@ class TestOverrides:
         assert parse_override("turn.max_iterations=32") == (["turn", "max_iterations"], 32)
 
     def test_missing_equals_is_rejected(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             parse_override("turn.max_iterations")
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -206,7 +206,7 @@ class TestOverrides:
         assert overrides_layer(["turn.max_iterations=3"]).origin == CLI_ORIGIN
 
     def test_dotted_key_with_no_segments_is_rejected(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             parse_override("...=1")
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -216,7 +216,7 @@ class TestPriority:
         path = write_config(tmp_path, {"turn": {"max_iterations": 1}})
         layers = collect_layers(
             path,
-            env={"NUCLEAMIND_CFG_TURN__MAX_ITERATIONS": "2"},
+            env={"KARYVIA_CFG_TURN__MAX_ITERATIONS": "2"},
             overrides=["turn.max_iterations=3"],
         )
         result = merge_layers(layers)
@@ -228,7 +228,7 @@ class TestPriority:
     def test_env_beats_file(self, tmp_path: Path) -> None:
         path = write_config(tmp_path, {"turn": {"max_iterations": 1}})
         result = merge_layers(
-            collect_layers(path, env={"NUCLEAMIND_CFG_TURN__MAX_ITERATIONS": "2"})
+            collect_layers(path, env={"KARYVIA_CFG_TURN__MAX_ITERATIONS": "2"})
         )
         turn = result.data["turn"]
         assert isinstance(turn, dict)
@@ -267,7 +267,7 @@ class TestSchema:
 
     def test_unknown_key_rejected_with_pointer_and_suggestion(self) -> None:
         """`CFG-001`：未知字段用自己的码，不被笼统的「配置无效」吞掉。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"turn": {"max_iterationz": 4}})
         error = caught.value
         assert error.code is ErrorCode.CONFIG_UNKNOWN_FIELD
@@ -278,19 +278,19 @@ class TestSchema:
 
     def test_camel_case_key_gets_a_snake_case_suggestion(self) -> None:
         """新层只认 snake_case，不提供 camelCase 别名——但要告诉用户该写什么。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"turn": {"maxIterations": 4}})
         assert "max_iterations" in caught.value.detail["errors"][0]["reason"]
 
     @pytest.mark.parametrize("field", ["compactor", "compactor_timeout_ms"])
     def test_removed_context_compactor_fields_are_rejected(self, field: str) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"context": {field: "removed"}})
         assert caught.value.code is ErrorCode.CONFIG_UNKNOWN_FIELD
         assert caught.value.detail["errors"][0]["pointer"] == f"/context/{field}"
 
     def test_unknown_section_is_reported(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"turnz": {}})
         errors = caught.value.detail["errors"]
         assert errors[0]["pointer"] == "/turnz"
@@ -316,13 +316,13 @@ class TestSchema:
         self, payload: dict[str, object], pointer: str
     ) -> None:
         """`CFG-001` 的「类型错误」一行：每处都要定位得到。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config(payload)  # type: ignore[arg-type]
         assert caught.value.detail["errors"][0]["pointer"] == pointer
 
     def test_bool_is_not_an_acceptable_integer(self) -> None:
         """`bool` 是 `int` 的子类，但 `max_iterations: true` 显然是写错了。"""
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             validate_config({"turn": {"max_iterations": True}})
 
     def test_null_section_falls_back_to_defaults(self) -> None:
@@ -344,14 +344,14 @@ class TestSchema:
     def test_error_detail_never_contains_the_offending_value(self) -> None:
         """密钥可以出现在任何指针上，所以 detail 里只放指针与原因，绝不放值。"""
         sentinel = "sk-ThisMustNeverLeak0123456789"
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"model": {"provider": {"nested": sentinel}}})
         assert sentinel not in repr(caught.value.detail)
         assert sentinel not in str(caught.value)
 
     def test_all_errors_reported_at_once(self) -> None:
         """逐条抛会让用户改一个键、重启、再看到下一个错误。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"turn": {"max_iterations": "x"}, "logging": {"level": 5}})
         assert len(caught.value.detail["errors"]) == 2
 
@@ -366,7 +366,7 @@ class TestSchema:
         这条测试就是那份重复的挡板。它若被删掉，两边会静默漂移，而受害者是「配置里没写
         的项到底用了什么值」。
         """
-        from nucleamind.kernel.turn import limits as limits_module
+        from karyvia.kernel.turn import limits as limits_module
 
         defaults = validate_config({}).turn
         assert defaults.max_iterations == limits_module.DEFAULT_MAX_ITERATIONS
@@ -380,7 +380,7 @@ class TestSchema:
 
     def test_default_limits_round_trip_through_turn_limits(self) -> None:
         """默认配置转出来的 `TurnLimits` 必须与直接构造的那个相等。"""
-        from nucleamind.kernel.turn import limits as limits_module
+        from karyvia.kernel.turn import limits as limits_module
 
         assert validate_config({}).turn.to_limits() == limits_module.TurnLimits()
 
@@ -397,9 +397,9 @@ class TestSchema:
 
         与 `test_turn_defaults_match_the_limits_module` 同理：这条测试就是那份重复的挡板。
         """
-        from nucleamind.kernel import routing as routing_package
-        from nucleamind.kernel.routing import session_lock
-        from nucleamind.runtime.instance import DEFAULT_CHANNEL_CONCURRENCY
+        from karyvia.kernel import routing as routing_package
+        from karyvia.kernel.routing import session_lock
+        from karyvia.runtime.instance import DEFAULT_CHANNEL_CONCURRENCY
 
         routing = validate_config({}).routing
         assert routing.command_prefix == routing_package.DEFAULT_COMMAND_PREFIX
@@ -421,7 +421,7 @@ class TestSchema:
         与上面两条同理：`schema.py` 不能 import `kernel.turn`（会把 engine 与 asyncio 拖上
         配置路径），代价就是这张对照表。
         """
-        from nucleamind.kernel.turn import context_builder, hooks, turn_compaction
+        from karyvia.kernel.turn import context_builder, hooks, turn_compaction
 
         config = validate_config({})
         assert config.hooks.observer_timeout_ms == hooks.DEFAULT_OBSERVER_TIMEOUT_MS
@@ -442,7 +442,7 @@ class TestSchema:
         与上面三条同理。**`on_failure` 的取值表也要对**：`MemorySection.critical` 把
         `"fail"` 翻成布尔，而那个字面量在 `kernel/turn/memory.py` 里也有一份。
         """
-        from nucleamind.kernel.turn import memory
+        from karyvia.kernel.turn import memory
 
         config = validate_config({})
         assert config.memory.recall_limit == memory.DEFAULT_MEMORY_RECALL_LIMIT
@@ -457,7 +457,7 @@ class TestSchema:
         `to_policy()` 与 `to_limits()` 一样用函数内 import，理由相同：`schema.py` 不得
         module-level import `kernel.turn`。
         """
-        from nucleamind.kernel.turn import retry
+        from karyvia.kernel.turn import retry
 
         config = validate_config({})
         assert config.retry.max_attempts == retry.DEFAULT_RETRY_MAX_ATTEMPTS
@@ -516,7 +516,7 @@ class TestSchema:
         assert validate_config({"memory": {"on_failure": "degrade"}}).memory.critical is False
 
     def test_unknown_memory_on_failure_is_rejected_with_the_allowed_values(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"memory": {"on_failure": "retry"}})
         issue = caught.value.detail["errors"][0]
         assert issue["pointer"] == "/memory/on_failure"
@@ -524,7 +524,7 @@ class TestSchema:
 
     def test_unknown_session_concurrency_is_rejected_with_the_allowed_values(self) -> None:
         """取值受限的字段必须在校验时就带着指针报错，而不是等到构造调度器那一刻。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"routing": {"session_concurrency": "parallel"}})
         issue = caught.value.detail["errors"][0]
         assert issue["pointer"] == "/routing/session_concurrency"
@@ -532,7 +532,7 @@ class TestSchema:
         assert "queue" in issue["reason"]
 
     def test_unknown_routing_field_is_rejected(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"routing": {"dedup_capcity": 10}})
         issue = caught.value.detail["errors"][0]
         assert issue["code"] == ErrorCode.CONFIG_UNKNOWN_FIELD.value
@@ -540,7 +540,7 @@ class TestSchema:
 
     def test_removed_channel_queue_limit_is_rejected(self) -> None:
         """删除重复策略后，旧字段必须显式失败，不能变成无效配置。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             validate_config({"routing": {"channel_queue_max_size": 10}})
         issue = caught.value.detail["errors"][0]
         assert issue["pointer"] == "/routing/channel_queue_max_size"
@@ -576,7 +576,7 @@ class TestLoadConfig:
         assert loaded.layout.sessions_dir.is_dir()
 
     def test_ensure_dirs_false_leaves_disk_untouched(self, tmp_path: Path) -> None:
-        """`nm doctor` 检查一个不存在的实例时不该顺手把它建出来。"""
+        """`karyvia doctor` 检查一个不存在的实例时不该顺手把它建出来。"""
         root = tmp_path / "inst"
         loaded = load_config(instance_dir=root, env={}, ensure_dirs=False)
         assert loaded.layout.root == root.resolve()
@@ -587,7 +587,7 @@ class TestLoadConfig:
         write_config(root, {"turn": {"max_iterations": 1, "tool_timeout_ms": 4000}})
         loaded = load_config(
             instance_dir=root,
-            env={"NUCLEAMIND_CFG_TURN__MAX_ITERATIONS": "2"},
+            env={"KARYVIA_CFG_TURN__MAX_ITERATIONS": "2"},
             overrides=["turn.max_iterations=3"],
         )
         assert loaded.config.turn.max_iterations == 3
@@ -601,7 +601,7 @@ class TestLoadConfig:
         assert loaded.limits.max_iterations == 5
 
     def test_relative_workspace_resolves_against_instance_dir(self, tmp_path: Path) -> None:
-        """按 cwd 解析会让「从哪个目录跑 nm」改变 agent 能看见的文件。"""
+        """按 cwd 解析会让「从哪个目录跑 karyvia」改变 agent 能看见的文件。"""
         root = tmp_path / "inst"
         write_config(root, {"workspace": {"root": "shared-ws"}})
         loaded = load_config(instance_dir=root, env={})
@@ -618,7 +618,7 @@ class TestLoadConfig:
     def test_blank_workspace_root_is_rejected(self, tmp_path: Path) -> None:
         root = tmp_path / "inst"
         write_config(root, {"workspace": {"root": "  "}})
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             load_config(instance_dir=root, env={})
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -685,7 +685,7 @@ class TestInstanceLock:
     def test_live_holder_blocks_a_second_acquire(self, tmp_path: Path) -> None:
         path = tmp_path / "instance.lock"
         with InstanceLock(path):
-            with pytest.raises(NucleaError) as caught:
+            with pytest.raises(KaryviaError) as caught:
                 make_lock(path, liveness=lambda pid: Liveness.ALIVE).acquire()
         error = caught.value
         assert error.code is ErrorCode.CONFIG_INSTANCE_LOCKED
@@ -695,7 +695,7 @@ class TestInstanceLock:
         """藏起重复获取的 bug 比报出来更糟。"""
         lock = InstanceLock(tmp_path / "instance.lock").acquire()
         try:
-            with pytest.raises(NucleaError) as caught:
+            with pytest.raises(KaryviaError) as caught:
                 lock.acquire()
             assert caught.value.code is ErrorCode.CONFIG_INSTANCE_LOCKED
         finally:
@@ -716,7 +716,7 @@ class TestInstanceLock:
         """模糊的答案不得授权抢走一把可能还活着的锁。"""
         path = tmp_path / "instance.lock"
         write_foreign_lock(path, pid=os.getpid() + 1)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             make_lock(path, liveness=lambda pid: Liveness.UNKNOWN).acquire()
         assert caught.value.code is ErrorCode.CONFIG_INSTANCE_LOCKED
 
@@ -738,7 +738,7 @@ class TestInstanceLock:
     def test_same_start_time_keeps_the_lock_held(self, tmp_path: Path) -> None:
         path = tmp_path / "instance.lock"
         write_foreign_lock(path, pid=os.getpid() + 1, created_at=5_000.0)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             make_lock(
                 path,
                 liveness=lambda pid: Liveness.ALIVE,
@@ -772,7 +772,7 @@ class TestInstanceLock:
             ),
             encoding="utf-8",
         )
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             make_lock(path, liveness=lambda pid: Liveness.DEAD).acquire()
         assert caught.value.code is ErrorCode.CONFIG_INSTANCE_LOCKED
 
@@ -834,7 +834,7 @@ class TestLockInfoDecoding:
         """只有 pid 的锁仍然可用：其余字段缺失时退化，但不能抛异常。"""
         path = tmp_path / "instance.lock"
         path.write_text(json.dumps({"pid": os.getpid() + 1}), encoding="utf-8")
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             make_lock(path, liveness=lambda pid: Liveness.UNKNOWN).acquire()
         assert caught.value.detail["holder_pid"] == os.getpid() + 1
 
@@ -844,7 +844,7 @@ class TestLockInfoDecoding:
         path.write_text(
             json.dumps({"pid": os.getpid() + 1, "created_at": "yesterday"}), encoding="utf-8"
         )
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             make_lock(path, liveness=lambda pid: Liveness.ALIVE).acquire()
         assert caught.value.detail["holder_created_at"] == 0.0
 
@@ -912,7 +912,7 @@ class TestProcessProbe:
 
 
 def test_loading_config_does_not_import_the_turn_engine(tmp_path: Path) -> None:
-    """`nm config show` 不该把 turn 引擎与 asyncio 调度拖上路径（`NFR-405` 冷启动预算）。
+    """`karyvia config show` 不该把 turn 引擎与 asyncio 调度拖上路径（`NFR-405` 冷启动预算）。
 
     `schema.py` 只从 `kernel.turn.limits` 取六个默认值常量，engine / scheduling / folding
     都不该被牵连；`routing` 的五个默认值同理，那个包会把调度器与 asyncio 一起带进来。
@@ -920,11 +920,11 @@ def test_loading_config_does_not_import_the_turn_engine(tmp_path: Path) -> None:
     """
     script = (
         "import sys;"
-        "from nucleamind.kernel.config import load_config;"
+        "from karyvia.kernel.config import load_config;"
         f"load_config(instance_dir=r'{tmp_path / 'inst'}', env={{}});"
-        "leaked=[m for m in ('nucleamind.kernel.turn.engine',"
-        "'nucleamind.kernel.turn.scheduling','nucleamind.kernel.turn.folding',"
-        "'nucleamind.kernel.routing')"
+        "leaked=[m for m in ('karyvia.kernel.turn.engine',"
+        "'karyvia.kernel.turn.scheduling','karyvia.kernel.turn.folding',"
+        "'karyvia.kernel.routing')"
         " if m in sys.modules];"
         "print('LEAKED' if leaked else 'CLEAN', leaked)"
     )
@@ -946,7 +946,7 @@ def test_loading_config_does_not_import_pydantic(tmp_path: Path) -> None:
     """
     script = (
         "import sys;"
-        "from nucleamind.kernel.config import load_config;"
+        "from karyvia.kernel.config import load_config;"
         f"load_config(instance_dir=r'{tmp_path / 'inst'}', env={{}});"
         "print('LEAKED' if 'pydantic' in sys.modules else 'CLEAN')"
     )

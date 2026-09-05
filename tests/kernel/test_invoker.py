@@ -15,19 +15,19 @@ import asyncio
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
     RiskLevel,
     SideEffect,
     ToolCall,
     ToolResult,
     ToolSpec,
 )
-from nucleamind.kernel.registry import CapabilityRegistry
-from nucleamind.kernel.turn import CancelToken, RegisteredTool, ToolExecutor, tools_from
+from karyvia.kernel.registry import CapabilityRegistry
+from karyvia.kernel.turn import CancelToken, RegisteredTool, ToolExecutor, tools_from
 
 from ._engine_support import CORRELATION
 from ._orchestrator_support import FakeToolHandler
@@ -185,7 +185,7 @@ async def test_a_tool_that_stops_within_the_grace_period_keeps_its_own_result() 
     stopped = ToolResult(
         call_id="c1", ok=False, content="我停下了", truncated=False,
         side_effect=SideEffect.NONE,
-        error=NucleaError(ErrorCode.CANCELLED_BY_USER, "已停止"),
+        error=KaryviaError(ErrorCode.CANCELLED_BY_USER, "已停止"),
     )
 
     async def body(invocation, cancel):  # noqa: ANN001, ANN202
@@ -271,7 +271,7 @@ def test_tools_from_rejects_a_foreign_payload() -> None:
         batch.add(CapabilityKind.TOOL, "fs.read", object())
     registry.freeze(registry.registrations)
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         tools_from(registry)
     assert caught.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 

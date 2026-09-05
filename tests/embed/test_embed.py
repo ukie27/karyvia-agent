@@ -14,11 +14,11 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError, SessionKey, TurnStatus
-from nucleamind.embed import EMBED_CHANNEL_ID, open_instance, run
-from nucleamind.kernel.config import InstanceLock
-from nucleamind.kernel.turn import CancelToken
-from nucleamind.runtime.bootstrap import bootstrap
+from karyvia.contracts import ErrorCode, KaryviaError, SessionKey, TurnStatus
+from karyvia.embed import EMBED_CHANNEL_ID, open_instance, run
+from karyvia.kernel.config import InstanceLock
+from karyvia.kernel.turn import CancelToken
+from karyvia.runtime.bootstrap import bootstrap
 
 from ..runtime._support import SCRIPT, TEST_MANIFESTS, text_response, write_config
 
@@ -37,7 +37,7 @@ async def test_the_context_manager_stops_the_instance(tmp_path: Path) -> None:
     write_config(tmp_path)
     async with open_instance(instance_dir=tmp_path, manifests=TEST_MANIFESTS) as agent:
         assert (await agent.send("在吗")).outcome is not None
-    # 停掉之后锁必须放开——否则一个用完的嵌入式实例会挡住 `nm run`。
+    # 停掉之后锁必须放开——否则一个用完的嵌入式实例会挡住 `karyvia run`。
     InstanceLock(tmp_path / "instance.lock").acquire().release()
 
 
@@ -75,7 +75,7 @@ async def test_embed_writes_its_own_session(tmp_path: Path) -> None:
 async def test_a_broken_instance_fails_loudly(tmp_path: Path) -> None:
     """门面不吞启动错误：一个装不起来的实例必须当场说清楚原因。"""
     write_config(tmp_path, model={"provider": "fake"})
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await run("在吗", instance_dir=tmp_path, manifests=TEST_MANIFESTS)
     assert caught.value.code is ErrorCode.CONFIG_INVALID
     assert caught.value.detail["pointer"] == "/model/name"

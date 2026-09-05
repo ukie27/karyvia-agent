@@ -1,14 +1,14 @@
 """`web` 插件的端到端用例（开发方案 `D36`）：两件工具在**真实装配的实例**上跑一次 turn。
 
 职责：验「装上 web 插件之后，模型真的能搜、真的能抓，而抓的那一下真的过了 SSRF 守卫」。
-不负责：插件自身的线格式与纯函数（`plugins/nucleamind-plugin-web/tests/`）、
+不负责：插件自身的线格式与纯函数（`plugins/karyvia-plugin-web/tests/`）、
 装配链内部结构（`tests/runtime/`）。
 
 **这里唯一的替身仍然是传输层**（`conftest.recorder`），与 `test_plugin_runtime.py` 同一条
 理由：模型供应商、注册路径、`ToolExecutor`、`runtime/access/net.py` 的守卫全是生产实现。
 因此本文件要求 web 插件已经装进当前环境：
 
-    nm plugins install --no-deps plugins/nucleamind-plugin-web
+    karyvia plugins install --no-deps plugins/karyvia-plugin-web
 
 **`web.fetch` 打不到公网，这是刻意的。** `conftest.py` 的网络闸门只放行回环，而
 `GuardedHttpAccess` 恰恰**拒绝**回环——两条规则合起来意味着这套用例里没有任何地址是
@@ -25,11 +25,11 @@ from pathlib import Path
 import httpx
 import pytest
 
-from nucleamind.kernel.turn import CancelToken
-from nucleamind.runtime.bootstrap import bootstrap
-from nucleamind.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
-from nucleamind.runtime.inspect import inspect_capabilities
-from nucleamind.runtime.plugin_home import GlobalPluginHome
+from karyvia.kernel.turn import CancelToken
+from karyvia.runtime.bootstrap import bootstrap
+from karyvia.runtime.first_run import MODEL_API_KEY_ENV, MODEL_PLUGIN_ID, MODEL_SECRET_NAME
+from karyvia.runtime.inspect import inspect_capabilities
+from karyvia.runtime.plugin_home import GlobalPluginHome
 
 from ._support import say, use_tool
 from .conftest import Recorder
@@ -80,7 +80,7 @@ def write_config(instance_dir: Path, plugins: dict[str, object]) -> None:
 
 
 async def run_prompt(instance_dir: Path, prompt: str) -> int:
-    """装配一次真实例并跑一条单次执行（`nm run -p` 的正文）。"""
+    """装配一次真实例并跑一条单次执行（`karyvia run -p` 的正文）。"""
     instance = await bootstrap(instance_dir=instance_dir)
     try:
         return await instance.run_cli(["-p", prompt], CancelToken())
@@ -115,7 +115,7 @@ def test_the_web_plugin_is_installed_as_an_entry_point() -> None:
     """整套用例的前提。**单独成一条**：装漏了要看到一句能照做的话。"""
     names = {item.plugin_id for item in GlobalPluginHome.resolve().catalog()}
     assert WEB_PLUGIN in names, (
-        "web 插件没装。请先跑 `nm plugins install --no-deps plugins/nucleamind-plugin-web`"
+        "web 插件没装。请先跑 `karyvia plugins install --no-deps plugins/karyvia-plugin-web`"
     )
 
 

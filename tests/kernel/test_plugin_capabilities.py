@@ -10,7 +10,7 @@
   单项或 `None`。`D16` 的 `BUILTIN_MANIFESTS` 是空元组，因此「什么都没有」是必须跑得通的
   正常路径，不是退化分支。
 - **身份如实记着**。`owner` / `name` / `priority` 要能原样回答「这个实现是谁提供的」
-  （`PLG-006`），否则 `nm capabilities` 与诊断就没有数据源。
+  （`PLG-006`），否则 `karyvia capabilities` 与诊断就没有数据源。
 
 能力经真 Host 注册再取回，而不是直接 `batch.add`：`D16` 之后这条路是唯一的注册路径，
 测试也该走它。
@@ -20,16 +20,16 @@ from __future__ import annotations
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
     Plugin,
     PluginId,
     ProviderId,
 )
-from nucleamind.kernel.plugins import (
+from karyvia.kernel.plugins import (
     CapabilityDeclaration,
     CapabilityHost,
     channels_from,
@@ -39,8 +39,8 @@ from nucleamind.kernel.plugins import (
     session_store_from,
     turn_context_compactors_from,
 )
-from nucleamind.kernel.registry import CapabilityRegistry, resolve_into
-from nucleamind.sdk.testing import (
+from karyvia.kernel.registry import CapabilityRegistry, resolve_into
+from karyvia.sdk.testing import (
     FakeCliEntry,
     FakeMemoryProvider,
     FakeModelProvider,
@@ -174,7 +174,7 @@ def test_a_wrong_payload_shape_is_caught_at_retrieval(
 ) -> None:
     """形状不对即 `KERNEL_INVARIANT_VIOLATED`，与已有四个取回函数同构。"""
     registry = frozen_with(kind, "x", payload="不是合法载荷")
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         retrieve(registry)  # type: ignore[operator]
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
     assert excinfo.value.detail["actual"] == "str"
@@ -187,7 +187,7 @@ def test_a_bare_implementation_object_is_not_an_acceptable_payload() -> None:
     会放它过去；具体 wrapper 才是可靠的窄化手段。
     """
     registry = frozen_with(CapabilityKind.MODEL, "model", payload=FakeModelProvider())
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         model_providers_from(registry)
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -195,7 +195,7 @@ def test_a_bare_implementation_object_is_not_an_acceptable_payload() -> None:
 def test_retrieval_before_freezing_is_refused() -> None:
     """冻结前不可查找——未定案的结果随时可能被覆盖掉（registry 自己抛）。"""
     registry = CapabilityRegistry()
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         model_providers_from(registry)
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -229,12 +229,12 @@ def test_two_active_singletons_would_be_a_broken_invariant() -> None:
         first = batch.add(CapabilityKind.SESSION_STORE, "a", _store())
         second = batch.add(CapabilityKind.SESSION_STORE, "b", _store())
     registry.freeze([first, second])
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         session_store_from(registry)
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
 def _store() -> object:
-    from nucleamind.kernel.plugins import RegisteredSessionStore
+    from karyvia.kernel.plugins import RegisteredSessionStore
 
     return RegisteredSessionStore(store=InMemorySessionStore())

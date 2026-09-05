@@ -3,20 +3,20 @@ x-common-config: &common-config
     context: ..
     dockerfile: deploy/Dockerfile
     args:
-      # 逗号分隔的官方插件目录后缀，对应 plugins/nucleamind-plugin-<名字>/。
+      # 逗号分隔的官方插件目录后缀，对应 plugins/karyvia-plugin-<名字>/。
       # 装进镜像还不等于启用——启用要写进 config.json 的 plugins.enabled。
-      NUCLEAMIND_PLUGINS: ${NUCLEAMIND_PLUGINS:-openai-api}
+      KARYVIA_PLUGINS: ${KARYVIA_PLUGINS:-openai-api}
   volumes:
-    - ~/.nucleamind:/home/nanobot/.nucleamind
+    - ~/.karyvia:/home/nanobot/.karyvia
   cap_drop:
     - ALL
 
-# 容器里跑的是新 Kernel（`nm`），只有两个服务：常驻的 `nm serve` 与交互式的 `nm run`。
-# `nm serve` 服务的是**已启用的 Channel 插件**；官方插件用 Dockerfile 的
-# `NUCLEAMIND_PLUGINS` 构建参数装进镜像，再写进 `plugins.enabled` 才会生效。
+# 容器里跑的是新 Kernel（`karyvia`），只有两个服务：常驻的 `karyvia serve` 与交互式的 `karyvia run`。
+# `karyvia serve` 服务的是**已启用的 Channel 插件**；官方插件用 Dockerfile 的
+# `KARYVIA_PLUGINS` 构建参数装进镜像，再写进 `plugins.enabled` 才会生效。
 services:
-  nucleamind-serve:
-    container_name: nucleamind-serve
+  karyvia-serve:
+    container_name: karyvia-serve
     <<: *common-config
     command: ["serve", "--host", "0.0.0.0"]
     restart: unless-stopped
@@ -31,7 +31,7 @@ services:
           cpus: "0.25"
           memory: 256M
 
-  nucleamind-cli:
+  karyvia-cli:
     <<: *common-config
     profiles:
       - cli

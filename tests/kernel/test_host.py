@@ -22,19 +22,19 @@ import inspect
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     CommandSpec,
     ErrorCode,
     HookName,
-    NucleaError,
+    KaryviaError,
     Plugin,
     PluginId,
     ProviderId,
     ToolSpec,
 )
-from nucleamind.kernel.plugins import (
+from karyvia.kernel.plugins import (
     CapabilityDeclaration,
     CapabilityHost,
     RegisteredChannel,
@@ -44,16 +44,16 @@ from nucleamind.kernel.plugins import (
     RegisteredSessionStore,
     RegisteredTurnContextCompactor,
 )
-from nucleamind.kernel.registry import (
+from karyvia.kernel.registry import (
     BUILTIN_BASE_PRIORITY,
     PLUGIN_BASE_PRIORITY,
     CapabilityRegistry,
     RegistrationBatch,
 )
-from nucleamind.kernel.routing import RegisteredCommand
-from nucleamind.kernel.turn import RegisteredContextProvider, RegisteredHook, RegisteredTool
-from nucleamind.sdk import NucleaAPI
-from nucleamind.sdk.testing import (
+from karyvia.kernel.routing import RegisteredCommand
+from karyvia.kernel.turn import RegisteredContextProvider, RegisteredHook, RegisteredTool
+from karyvia.sdk import KaryviaAPI
+from karyvia.sdk.testing import (
     ECHO_SPEC,
     EchoTool,
     FakeCliEntry,
@@ -120,14 +120,14 @@ class _NullCommand:
 # --------------------------------------------------------------------------- 与 SDK 表面一致
 
 
-def test_host_satisfies_the_nuclea_api_protocol() -> None:
-    """结构化子类型：Host 不继承 `NucleaAPI`（`R2` 禁止 kernel import sdk）。
+def test_host_satisfies_the_karyvia_api_protocol() -> None:
+    """结构化子类型：Host 不继承 `KaryviaAPI`（`R2` 禁止 kernel import sdk）。
 
     这里的 `isinstance` 只是诊断回声——真正的证明是 `runtime/wiring.py` 里那句类型标注，
     因为 basedpyright 的 `exclude = ["**/tests"]` 让测试验不了签名兼容性。
     """
     _, _, host = make_host()
-    assert isinstance(host, NucleaAPI)
+    assert isinstance(host, KaryviaAPI)
 
 
 def test_ten_methods_cover_ten_kinds() -> None:
@@ -207,7 +207,7 @@ def test_each_kind_gets_its_declared_payload_shape(kind: CapabilityKind, shape: 
 def test_registering_an_undeclared_capability_is_rejected() -> None:
     """放行未声明的注册，manifest 的 `capabilities` 就成了一份没有约束力的文档。"""
     _, _, host = make_host(declare(CapabilityKind.TOOL, "other.tool"))
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         host.register_tool(ECHO_SPEC, EchoTool())
     assert excinfo.value.code is ErrorCode.PLUGIN_LOAD_FAILED
     assert excinfo.value.detail["capability"] == f"tool:{ECHO_SPEC.name}"
@@ -220,7 +220,7 @@ def test_a_declared_capability_that_is_never_registered_fails_at_finish() -> Non
         declare(CapabilityKind.MODEL, "model"),
     )
     host.register_tool(ECHO_SPEC, EchoTool())
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         host.finish()
     assert excinfo.value.code is ErrorCode.PLUGIN_LOAD_FAILED
     assert excinfo.value.detail["unfulfilled"] == ["model:model"]
@@ -269,7 +269,7 @@ def test_on_default_priority_equals_the_plugin_baseline() -> None:
 
     SDK 改了默认值而这里没改，内建 Hook 的排序会静默出错——那正是这条测试要拦的。
     """
-    assert inspect.signature(NucleaAPI.on).parameters["priority"].default == PLUGIN_BASE_PRIORITY
+    assert inspect.signature(KaryviaAPI.on).parameters["priority"].default == PLUGIN_BASE_PRIORITY
 
 
 def test_the_sdk_default_priority_is_treated_as_unstated() -> None:
@@ -319,7 +319,7 @@ def test_registering_after_commit_raises() -> None:
     )
     host.register_tool(ECHO_SPEC, EchoTool())
     batch.commit()
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         host.register_model_provider("model", FakeModelProvider())
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -350,7 +350,7 @@ def test_a_namespace_declaration_admits_any_name_under_the_prefix() -> None:
 def test_a_namespace_does_not_admit_the_bare_prefix() -> None:
     """前缀本身不是它放行的名字之一——要注册 `mcp` 就再写一条精确声明。"""
     _, _, host = make_host(namespace(CapabilityKind.TOOL, "mcp"))
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         host.register_tool(_tool("mcp"), EchoTool())
     assert excinfo.value.code is ErrorCode.PLUGIN_LOAD_FAILED
 
@@ -358,13 +358,13 @@ def test_a_namespace_does_not_admit_the_bare_prefix() -> None:
 def test_the_prefix_comparison_lands_on_a_separator() -> None:
     """否则 `mcpx.read` 会被判成 `mcp` 的后代（`WorkspaceGuard` 的路径前缀同一条道理）。"""
     _, _, host = make_host(namespace(CapabilityKind.TOOL, "mcp"))
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         host.register_tool(_tool("mcpx.read"), EchoTool())
 
 
 def test_a_namespace_only_admits_its_own_kind() -> None:
     _, _, host = make_host(namespace(CapabilityKind.TOOL, "mcp"))
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         host.register_command(CommandSpec(name="mcp.list", description="x"), _NullCommand())
 
 
@@ -386,7 +386,7 @@ def test_two_namespaces_matching_the_same_name_is_an_error() -> None:
         namespace(CapabilityKind.TOOL, "mcp"),
         namespace(CapabilityKind.TOOL, "mcp.remote"),
     )
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         host.register_tool(_tool("mcp.remote.read"), EchoTool())
     assert excinfo.value.code is ErrorCode.PLUGIN_LOAD_FAILED
     assert excinfo.value.detail["namespaces"] == ["mcp", "mcp.remote"]
@@ -404,7 +404,7 @@ def test_an_exact_declaration_alongside_a_namespace_is_still_required() -> None:
         namespace(CapabilityKind.TOOL, "mcp"),
         declare(CapabilityKind.TOOL, "mcp.probe"),
     )
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         host.finish()
     assert excinfo.value.detail["unfulfilled"] == ["tool:mcp.probe"]
 

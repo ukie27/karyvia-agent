@@ -12,7 +12,7 @@ RUN uv venv --seed "$VIRTUAL_ENV"
 
 # Install Python dependencies first (cached layer).
 COPY pyproject.toml README.md LICENSE THIRD_PARTY_NOTICES.md ./
-RUN mkdir -p src/nucleamind && touch src/nucleamind/__init__.py && \
+RUN mkdir -p src/karyvia && touch src/karyvia/__init__.py && \
     uv pip install --python "$VIRTUAL_ENV/bin/python" --no-cache . && \
     rm -rf src
 
@@ -23,16 +23,16 @@ RUN uv pip install --python "$VIRTUAL_ENV/bin/python" --no-cache .
 # Official plugins are discovered through entry points, so they must actually be
 # installed. Pick what the image should serve; each plugin declares its own
 # platform SDK as an optional extra (D32-D34: the host depends on none of them).
-ARG NUCLEAMIND_PLUGINS=
+ARG KARYVIA_PLUGINS=
 COPY plugins/ plugins/
-RUN for plugin in $(printf '%s' "$NUCLEAMIND_PLUGINS" | tr ',' ' '); do \
+RUN for plugin in $(printf '%s' "$KARYVIA_PLUGINS" | tr ',' ' '); do \
         uv pip install --python "$VIRTUAL_ENV/bin/python" --no-cache \
-            "./plugins/nucleamind-plugin-${plugin}"; \
+            "./plugins/karyvia-plugin-${plugin}"; \
     done
 
 # Create the non-root user and hand ownership of the writable virtualenv to it.
 RUN useradd -m -u 1000 -s /bin/bash nanobot && \
-    mkdir -p /home/nanobot/.nucleamind && \
+    mkdir -p /home/nanobot/.karyvia && \
     chown -R nanobot:nanobot /home/nanobot /app/.venv
 
 COPY deploy/entrypoint.sh /usr/local/bin/entrypoint.sh

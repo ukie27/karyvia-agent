@@ -22,8 +22,8 @@ from collections.abc import AsyncIterator, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS
-from nucleamind.contracts import (
+from karyvia.builtins.registry import BUILTIN_MANIFESTS
+from karyvia.contracts import (
     CancelSignal,
     CapabilityKind,
     ContextFragment,
@@ -37,9 +37,9 @@ from nucleamind.contracts import (
     Sender,
     TrustLevel,
 )
-from nucleamind.runtime.plugin_home import GlobalPluginHome, InstalledPlugin
-from nucleamind.sdk import CapabilityDecl, NucleaAPI, PluginManifest, parse_manifest
-from nucleamind.sdk.testing import (
+from karyvia.runtime.plugin_home import GlobalPluginHome, InstalledPlugin
+from karyvia.sdk import CapabilityDecl, KaryviaAPI, PluginManifest, parse_manifest
+from karyvia.sdk.testing import (
     FAKE_MODEL_ID,
     FakeModelProvider,
     text_response,
@@ -76,7 +76,7 @@ __all__ = [
 SCRIPT: list[ModelResponse] = []
 
 
-def setup_fake_model(api: NucleaAPI) -> None:
+def setup_fake_model(api: KaryviaAPI) -> None:
     """假模型插件的 `setup`。与任何内建同型：拿 Host、注册一次、返回。"""
     api.register_model_provider("fake", FakeModelProvider(list(SCRIPT)))
 
@@ -211,7 +211,7 @@ MULTI_CHANNEL: PluginManifest = PluginManifest(
 )
 
 
-def setup_multi_channel(api: NucleaAPI) -> None:
+def setup_multi_channel(api: KaryviaAPI) -> None:
     api.register_channel(MULTI_CHANNEL_ID, ScriptedChannel())
 
 
@@ -277,7 +277,7 @@ FAKE_MEMORY: PluginManifest = PluginManifest(
 )
 
 
-def setup_fake_memory(api: NucleaAPI) -> None:
+def setup_fake_memory(api: KaryviaAPI) -> None:
     api.register_memory_provider(MEMORY_NAME, FakeMemoryProvider(dict(MEMORIES)))
 
 

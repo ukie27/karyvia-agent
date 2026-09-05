@@ -4,7 +4,7 @@
 把泵带走、`stop()` 会不会漏掉插件派生的任务、两次 `Ctrl-C` 各做什么。
 不负责：验装配（`test_bootstrap.py`）、验渲染（`tests/builtins/test_cli_entry.py`）。
 
-**`_Interrupts` 单独测**：`nm run` 的其余部分要一个真终端，而这个状态机恰好是那条命令
+**`_Interrupts` 单独测**：`karyvia run` 的其余部分要一个真终端，而这个状态机恰好是那条命令
 里唯一有分支的地方——第一次取消 turn、第二次退出，`§10.3` 的全部内容。
 """
 
@@ -16,20 +16,20 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelReason,
     CapabilityKind,
     ErrorCode,
     EventName,
-    NucleaError,
+    KaryviaError,
     StreamState,
 )
-from nucleamind.kernel.config import InstanceLock
-from nucleamind.kernel.plugins import PluginPhase
-from nucleamind.kernel.turn import CancelToken
-from nucleamind.runtime.cli.commands.run import _Interrupts
-from nucleamind.runtime.instance import AgentInstance, delivery_error
-from nucleamind.sdk import NucleaAPI
+from karyvia.kernel.config import InstanceLock
+from karyvia.kernel.plugins import PluginPhase
+from karyvia.kernel.turn import CancelToken
+from karyvia.runtime.cli.commands.run import _Interrupts
+from karyvia.runtime.instance import AgentInstance, delivery_error
+from karyvia.sdk import KaryviaAPI
 
 from ._support import (
     MULTI_CHANNEL_ID,
@@ -128,7 +128,7 @@ name = "{MULTI_CHANNEL_ID}"
     await instance.stop()
     assert channel.stopped == 1
     InstanceLock(instance.layout.lock_path).acquire().release()
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await instance.start()
     assert caught.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -158,7 +158,7 @@ class FailingStartChannel(ScriptedChannel):
 _FAILING_CHANNELS: list[FailingStartChannel] = []
 
 
-def setup_failing_channel(api: NucleaAPI) -> None:
+def setup_failing_channel(api: KaryviaAPI) -> None:
     channel = FailingStartChannel()
     _FAILING_CHANNELS.append(channel)
     api.register_channel(MULTI_CHANNEL_ID, channel)
@@ -247,7 +247,7 @@ async def test_a_stopped_plugin_cannot_spawn_new_tasks(tmp_path: Path) -> None:
     async def late() -> None:  # pragma: no cover - 它就不该被跑
         await asyncio.sleep(0)
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         ctx.spawn_task(late(), name="late")
     assert caught.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
     assert ctx.tasks == set()
@@ -613,7 +613,7 @@ async def test_a_failing_delivery_does_not_fail_the_turn(tmp_path: Path) -> None
     try:
         await instance.start()
         channel = multi_channel(instance)
-        channel.fail_delivery_with = NucleaError(
+        channel.fail_delivery_with = KaryviaError(
             ErrorCode.EXTERNAL_CHANNEL, "平台拒收。", retryable=True
         )
         channel.push(inbound("c0", "在吗", message_id="m0"))
@@ -658,7 +658,7 @@ async def test_the_delivery_failure_event_points_at_the_turn_it_belongs_to(
         assert first.correlation is not None  # type: ignore[attr-defined]
         assert first.correlation.turn_id  # type: ignore[attr-defined]
         assert first.payload["channel"] == MULTI_CHANNEL_ID  # type: ignore[attr-defined]
-        # 非 `NucleaError` 折成 `EXTERNAL_CHANNEL` 而不是 `KERNEL_UNEXPECTED`：原因在平台
+        # 非 `KaryviaError` 折成 `EXTERNAL_CHANNEL` 而不是 `KERNEL_UNEXPECTED`：原因在平台
         # 那一侧，记成内核异常会把排查方向指错。
         assert first.error is not None  # type: ignore[attr-defined]
         assert first.error.code is ErrorCode.EXTERNAL_CHANNEL  # type: ignore[attr-defined]
@@ -698,12 +698,12 @@ async def test_a_failing_echo_is_marked_synthetic(tmp_path: Path) -> None:
 
 
 def test_delivery_error_keeps_what_the_implementation_said() -> None:
-    """照约定抛 `NucleaError` 的实现原样带出——`retryable` 是它的判断，不替它覆写。
+    """照约定抛 `KaryviaError` 的实现原样带出——`retryable` 是它的判断，不替它覆写。
 
     未按约定抛的实现没告诉我们能不能重试，因此折出来的那条标 `retryable=False`：
     猜一个 `True` 会让编排层去重发一条可能已经发出去的消息。
     """
-    declared = NucleaError(ErrorCode.EXTERNAL_CHANNEL, "限流。", retryable=True)
+    declared = KaryviaError(ErrorCode.EXTERNAL_CHANNEL, "限流。", retryable=True)
     assert delivery_error(declared) is declared
 
     folded = delivery_error(ValueError("token=abc123"))

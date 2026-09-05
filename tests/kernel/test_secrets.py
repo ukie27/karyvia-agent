@@ -17,9 +17,9 @@ from typing import Final
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError, SecretStr
-from nucleamind.contracts.errors import MASK
-from nucleamind.kernel.config import (
+from karyvia.contracts import ErrorCode, KaryviaError, SecretStr
+from karyvia.contracts.errors import MASK
+from karyvia.kernel.config import (
     SecretMap,
     SecretRef,
     contains_secret_ref,
@@ -31,7 +31,7 @@ from nucleamind.kernel.config import (
 )
 
 #: 哨兵：任何输出里出现它都是泄漏。
-SENTINEL: Final = "nm-sentinel-4f2b8c1e-do-not-leak"
+SENTINEL: Final = "karyvia-sentinel-4f2b8c1e-do-not-leak"
 
 ENV: Final = {"NM_TEST_KEY": SENTINEL, "NM_TEST_HOST": "example.invalid"}
 
@@ -109,7 +109,7 @@ def test_secret_str_equality_and_hash_are_by_value() -> None:
 def test_secret_str_does_not_leak_through_logging() -> None:
     stream = io.StringIO()
     handler = logging.StreamHandler(stream)
-    logger = logging.getLogger("nucleamind.test.secrets")
+    logger = logging.getLogger("karyvia.test.secrets")
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     try:
@@ -121,12 +121,12 @@ def test_secret_str_does_not_leak_through_logging() -> None:
     assert MASK in stream.getvalue()
 
 
-def test_nuclea_error_masks_secret_in_detail_and_scrubs_it_from_the_message() -> None:
+def test_karyvia_error_masks_secret_in_detail_and_scrubs_it_from_the_message() -> None:
     """`redact` 认得 `SecretStr`，且明文进入密文集合后会被 `scrub` 从消息里擦掉。
 
     第二条是重点：只按键名脱敏挡不住「凭据被顺手拼进了 user_message」。
     """
-    error = NucleaError(
+    error = KaryviaError(
         ErrorCode.CONFIG_INVALID,
         f"provider 拒绝了凭据 {SENTINEL}。",
         detail={"credential": SecretStr(SENTINEL), "pointer": "/model/api_key"},
@@ -168,7 +168,7 @@ def test_scan_escapes_pointer_tokens() -> None:
 
 
 def test_scan_does_not_read_the_environment() -> None:
-    """纯扫描：变量一个都没导出也不该失败（`nm doctor` 要靠它列出待补的变量）。"""
+    """纯扫描：变量一个都没导出也不该失败（`karyvia doctor` 要靠它列出待补的变量）。"""
     refs = scan_secret_refs({"model": {"api_key": "${NM_NEVER_SET_ANYWHERE}"}})
 
     assert refs[0].names == ("NM_NEVER_SET_ANYWHERE",)
@@ -258,7 +258,7 @@ def test_resolve_text_returns_plain_string_when_there_is_no_ref() -> None:
 
 
 def test_missing_variable_reports_the_name_only() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         resolve_secrets({"model": {"api_key": "${NM_ABSENT_KEY}"}}, env={})
 
     error = excinfo.value
@@ -271,7 +271,7 @@ def test_missing_variable_reports_the_name_only() -> None:
 
 def test_empty_variable_counts_as_missing_with_its_own_reason() -> None:
     """`OPENAI_API_KEY=` 几乎总是配错；静默接受只会把报错推到第一次模型调用。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         resolve_secrets({"model": {"api_key": "${NM_EMPTY}"}}, env={"NM_EMPTY": "   "})
 
     assert excinfo.value.detail["missing"] == [
@@ -281,7 +281,7 @@ def test_empty_variable_counts_as_missing_with_its_own_reason() -> None:
 
 def test_all_missing_variables_are_reported_at_once() -> None:
     """一次报全：缺三个变量是首次配置的常态，逐条抛出会让用户重启三次。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         resolve_secrets(
             {"a": "${NM_ONE}", "b": {"c": "${NM_TWO}"}, "d": "${NM_THREE}"},
             env={},
@@ -293,7 +293,7 @@ def test_all_missing_variables_are_reported_at_once() -> None:
 
 def test_missing_variable_error_carries_no_values() -> None:
     """哨兵：另一个变量已导出时，它的值不得出现在错误里。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         resolve_secrets(
             {"a": "${NM_TEST_KEY}", "b": "${NM_ABSENT_KEY}"},
             env=ENV,
@@ -305,7 +305,7 @@ def test_missing_variable_error_carries_no_values() -> None:
 
 
 def test_resolve_text_missing_variable_records_the_given_pointer() -> None:
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         resolve_text("${NM_ABSENT_KEY}", env={}, pointer="/plugins/acme/config/api_key")
 
     assert excinfo.value.detail["missing"] == [
@@ -373,7 +373,7 @@ def test_write_back_refuses_a_secret_it_cannot_express_as_a_reference() -> None:
     """换不回去就抛错。「找不到来源就写明文」是这条防线唯一不能有的行为。"""
     secrets = resolve_secrets({"model": {"api_key": "${NM_TEST_KEY}"}}, env=ENV)
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         prepare_for_write({"other": SecretStr("from-somewhere-else")}, secrets)
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -382,7 +382,7 @@ def test_write_back_refuses_a_secret_it_cannot_express_as_a_reference() -> None:
 
 def test_write_back_refuses_non_json_values() -> None:
     """非 JSON 形状的值不 `str()` 它：`str()` 正是明文泄漏最爱走的那条路。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         prepare_for_write({"path": object()}, SecretMap())
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -412,7 +412,7 @@ def test_write_back_refuses_a_moved_short_secret_instead_of_guessing() -> None:
     """短值 + 换了位置 = 反查不可靠，此时抛错。不确定就拒写，绝不写明文。"""
     secrets = resolve_secrets({"model": {"api_key": "${NM_SHORT}"}}, env={"NM_SHORT": "1234"})
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         prepare_for_write({"backup": secrets.at("model", "api_key")}, secrets)
 
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED

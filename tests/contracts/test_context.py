@@ -11,17 +11,17 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     UNTRUSTED_DATA_PREFIX,
     ContextFragment,
     ErrorCode,
     FragmentKind,
     FragmentScope,
-    NucleaError,
+    KaryviaError,
     Sensitivity,
     TrustLevel,
 )
-from nucleamind.contracts.context import MAX_FRAGMENT_LENGTH
+from karyvia.contracts.context import MAX_FRAGMENT_LENGTH
 
 NOW = datetime(2026, 8, 10, 12, 0, tzinfo=UTC)
 
@@ -64,20 +64,20 @@ def test_enums_are_complete() -> None:
 
 
 def test_empty_content_is_rejected() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         fragment(content="")
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
 
 def test_oversized_content_is_rejected() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         fragment(content="x" * (MAX_FRAGMENT_LENGTH + 1))
     assert exc.value.code is ErrorCode.INPUT_TOO_LARGE
 
 
 @pytest.mark.parametrize(("field", "value"), [("priority", -1), ("estimated_tokens", -1)])
 def test_negative_numbers_are_rejected(field: str, value: int) -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         fragment(**{field: value})
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -85,12 +85,12 @@ def test_negative_numbers_are_rejected(field: str, value: int) -> None:
 @pytest.mark.parametrize("source", ["Builtin:X", "plugin memory", "", '"><x'])
 def test_source_shape_is_enforced(source: str) -> None:
     """来源受限的字符集顺带保证它能安全嵌进数据块属性，不需要再做一层转义。"""
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         fragment(source=source)
 
 
 def test_naive_expiry_is_rejected() -> None:
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         fragment(expires_at=datetime(2026, 8, 10))  # noqa: DTZ001
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 

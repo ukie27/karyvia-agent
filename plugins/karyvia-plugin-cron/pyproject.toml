@@ -1,0 +1,26 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "karyvia-plugin-cron"
+version = "0.1.0"
+description = "Karyvia 官方插件：定时任务（间隔 / cron 表达式 / 一次性），到点自己开一条 turn"
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.11"
+license = { text = "MIT" }
+# 插件只依赖 SDK 与契约（`R4`）。**cron 表达式自己解析**，不引入 croniter：
+# CI 用 `--no-deps` 装插件，依赖它会让所有涉及表达式的用例在 CI 里跑不起来，
+# 而这段逻辑是可穷举的纯函数（理由见 `expr.py` 的模块 docstring）。
+#
+# `tzdata` 只在 Windows 上必需：那里没有系统时区库，`ZoneInfo("Asia/Shanghai")` 会抛
+# `ZoneInfoNotFoundError`。**测试树不依赖它**——名字到 `tzinfo` 的解析可注入，
+# DST 用例用手写的 `tzinfo` 子类驱动（`settings.py`、`tests/_cron_fakes.py`）。
+dependencies = ["karyvia>=0.3.0", "tzdata; sys_platform == 'win32'"]
+
+# 发现的唯一入口（技术方案 §7.1）。name 必须等于 manifest 里的 `id`。
+[project.entry-points."karyvia.plugins"]
+cron = "karyvia_plugin_cron:MANIFEST"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/karyvia_plugin_cron"]

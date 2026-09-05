@@ -6,18 +6,18 @@ import asyncio
 
 import pytest
 
-from nucleamind.builtins.context_compact_basic import BasicTurnContextCompactor
-from nucleamind.contracts import (
+from karyvia.builtins.context_compact_basic import BasicTurnContextCompactor
+from karyvia.contracts import (
     Builtin,
     CancelSignal,
     ChunkKind,
     CompactionModel,
     ErrorCode,
     EventName,
+    KaryviaError,
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    NucleaError,
     RiskLevel,
     Role,
     StopReason,
@@ -28,15 +28,15 @@ from nucleamind.contracts import (
     TurnCompactionResult,
     TurnContextUnitKind,
 )
-from nucleamind.kernel.observability import EventBus, MemoryRingSink
-from nucleamind.kernel.turn import BudgetLedger, TokenAccounting, TurnLimits
-from nucleamind.kernel.turn.request_size import estimate_request_tokens
-from nucleamind.kernel.turn.turn_compaction import (
+from karyvia.kernel.observability import EventBus, MemoryRingSink
+from karyvia.kernel.turn import BudgetLedger, TokenAccounting, TurnLimits
+from karyvia.kernel.turn.request_size import estimate_request_tokens
+from karyvia.kernel.turn.turn_compaction import (
     TurnCompactingModel,
     TurnCompactionPolicy,
     project_units,
 )
-from nucleamind.sdk.testing import (
+from karyvia.sdk.testing import (
     FakeModelProvider,
     ManualCancel,
     StaticTurnContextCompactor,
@@ -238,7 +238,7 @@ async def test_bare_plugin_exception_is_sanitized_without_fallback() -> None:
     provider = FakeModelProvider([text_response("must not run")])
     model = _model(request, provider, _BrokenCompactor(), budget=80)
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         await model.complete(request, ManualCancel())
 
     assert excinfo.value.code is ErrorCode.PLUGIN_TURN_COMPACTION_FAILED
@@ -258,7 +258,7 @@ async def test_compactor_timeout_fails_once_without_fallback() -> None:
     provider = FakeModelProvider([text_response("must not run")])
     model = _model(request, provider, _SlowCompactor(), budget=80, timeout_ms=1)
 
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         await model.complete(request, ManualCancel())
 
     assert excinfo.value.code is ErrorCode.TIMEOUT_TURN_COMPACTION
@@ -303,7 +303,7 @@ class _OverflowOnceProvider(FakeModelProvider):
         if not self.overflowed:
             self.overflowed = True
             self.requests.append(request)
-            raise NucleaError(
+            raise KaryviaError(
                 ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW,
                 "模型请求超过供应商窗口。",
             )
@@ -316,7 +316,7 @@ class _OverflowOnceProvider(FakeModelProvider):
         if not self.overflowed:
             self.overflowed = True
             self.requests.append(request)
-            raise NucleaError(
+            raise KaryviaError(
                 ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW,
                 "模型请求超过供应商窗口。",
             )

@@ -1,12 +1,12 @@
 """`config.json` 的第二个写入点：改一个字符串列表（`D29` 的 `runtime/config_edit.py`）。
 
-职责：验「只改那一层」「形状不对即拒绝」「原子写回」「不存在时让用户先 nm init」四件事。
-不负责：验 `nm plugins` 的语义（`tests/runtime/cli/test_plugins_cli.py`）、验首次生成
+职责：验「只改那一层」「形状不对即拒绝」「原子写回」「不存在时让用户先 karyvia init」四件事。
+不负责：验 `karyvia plugins` 的语义（`tests/runtime/cli/test_plugins_cli.py`）、验首次生成
 （`tests/runtime/test_first_run.py`）。
 
 **这套用例的主角是「没被改到的东西」**：一次 `enable` 之后，用户手写的键、`$schema`、
 `${VAR}` 字面量与四十多个默认值的缺席都必须原样成立。写回时多物化一层，
-`nm config show --origins` 就再也答不出「我改过什么」。
+`karyvia config show --origins` 就再也答不出「我改过什么」。
 """
 
 from __future__ import annotations
@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, JsonValue, NucleaError
-from nucleamind.runtime.config_edit import (
+from karyvia.contracts import ErrorCode, JsonValue, KaryviaError
+from karyvia.runtime.config_edit import (
     add_to_list,
     read_document,
     remove_from_list,
@@ -43,17 +43,17 @@ def config_path(tmp_path: Path) -> Path:
 
 def test_a_missing_config_points_at_nm_init(tmp_path: Path) -> None:
     """**写**这条路上缺文件不是「空配置」：凭空造一份会绕过首次运行的模板。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         read_document(tmp_path / "config.json")
     assert caught.value.code is ErrorCode.CONFIG_INVALID
-    assert caught.value.detail["suggestion"] == "nm init"
+    assert caught.value.detail["suggestion"] == "karyvia init"
 
 
 def test_broken_json_is_reported_by_the_shared_reader(tmp_path: Path) -> None:
     """坏 JSON 的诊断沿用 `read_config_file()`，不在这里写第二份解析。"""
     path = tmp_path / "config.json"
     path.write_text("{,}", encoding="utf-8")
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         read_document(path)
     assert caught.value.code is ErrorCode.CONFIG_INVALID
 
@@ -92,8 +92,8 @@ def test_a_wrong_shape_is_refused_with_a_pointer(
     section: dict[str, JsonValue], value: str
 ) -> None:
     """**不静默修正**（原则 7）：把 `"enabled": "acme"` 当成 `["acme"]` 会让用户的下一次
-    `nm config show` 看到一份他没写过的配置。指针指到具体那一项。"""
-    with pytest.raises(NucleaError) as caught:
+    `karyvia config show` 看到一份他没写过的配置。指针指到具体那一项。"""
+    with pytest.raises(KaryviaError) as caught:
         add_to_list(section, "plugins", "enabled", "acme")
     assert caught.value.code is ErrorCode.CONFIG_INVALID
     assert caught.value.detail["pointer"] == value
@@ -128,7 +128,7 @@ def test_a_failed_write_leaves_the_original_untouched(config_path: Path) -> None
     before = config_path.read_text(encoding="utf-8")
     target = config_path.parent / "sub"
     target.mkdir()
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         write_document(target, {"plugins": {}})
     assert caught.value.code is ErrorCode.PERSISTENCE_WRITE_FAILED
     assert "errno" in caught.value.detail

@@ -1,4 +1,4 @@
-# NucleaMind 技术方案
+# Karyvia 技术方案
 
 - 状态：评审后修订
 - 更新时间：2026-08-10
@@ -20,8 +20,8 @@
 
 不在本文档范围：具体插件的功能设计、WebUI 前端方案。
 
-**NucleaMind 是对 nanobot 的改造，不是它的兼容发行版。** 新架构的命名、目录、
-配置格式、环境变量与 CLI 接口冲突时一律以 NucleaMind 为准，不保留别名、不双读、
+**Karyvia 是对 nanobot 的改造，不是它的兼容发行版。** 新架构的命名、目录、
+配置格式、环境变量与 CLI 接口冲突时一律以 Karyvia 为准，不保留别名、不双读、
 不写长期迁移垫片；`legacy/` 已随 `D35` 删除（§4.3）。
 
 ## 2. 设计目标与硬约束
@@ -44,23 +44,23 @@
 采用：
 
 - **两层循环**：`packages/agent/src/agent-loop.ts` 是不认识具体工具、渠道和存储的最小循环，
-  上层 harness 负责 session、context、压缩和事件。NucleaMind 对应 `kernel/turn/engine.py`
+  上层 harness 负责 session、context、压缩和事件。Karyvia 对应 `kernel/turn/engine.py`
   与 `kernel/turn/orchestrator.py`。这是解决 nanobot `agent/loop.py` 2296 行的直接手段。
 - **回调参数化的循环**：`AgentLoopConfig` 把 context 转换、steering、工具前后拦截都做成
-  显式回调，并在文档里写明「must not throw，返回安全兜底值」。NucleaMind 把这条契约
+  显式回调，并在文档里写明「must not throw，返回安全兜底值」。Karyvia 把这条契约
   写进 Hook 定义和 Host API docstring。
 - **扩展 API 单一入口**：Pi 的 `ExtensionAPI` 是插件唯一依赖面，`registerTool`、
-  `registerCommand`、`registerProvider`、`on(event)` 集中在一个对象上。NucleaMind 的
-  `NucleaAPI` 采用同样形态。
+  `registerCommand`、`registerProvider`、`on(event)` 集中在一个对象上。Karyvia 的
+  `KaryviaAPI` 采用同样形态。
 - **事件分发做错误隔离**：`ExtensionRunner.emit*` 每个 handler 单独 try/catch 并上报
   `ExtensionError`，不让单个扩展打断主流程。
 
 不采用：
 
 - Pi 面向 TUI 的大量渲染扩展点（`registerMessageRenderer`、widget、keybinding、overlay）。
-  NucleaMind 首版没有 TUI 扩展面，引入这些会让 SDK 表面直接翻倍。
+  Karyvia 首版没有 TUI 扩展面，引入这些会让 SDK 表面直接翻倍。
 - Pi 的 coding-agent 假设（project trust、git checkpoint、compaction 细节耦合到 UI）。
-- Pi 的扩展目录自动扫描（`.pi/extensions/*.ts` 直接加载）。NucleaMind 以 Python
+- Pi 的扩展目录自动扫描（`.pi/extensions/*.ts` 直接加载）。Karyvia 以 Python
   entry point 为主分发方式，见 §7.1。
 
 **OpenClaw（借鉴插件包契约，不借鉴宿主规模）**
@@ -69,7 +69,7 @@
 `pluginApi` 兼容范围和构建信息，缺字段即校验失败，不猜测、不带病加载。
 
 不采用：OpenClaw 的宿主体量（`src/plugin-sdk/` 数百个文件）。那是「SDK 即宿主内部」的
-反面教材，NucleaMind 的 SDK 表面必须可枚举。
+反面教材，Karyvia 的 SDK 表面必须可枚举。
 
 **nanobot（迁移基线）**
 
@@ -81,7 +81,7 @@
 
 - Python 3.11+，全 asyncio，行宽 100，`ruff check`（不跑 `ruff format`）。
 - `basedpyright` 严格模式必须通过，动态数据在边界一次性解析成具体类型。
-- 仓库重构（`src/` 布局、包重命名 `nanobot` → `nucleamind`、遗留代码隔离）
+- 仓库重构（`src/` 布局、包重命名 `nanobot` → `karyvia`、遗留代码隔离）
   作为**第一个里程碑 M-A** 一次性完成。它允许且仅允许 §4.5 明列的包名、发行名和
   CLI 名称变化；不得同时改变 Agent 业务逻辑、遗留配置格式、遗留环境变量或遗留状态目录。
   验收标准是除明列命名变化外，现有行为基线保持一致。理由见 §13 M-A。
@@ -97,7 +97,7 @@
 第 4 层  能力实现       builtins/*            plugins/*（独立发行包）
                               |         \        |
                               |          \       |  只依赖 sdk
-第 3 层  公开 SDK       sdk（NucleaAPI + 稳定类型 + 版本 + 测试夹具）
+第 3 层  公开 SDK       sdk（KaryviaAPI + 稳定类型 + 版本 + 测试夹具）
                               |
                               |  宿主侧由 kernel 实现
 第 2 层  Kernel 机制     registry / turn / routing / plugins / config / observability
@@ -118,7 +118,7 @@
 | `R5` | 只有 `runtime/` 可同时 import `kernel/` 与 `builtins/`；它是唯一的组装根 |
 
 `R5` 把「组装」显式收敛到一个层。没有这条规则，`kernel/` 里迟早会出现
-`from nucleamind.builtins import ...` 的便利导入，`R2` 就名存实亡。
+`from karyvia.builtins import ...` 的便利导入，`R2` 就名存实亡。
 
 曾经还有第六条 `R6`（新层禁止 import `legacy/`）。它是**单向**规则——新代码不得 import
 `legacy/`，但 `legacy/` 可以 import 新代码——服役期间只拦下过一处例外
@@ -147,13 +147,13 @@
 包内 23 个子目录一层排开，看不出哪些是核心、哪些是可选能力。目标布局：
 
 ```text
-NucleaMind/
+Karyvia/
 ├── src/
-│   └── nucleamind/            # 唯一 Python 包
+│   └── karyvia/            # 唯一 Python 包
 ├── plugins/                   # 一等公民：官方插件，各自独立发行
-│   └── nucleamind-plugin-<id>/
+│   └── karyvia-plugin-<id>/
 │       ├── pyproject.toml
-│       ├── src/nucleamind_plugin_<id>/
+│       ├── src/karyvia_plugin_<id>/
 │       └── tests/
 ├── examples/plugins/          # 教学用最小示例插件
 ├── tests/                     # 主包测试，目录镜像分层
@@ -167,7 +167,7 @@ NucleaMind/
 **采用 `src/` 布局**的三条理由，都是可验证的工程收益，不是风格偏好：
 
 1. 消除「测试导入的是仓库目录而不是安装产物」这一 Python 打包经典陷阱。
-   扁平布局下 `import nucleamind` 会命中仓库目录，打包遗漏文件在测试中发现不了。
+   扁平布局下 `import karyvia` 会命中仓库目录，打包遗漏文件在测试中发现不了。
 2. 强制 editable install，使 **entry point 发现机制在开发期与生产期行为一致**。
    插件体系（§7.1）以 entry point 为主要发现来源，这一点从可选项变成刚需。
 3. 顶层目录只剩工程职责，包代码收敛到一处。
@@ -179,10 +179,10 @@ NucleaMind/
 ### 4.2 包内分层
 
 ```text
-src/nucleamind/
+src/karyvia/
 ├── contracts/                 # 第 1 层：公开数据契约，纯类型，零内部依赖
 │   ├── ids.py                 # InstanceId / SessionKey / TurnId / CorrelationId
-│   ├── errors.py              # NucleaError + ErrorCategory
+│   ├── errors.py              # KaryviaError + ErrorCategory
 │   ├── events.py              # RuntimeEvent 家族
 │   ├── message.py             # InboundMessage / OutboundMessage / StreamState
 │   ├── session.py             # SessionRecord / TurnRecord / SessionSnapshot
@@ -225,7 +225,7 @@ src/nucleamind/
 │   │   ├── declarations.py    # CapabilityDeclaration / LoadRequest（D16）
 │   │   ├── capabilities.py    # 五个单值 kind 的载荷形状与取回函数（D16）
 │   │   ├── builtin_loader.py  # 对 LoadRequest 泛化的 setup 运行器（D16）
-│   │   ├── host.py            # NucleaAPI 宿主侧实现（D16）
+│   │   ├── host.py            # KaryviaAPI 宿主侧实现（D16）
 │   │   ├── discovery.py       # 两条显式来源的插件发现（D25）
 │   ├── config/                # 含 plugin_blocks.py：plugins.<id>.{config,secrets}（D23）
 │   │   ├── layout.py          # 实例目录的路径代数（不含锁）
@@ -246,7 +246,7 @@ src/nucleamind/
 │
 ├── sdk/                       # 第 3 层：插件唯一依赖面。只 import contracts
 │   ├── __init__.py            # __all__ 为规范性稳定清单
-│   ├── api.py                 # NucleaAPI Protocol（11 个能力注册方法 + ctx）
+│   ├── api.py                 # KaryviaAPI Protocol（11 个能力注册方法 + ctx）
 │   ├── manifest.py            # PluginManifest / CapabilityDecl
 │   ├── version.py             # SDK_VERSION
 │   └── testing/               # 公开测试工具（插件开发者的验收手段）
@@ -281,9 +281,9 @@ src/nucleamind/
 │   ├── startup.py             # 实例构造成功前的资源所有权事务
 │   ├── first_run.py           # 首次运行落盘 config.json + config.schema.json（D24）
 │   ├── instance.py            # AgentInstance：就绪 / 运行 / 停止
-│   └── cli/                   # nm 可执行程序
+│   └── cli/                   # karyvia 可执行程序
 │       ├── main.py            # argv 解析与进程入口
-│       └── commands/          # nm init / run / config / session / plugins / capabilities
+│       └── commands/          # karyvia init / run / config / session / plugins / capabilities
 │                              # （plugins / capabilities 见 D29）
 │
 ├── embed/                     # 第 5 层：嵌入式 Python SDK，runtime 的薄门面
@@ -297,13 +297,13 @@ src/nucleamind/
 | `sdk/` | **插件** SDK，插件唯一依赖面 | 不是嵌入式调用 API |
 | `embed/` | **嵌入式** Python SDK，供外部 Python 代码调用 | 不是插件接口 |
 | `builtins/cli_entry/` | 内建 CLI **能力**：把 stdin 变成 `InboundMessage` | 不是命令行程序 |
-| `runtime/cli/` | `nm` **可执行程序**：解析 argv、组装实例 | 不是会话内的斜杠命令 |
+| `runtime/cli/` | `karyvia` **可执行程序**：解析 argv、组装实例 | 不是会话内的斜杠命令 |
 
 `sdk/` 这个最醒目的名字给插件 SDK——它才是本项目对外的主要接口面。
 `embed/` 是重写的新门面，不是从旧 `nanobot/sdk/` 移植：旧实现随 `legacy/` 一起删除。
 它只包装 `runtime/instance.py`，在 `D23` runtime 组装完成后落地，在此之前只是空骨架。
 
-`nm plugins enable` 与会话内 `/plugins` 是两个刻意分开的surface：前者是离线配置操作
+`karyvia plugins enable` 与会话内 `/plugins` 是两个刻意分开的surface：前者是离线配置操作
 （改配置文件，下次启动生效），后者是运行期只读查询。两者共用
 `kernel/observability/diagnostics.py` 的同一份查询实现，不各写一套。
 
@@ -346,18 +346,18 @@ tests/                 # 是一个包（__init__.py），否则 builtins/ 与标
 
 ### 4.5 命名与包标识
 
-NucleaMind 是改造，不是 nanobot 的兼容发行版。新架构的命名冲突一律以 NucleaMind
+Karyvia 是改造，不是 nanobot 的兼容发行版。新架构的命名冲突一律以 Karyvia
 为准，**不保留旧名、不做双读、不写长期迁移垫片**。
 
 | 项 | 现状 | 目标 | 旧名处置 |
 | --- | --- | --- | --- |
-| Python 包 | `nanobot` | `nucleamind` | 删除 |
-| 发行名 | `nanobot-ai` | `nucleamind` | 删除 |
-| CLI 命令 | `nanobot` | `nm` | 删除，不留别名 |
-| 环境变量前缀 | `NANOBOT_` | 只用 `NUCLEAMIND_` | 删除（`D35`） |
-| 实例目录 | `~/.nanobot/` | `~/.nucleamind/instances/<instance>/` | 删除（`D35`） |
+| Python 包 | `nanobot` | `karyvia` | 删除 |
+| 发行名 | `nanobot-ai` | `karyvia` | 删除 |
+| CLI 命令 | `nanobot` | `karyvia` | 删除，不留别名 |
+| 环境变量前缀 | `NANOBOT_` | 只用 `KARYVIA_` | 删除（`D35`） |
+| 实例目录 | `~/.nanobot/` | `~/.karyvia/instances/<instance>/` | 删除（`D35`） |
 | 配置键风格 | camelCase 别名 | 只用 snake_case | 删除（`D35`） |
-| 插件 entry point 组 | 无 | `nucleamind.plugins` | — |
+| 插件 entry point 组 | 无 | `karyvia.plugins` | — |
 
 不写长期兼容垫片的理由：每个垫片都要长期维护、要双份测试，而它们保护的是一个
 **本项目不再承诺支持的产品**。旧实例目录里的数据仍在磁盘上，需要时手工拷贝配置即可；
@@ -446,7 +446,7 @@ class ToolResult:
     side_effect: SideEffect          # NONE / OCCURRED / UNKNOWN
     data: JsonValue | None = None
     artifacts: tuple[ArtifactRef, ...] = ()
-    error: NucleaError | None = None
+    error: KaryviaError | None = None
     duration_ms: int = 0
 ```
 
@@ -487,7 +487,7 @@ class ErrorCategory(StrEnum):
     PERSISTENCE = "persistence"
     KERNEL_INTERNAL = "kernel_internal"
 
-class NucleaError(Exception):
+class KaryviaError(Exception):
     code: str                        # 稳定字符串，如 "plugin.sdk_incompatible"
     category: ErrorCategory
     user_message: str                # 面向用户，已脱敏
@@ -576,7 +576,7 @@ capabilities = [
    `BAS-010` 强制回落到内建实现外，其他覆盖失败的能力保持缺失，由 Runtime 的最终能力
    校验决定实例是否具备运行条件。
 
-解析产物是一个可序列化报告，供 `nm capabilities` 与诊断接口输出：
+解析产物是一个可序列化报告，供 `karyvia capabilities` 与诊断接口输出：
 
 ```python
 @dataclass(frozen=True, slots=True)
@@ -584,7 +584,7 @@ class ResolutionReport:
     active: tuple[CapabilityRef, ...]
     shadowed: tuple[tuple[CapabilityRef, CapabilityRef], ...]   # (被覆盖, 覆盖者)
     disabled: tuple[tuple[CapabilityRef, str], ...]             # (能力, 原因)
-    failures: tuple[NucleaError, ...]
+    failures: tuple[KaryviaError, ...]
 ```
 
 查找性能（`NFR-403`）：注册在启动期完成后 registry 冻结，内部为 `dict[(kind, name)]`，
@@ -592,21 +592,21 @@ class ResolutionReport:
 
 **内建与插件走同一注册契约**（`BAS-002`、`SDK-007`）：`builtins/registry.py` 只提供
 `BUILTIN_MANIFESTS: tuple[PluginManifest, ...]`。内建 bootstrap 与外部插件 loader
-都必须通过同一个 Host `NucleaAPI` 实现和 `RegistrationBatch` 注册能力，不存在内建专用
+都必须通过同一个 Host `KaryviaAPI` 实现和 `RegistrationBatch` 注册能力，不存在内建专用
 注册 API。两者仅在“来源发现、依赖解析、可卸载性”上不同：内建清单是静态可信来源，
 外部插件还需经过 §7.3 的发现、校验和生命周期流程。
 Host 的注册分派与 `PluginContext` 的资源门面是两个职责：前者接收注入的 Context，后者
 由 Runtime 提供生产实现；禁止为外部插件复制第二套注册分派。
 
-**Host 与 `NucleaAPI` 的层间张力，`D16` 的结论是「结构化实现 + 在 `runtime/` 静态证明」**：
+**Host 与 `KaryviaAPI` 的层间张力，`D16` 的结论是「结构化实现 + 在 `runtime/` 静态证明」**：
 `R2` 禁止 `kernel/` import `sdk/`，因此 `kernel/plugins/host.py` 的 `CapabilityHost` 不继承
-`NucleaAPI`，而是结构化满足它（仓库先例：`HookRouter` 结构化满足 `deps.HookDispatcher`）。
-`NucleaAPI` 与 `PluginContext` **不下沉 `contracts/`**——与 `D05` 下沉 `CliEntry`、`D11` 下沉
+`KaryviaAPI`，而是结构化满足它（仓库先例：`HookRouter` 结构化满足 `deps.HookDispatcher`）。
+`KaryviaAPI` 与 `PluginContext` **不下沉 `contracts/`**——与 `D05` 下沉 `CliEntry`、`D11` 下沉
 `SecretStr` 不同，那两个是 kernel **要调用**的类型，而 Host 只是**持有并转交** ctx、自己
 一个成员都不碰。ctx 因此做成泛型参数（`CapabilityHost[ContextT]`）；标成 `object` 行不通，
-那样 `ctx` 的返回类型与 `NucleaAPI.ctx` 声明的 `PluginContext` 不兼容，一致性就无从证明。
+那样 `ctx` 的返回类型与 `KaryviaAPI.ctx` 声明的 `PluginContext` 不兼容，一致性就无从证明。
 
-一致性由 **`runtime/wiring.py` 里一句类型标注**（`conformance: NucleaAPI = host`）兑现，
+一致性由 **`runtime/wiring.py` 里一句类型标注**（`conformance: KaryviaAPI = host`）兑现，
 且必须落在生产路径上（`load_into(host_for=...)` 真的会调那个工厂）。理由是硬的：
 `pyproject.toml` 的 basedpyright 配置是 `exclude = ["**/tests"]`，测试验不了签名兼容；
 而 `runtime_checkable` 的 `isinstance` 只看方法名，同样证明不了。`runtime/` 是唯一同时
@@ -622,7 +622,7 @@ bootstrap」的字面表述有出入，取其意不取其形）：`R2` 只允许
 **两处 `priority` 默认值与内建基准 0 的冲突，`D16` 各修一处**：`CapabilityDecl.priority`
 默认 100（§7.2）而内建基准是 0（§6.1 规则 1），`to_declaration()` 用 pydantic 的
 `model_fields_set` 判断作者是否真的写过该字段，没写就留 `None` 交给 `base_priority_for()`；
-`NucleaAPI.on()` 的签名默认值同样是 100，Host 把「等于 `PLUGIN_BASE_PRIORITY`」一律视为
+`KaryviaAPI.on()` 的签名默认值同样是 100，Host 把「等于 `PLUGIN_BASE_PRIORITY`」一律视为
 未声明。两条都不修的话，§10.2 的「内建最后被裁」与「内建排在插件前」会同时静默失效。
 
 ### 6.2 Turn 执行：两层拆分
@@ -791,7 +791,7 @@ class Disposition(StrEnum):
 
 - 只有 `content` 以配置的命令前缀（默认 `/`）开头才尝试匹配，避免对普通文本做无谓解析。
 - 命令名冲突在启动期报错，不在调用期按加载顺序择一（`CMD-002`）。
-- 命令执行异常一律捕获为 `NucleaError`，返回可诊断输出，会话保持可用，进程不退出
+- 命令执行异常一律捕获为 `KaryviaError`，返回可诊断输出，会话保持可用，进程不退出
   （`CMD-003`）。
 - 命令即使不进模型，也分配 `turn_id` 并发布 turn 事件，使可观测性统一（`KER-010`）。
   分配与发布都在 orchestrator（`D14`）：dispatcher 只回答「这条输入该怎么走」，
@@ -930,7 +930,7 @@ Pi 在 `AgentLoopConfig` 中反复强调的约定，本方案照搬。
 ```text
 1. 内置默认值   代码中的字段表 kernel/config/schema.py::SECTION_SPECS
 2. 实例配置文件  <instance_dir>/config.json
-3. 环境变量覆盖  NUCLEAMIND_CFG_<SECTION>__<KEY>
+3. 环境变量覆盖  KARYVIA_CFG_<SECTION>__<KEY>
 4. 进程参数      --set section.key=value（测试与临时用）
 ```
 
@@ -944,9 +944,9 @@ Pi 在 `AgentLoopConfig` 中反复强调的约定，本方案照搬。
   实测 pydantic 版让 `import kernel.config` 达 313 ms（手写版 110 ms），而 `NFR-405`
   给整个冷启动的预算是 300 ms，配置加载在 §10.1 步骤 2、永远在必经路径上。
   `sdk/manifest.py` 继续用 pydantic——它只在真的要发现插件时才付这笔钱。
-- **环境变量前缀是 `NUCLEAMIND_CFG_`、层级用双下划线**（字段名本身含下划线，单下划线
+- **环境变量前缀是 `KARYVIA_CFG_`、层级用双下划线**（字段名本身含下划线，单下划线
   无法区分「层级」与「词间」）。不设白名单：字段表本身就是白名单，未登记的键由
-  `extra="forbid"` 报未知字段。选实例的 `NUCLEAMIND_INSTANCE_DIR` / `NUCLEAMIND_INSTANCE`
+  `extra="forbid"` 报未知字段。选实例的 `KARYVIA_INSTANCE_DIR` / `KARYVIA_INSTANCE`
   靠前缀自然区分开。
 
 规则：
@@ -1005,7 +1005,7 @@ Sink 设计（`OBS-005`、`NFR-504`）：Bus 只做扇出，不认识任何具�
 
 `publish()` **同步、绝不抛出、绝不 await 订阅者**（`D12` 落地时确定）：bus 一旦 await
 订阅者，一个慢订阅者就直接拉长 turn，`NFR-204` 在时间维度上便不成立；而 publish 还要在
-没有事件循环的路径上被调用（`instance.starting`、`nm config show`、绝大多数测试）。
+没有事件循环的路径上被调用（`instance.starting`、`karyvia config show`、绝大多数测试）。
 asyncio 抢占不了同步回调，因此「超时隔离」的形态是**测量 + 熔断**：超过
 `slow_after_ms` 记一次 strike、抛异常也记一次、健康投递清零，连续 strike 达到
 `max_strikes` 即自动退订，健康数据由 `bus.health()` 暴露。订阅者内部再 `publish()` 会
@@ -1032,17 +1032,17 @@ asyncio 抢占不了同步回调，因此「超时隔离」的形态是**测量 
 
 ### 7.1 发现机制
 
-回答 §17.2 第 1 项。生产发现只有一条来源：全局安装目录中由 `nm` 管理的 entry point 记录。
+回答 §17.2 第 1 项。生产发现只有一条来源：全局安装目录中由 `karyvia` 管理的 entry point 记录。
 
 | 来源 | 用途 | 形式 |
 | --- | --- | --- |
-| `~/.nucleamind/plugins.json` | 全局已安装插件目录 | id、版本、逻辑依赖、安装后端、来源、运行入口和已解析发行包版本；当前 Python 入口为 `name = "pkg.module:MANIFEST"` |
+| `~/.karyvia/plugins.json` | 全局已安装插件目录 | id、版本、逻辑依赖、安装后端、来源、运行入口和已解析发行包版本；当前 Python 入口为 `name = "pkg.module:MANIFEST"` |
 
 不采用的方案及理由：
 
-- **不扫描 site-packages**：手工 `pip install` 不等于 NucleaMind 已安装，且环境扫描的所有权
+- **不扫描 site-packages**：手工 `pip install` 不等于 Karyvia 已安装，且环境扫描的所有权
   与卸载边界不清楚。
-- **不做目录自动加载**（Pi 的做法）：Pi 是单用户 coding agent，目录即意图；NucleaMind 需要
+- **不做目录自动加载**（Pi 的做法）：Pi 是单用户 coding agent，目录即意图；Karyvia 需要
   「安装 ≠ 启用」的解耦（`DST-002`）。
 - nanobot 现有的 `pkgutil` 扫描只保留在旧路径中，新体系内建能力用静态清单，
   行为确定且可读（「显式优于魔法」）。
@@ -1055,7 +1055,7 @@ asyncio 抢占不了同步回调，因此「超时隔离」的形态是**测量 
 
 当前实现的两处细化：
 
-- 安装目录、插件代码目录、实例索引和管理锁都直接位于 `~/.nucleamind/`，不增加
+- 安装目录、插件代码目录、实例索引和管理锁都直接位于 `~/.karyvia/`，不增加
   `global/` 中间层。实例配置不保存安装路径。
 - **候选 id 在读 manifest 之前就已知**（来自安装目录中的 entry point name），
   「未启用即不导入」因此是没有路径而不是一条纪律。代价是 entry point 的 name 必须等于
@@ -1098,10 +1098,10 @@ class PluginManifest(BaseModel):
   后者是带前向引用的普通递归 Union，pydantic 为它生成 schema 时会无限递归。两者互相
   兼容，因此该字段可以原样交给任何接受 `JsonSchema` 的调用方。
 
-错误契约：语义校验（id 形状、PEP 440、覆盖目标、能力重名）直接抛 `NucleaError`
+错误契约：语义校验（id 形状、PEP 440、覆盖目标、能力重名）直接抛 `KaryviaError`
 （pydantic 只截获 `ValueError` / `AssertionError`，其余原样穿透）；结构错误由 pydantic
 报 `ValidationError`，但外部数据一律走 `parse_manifest(data, origin=...)`，它转成带
-**字段路径**的 `NucleaError(PLUGIN_MANIFEST_UNSUPPORTED)`，`detail.errors` 形如
+**字段路径**的 `KaryviaError(PLUGIN_MANIFEST_UNSUPPORTED)`，`detail.errors` 形如
 `[{"field": "capabilities.0.kind", "message": ...}]`。调用方因此只需处理一种异常类型。
 
 约束：**导入 manifest 模块必须无副作用且廉价**。CI 中的插件模板测试会断言导入 manifest
@@ -1225,10 +1225,10 @@ class PluginContext(Protocol):
     def secret(self, name: str) -> SecretStr: ...   # 解析本插件配置的 Secret 引用
 ```
 
-`NucleaAPI` 是注册面，形态直接对应 Pi 的 `ExtensionAPI`；当前共有 10 个方法：
+`KaryviaAPI` 是注册面，形态直接对应 Pi 的 `ExtensionAPI`；当前共有 10 个方法：
 
 ```python
-class NucleaAPI(Protocol):
+class KaryviaAPI(Protocol):
     ctx: PluginContext
     def register_tool(self, spec: ToolSpec, handler: ToolHandler) -> None: ...
     def register_command(self, spec: CommandSpec, handler: CommandHandler) -> None: ...
@@ -1253,7 +1253,7 @@ Protocol）：`kernel/` 与 `runtime/` 都要调用 CLI 能力，而 `R2` 禁止
 落在 `errors.py` 而不是新模块，是因为掩码 `MASK`、`redact()` 与它本就是同一件事的三个面：
 `redact()` 认得 `SecretStr`，明文因此会进入 `scrub()` 的密文集合，被顺手拼进 `user_message`
 的凭据也擦得掉。它不在 `sdk.__all__` 里——契约类型不从 `sdk` 转发，插件按 `R4` 直接
-`from nucleamind.contracts import SecretStr`。
+`from karyvia.contracts import SecretStr`。
 
 **信任边界**：安装并启用插件等同于完全信任它在当前进程执行 Python 代码。Kernel 不维护
 权限声明、授权账本或行为监控。插件可以直接 `import os` / `socket` / `subprocess`；需要
@@ -1288,7 +1288,7 @@ Protocol）：`kernel/` 与 `runtime/` 都要调用 CLI 能力，而 `R2` 禁止
 
 ## 8. 内建默认能力
 
-回答 §17.2 第 4 项：**同仓库、同 wheel、独立子包**（`src/nucleamind/builtins/`）。
+回答 §17.2 第 4 项：**同仓库、同 wheel、独立子包**（`src/karyvia/builtins/`）。
 
 理由：`DST-001` 要求一步安装即得完整基线，`DST-003` 要求离线可用，独立分发会引入
 版本矩阵。同时 `builtins/` 受 `R4` 约束（只能 import `sdk/`），所以「同包发布」
@@ -1434,7 +1434,7 @@ fs.read   fs.write   fs.edit   fs.list   fs.grep   shell.exec
 内建能力**不享受任何特权**（`BAS-005`）：`builtins/` 通过 `sdk/` 拿到的
 `PluginContext` 与外部插件同型，并通过同一份 `BUILTIN_MANIFESTS` 声明能力。
 `tests/architecture/test_builtin_no_privilege.py` 断言 `builtins/` 不 import
-`nucleamind.kernel.*`。
+`karyvia.kernel.*`。
 
 - Workspace：路径解析后必须落在允许根内，`realpath` 后重新校验，覆盖符号链接、`..`、
   Windows 大小写与重解析点（`EDG-405`）。复用 nanobot `agent/tools/path_utils.py` 的实现。
@@ -1515,7 +1515,7 @@ Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中
 
 `D24` 对本节步骤 2 的两处细化（实现在 `runtime/first_run.py` 与 `runtime/cli/commands/`）：
 
-- **「无配置文件 → 生成最小配置 + 指引后退出」在 `nm run` 里落地，也可用 `nm init` 显式
+- **「无配置文件 → 生成最小配置 + 指引后退出」在 `karyvia run` 里落地，也可用 `karyvia init` 显式
   触发，两者走同一个 `ensure_initial_config()`**。生成后**不继续进会话**：紧接着跑起来
   取决于用户有没有提前 export 那个环境变量，同一条命令因此会有两种结局，而首次运行是最
   需要确定性的时刻。
@@ -1576,7 +1576,7 @@ Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中
 可见工具和可执行工具；不能出现模型看不见却仍可执行的旧表。`before_tool_call` 只允许改写
 参数，不能改变工具名、调用标识、关联标识、超时或幂等键。
 
-任一步的 `NucleaError` 都携带 `Correlation` 与 `capability`，因此日志、事件和用户提示
+任一步的 `KaryviaError` 都携带 `Correlation` 与 `capability`，因此日志、事件和用户提示
 可以指向同一次执行和同一个提供方（`10.7`、`NFR-501`）。
 
 `D14` 落地时对本节步骤的三处修正（实现在 `kernel/turn/orchestrator.py`）：
@@ -1618,14 +1618,14 @@ Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中
 ### 10.4 插件启用与覆盖
 
 ```text
-nm plugins install nucleamind-plugin-memory-sqlite  # 全局安装，不为任何实例自动启用
-nm plugins enable memory-sqlite                 # 写入 plugins.enabled
-nm restart                                      # 下次启动生效（首版不热更新）
-nm capabilities                                 # 报告中可见 provider 与 shadowed 关系
+karyvia plugins install karyvia-plugin-memory-sqlite  # 全局安装，不为任何实例自动启用
+karyvia plugins enable memory-sqlite                 # 写入 plugins.enabled
+karyvia restart                                      # 下次启动生效（首版不热更新）
+karyvia capabilities                                 # 报告中可见 provider 与 shadowed 关系
 ```
 
 覆盖内建能力时（例如插件提供 `session_store`），`ResolutionReport.shadowed` 中出现
-`(builtin:jsonl, plugin:session-pg)`，`nm capabilities` 明确打印，不静默替换（`8.3` 第 4 条）。
+`(builtin:jsonl, plugin:session-pg)`，`karyvia capabilities` 明确打印，不静默替换（`8.3` 第 4 条）。
 
 `plugins.disable` 压过 `plugins.enabled`。命中禁用列表的外部插件在读取 manifest 前就被
 跳过，因此不会导入代码、注册能力、声明覆盖或启动后台资源。若它此前覆盖了内建能力，
@@ -1637,10 +1637,10 @@ nm capabilities                                 # 报告中可见 provider 与 s
 
 ### 10.5 卸载与数据
 
-`nm plugins install/update/uninstall` 是全局操作，并要求所有已知实例停止。卸载删除
-`~/.nucleamind/plugin-packages/<id>/`，同时清除全部已知实例中的配置引用，因此覆盖插件被
+`karyvia plugins install/update/uninstall` 是全局操作，并要求所有已知实例停止。卸载删除
+`~/.karyvia/plugin-packages/<id>/`，同时清除全部已知实例中的配置引用，因此覆盖插件被
 卸载后，内建实现会在实例下次启动时恢复。`<instance_dir>/plugins/<id>/` 默认保留；清理需
-显式 `nm plugins purge <id> --confirm --instance ...`，执行前打印路径与体积。仍被其他全局
+显式 `karyvia plugins purge <id> --confirm --instance ...`，执行前打印路径与体积。仍被其他全局
 插件依赖的插件不得卸载；多实例配置写入与全局代码删除使用补偿事务，任一步失败就恢复此前
 已写的配置。
 
@@ -1652,7 +1652,7 @@ nm capabilities                                 # 报告中可见 provider 与 s
 回答 §17.2 第 8、9 项。
 
 ```text
-~/.nucleamind/
+~/.karyvia/
   plugins.json                    # 全局安装目录
   plugin-packages/<plugin_id>/    # 管理器拥有的插件代码；默认依赖版本必须与其他根兼容
   plugin-cache/                   # 安装器缓存；不参与发现
@@ -1669,7 +1669,7 @@ nm capabilities                                 # 报告中可见 provider 与 s
       workspace/                  # 默认 workspace 根（可配置指向项目目录）
 ```
 
-`--instance-dir` / `NUCLEAMIND_INSTANCE_DIR` 仍可把实例放在任意显式路径；这些外部实例同样
+`--instance-dir` / `KARYVIA_INSTANCE_DIR` 仍可把实例放在任意显式路径；这些外部实例同样
 登记进 `instances.json`，但不复制到 `instances/`。
 
 多实例规则（`DST-005`、`EDG-507`）：
@@ -1706,7 +1706,7 @@ nm capabilities                                 # 报告中可见 provider 与 s
 | --- | --- | --- |
 | 能力名 | 小写点分，`<域>.<动作>` | `fs.read`、`shell.exec` |
 | 插件 id | 小写短横线 | `memory-sqlite`、`channel-telegram` |
-| 插件包名 | `nucleamind-plugin-<id>` | `nucleamind-plugin-memory-sqlite` |
+| 插件包名 | `karyvia-plugin-<id>` | `karyvia-plugin-memory-sqlite` |
 | 错误码 | 点分，`<域>.<原因>` | `plugin.sdk_incompatible`、`tool.cancel_timeout` |
 | 事件名 | 点分，`<域>.<过去式>` | `turn.completed`、`plugin.load_failed` |
 | Hook 名 | 蛇形，动词短语 | `before_tool_call`、`context_assemble` |
@@ -1794,7 +1794,7 @@ nm capabilities                                 # 报告中可见 provider 与 s
 
 ```text
 A0  捕获行为基线（必须早于任何改动）：规范化的用例 ID 与结果集合落盘入库
-A1  git mv nanobot/ src/nucleamind/legacy/    保留 git 历史
+A1  git mv nanobot/ src/karyvia/legacy/    保留 git 历史
 A2  脚本机械重写导入前缀、字符串模块路径和构建资源路径；
     遗留代码继续使用 `NANOBOT_*`、`~/.nanobot/` 和原配置格式
 A3  pyproject 重写：包名、发行名、入口、构建 include、basedpyright/pytest 路径
@@ -1805,7 +1805,7 @@ A0 是 M-A 全部完成判据的前提：「与重构前一致」这个标准依
 不假设全绿；采集错误非空时基线判为不可信。规范化规则与工具契约见
 [`development-plan.md`](./development-plan.md) 的 `D00`。
 
-按 §4.5，**不在新层写长期兼容垫片**。迁移期 `legacy/` 的入口曾收敛为 `nm legacy`
+按 §4.5，**不在新层写长期兼容垫片**。迁移期 `legacy/` 的入口曾收敛为 `karyvia legacy`
 单个子命令，`runtime/legacy_entry.py` 是唯一、限期存在的过渡例外；
 **两者都已在 `D31` 删除**。
 
@@ -1821,17 +1821,17 @@ A0 是 M-A 全部完成判据的前提：「与重构前一致」这个标准依
 - A0 基线与重构后重新采集的结果逐项一致：规范化后无丢失用例、无结果变化，
   且两次采集的采集错误列表均为空。因导入路径变化而更新测试源码是允许的，
   但不得改变断言语义。
-- `pip install -e .` 后 `nm --version` 与 `nm legacy --help` 均可用；不存在 `nanobot` 命令。
-- `nm legacy` 继续读取原有 `NANOBOT_*`、`~/.nanobot/` 和 camelCase 配置，证明 D00
+- `pip install -e .` 后 `karyvia --version` 与 `karyvia legacy --help` 均可用；不存在 `nanobot` 命令。
+- `karyvia legacy` 继续读取原有 `NANOBOT_*`、`~/.nanobot/` 和 camelCase 配置，证明 D00
   没有把遗留配置迁移混入结构调整。
-- `import nucleamind` 命中安装产物；仓库根目录下不存在可被误导入的同名目录。
+- `import karyvia` 命中安装产物；仓库根目录下不存在可被误导入的同名目录。
 - wheel 构建产物包含 `templates/`、`skills/`、`web/dist/` 等非 Python 资源（与重构前一致）。
 - `scripts/legacy_debt.py` 输出基线数字，写入 CI 记录。
-- 新层无意外旧名：`rg -i nanobot src/nucleamind --glob '!legacy/**'` 只允许命中
-  迁移说明与 `nm legacy`；`legacy/` 内保留旧配置键、环境变量和历史叙述是预期行为。
+- 新层无意外旧名：`rg -i nanobot src/karyvia --glob '!legacy/**'` 只允许命中
+  迁移说明与 `karyvia legacy`；`legacy/` 内保留旧配置键、环境变量和历史叙述是预期行为。
 
 **不在 M-A 范围**：Agent 业务逻辑变更、配置 schema 迁移、状态目录迁移、任何模块拆分、
-任何 `legacy/` 内部整理。NucleaMind 新配置语义在 M3/D10 之后的新层实现中落地，
+任何 `legacy/` 内部整理。Karyvia 新配置语义在 M3/D10 之后的新层实现中落地，
 不回写遗留实现。
 
 ### M-B 架构守卫（阶段一前置，P0）
@@ -1877,7 +1877,7 @@ A0 是 M-A 全部完成判据的前提：「与重构前一致」这个标准依
    OpenAI 兼容接口在新层重写为官方插件而不是改造 `legacy/api/server.py`。
    不搭薄适配层、不设 `legacy | kernel` 双路径开关——本项目是改造而非兼容发行版，
    双路径要求两套实现长期共存与双份测试，成本高于收益，回退用 git 即可。
-   M1–M4 期间 `legacy/` 内部代码完全不动，新 Kernel 以独立入口 `nm` 并行生长，
+   M1–M4 期间 `legacy/` 内部代码完全不动，新 Kernel 以独立入口 `karyvia` 并行生长，
    任何阶段中止都不影响现有可用功能。
 
 完成判据：`engine.py ≤ 400` 行且不 import 任何具体能力；基线测试的行为断言在新实现上
@@ -1890,7 +1890,7 @@ A0 是 M-A 全部完成判据的前提：「与重构前一致」这个标准依
 完成判据（对应 §16.1）：
 
 - 全新环境只配模型凭据 → 完成一次带工具调用的 turn（`e2e` 用例）。
-- `nm capabilities` 列出全部内建能力及提供方。
+- `karyvia capabilities` 列出全部内建能力及提供方。
 - 缺凭据时的错误指向文件与字段名，且哨兵扫描确认无凭据值泄漏。
 - CLI 可中断，中断后会话可继续。
 - 尝试禁用全部可禁用内建能力的配置下，CLI 仍可用；禁用 CLI 的配置被显式拒绝。
@@ -1898,20 +1898,20 @@ A0 是 M-A 全部完成判据的前提：「与重构前一致」这个标准依
 ### M4 Plugin Runtime 最小闭环（阶段二，P0）
 
 交付：`kernel/plugins/` 的外部发现、校验与生命周期、资源门面、示例插件和
-`nm plugins` 命令；复用 M3/D16 已建立的 Host `NucleaAPI` 与事务性注册通道。
+`karyvia plugins` 命令；复用 M3/D16 已建立的 Host `KaryviaAPI` 与事务性注册通道。
 
-示例插件选择：**`nucleamind-plugin-echo-tool`（新增一个工具）+
-`nucleamind-plugin-session-memory`（覆盖内建 session store 为内存实现）**。
+示例插件选择：**`karyvia-plugin-echo-tool`（新增一个工具）+
+`karyvia-plugin-session-memory`（覆盖内建 session store 为内存实现）**。
 后者专门用于验证覆盖路径与 disable 优先语义，风险低且能覆盖 SINGLETON arity。
 
 完成判据（对应 §16.2）：
 
 - 不修改 engine/orchestrator 即可加载外部插件。
 - 插件注册的工具参与真实 turn。
-- 覆盖内建 session store，`nm capabilities` 显示 shadowed 关系。
+- 覆盖内建 session store，`karyvia capabilities` 显示 shadowed 关系。
 - 禁用后能力消失，恢复行为由配置决定。
 - 配置错误、SDK 不兼容、运行时失败三类场景各有稳定错误码与诊断输出。
-- 示例插件不 import `nucleamind.kernel.*`（架构测试断言）。
+- 示例插件不 import `karyvia.kernel.*`（架构测试断言）。
 - 内建 session store 与插件 session store 通过同一契约测试。
 
 ### M5 官方能力插件化（阶段三，P1）
@@ -1960,10 +1960,10 @@ a 步同样不再是「补基线测试」：`D32` 起就改成直接读旧实现
 | Model Provider | 部分支持 | 支持 API-Key 形式；OAuth 登录流首版不支持 |
 | Memory 插件 | 部分支持 | 映射 MemoryProvider，不保证宿主专有检索语义 |
 | Channel 插件 | 不支持 | 依赖 OpenClaw gateway 协议与账户模型，成本过高 |
-| WebUI / 渲染扩展 | 不支持 | NucleaMind 首版无对应扩展面 |
+| WebUI / 渲染扩展 | 不支持 | Karyvia 首版无对应扩展面 |
 | 依赖隐式全局状态的插件 | 不支持 | 加载期拒绝并给出具体原因（`CMP-003`） |
 
-兼容层作为**独立包** `nucleamind-compat-openclaw`，本身就是一个 NucleaMind 插件，
+兼容层作为**独立包** `karyvia-compat-openclaw`，本身就是一个 Karyvia 插件，
 因此 `CMP-004`（不成为 Kernel 依赖）由包边界天然保证。
 
 ## 14. 风险与应对
@@ -1975,7 +1975,7 @@ a 步同样不再是「补基线测试」：`D32` 起就改成直接读旧实现
 | 遗留隔离区长期不清 | §4.3 | **已闭环**：债务棘轮压到 `D35` 清空，隔离区与棘轮一并删除 |
 | 重命名遗漏 | §4.5 | M-A 验收双防线：归一化后的测试结果逐项一致 + 新层旧名扫描无意外命中 |
 | 一次性重写失控 | `13.1` | M2 采用「基线测试 → 新实现 → 单点切换并删除旧实现」，每步有独立验收，回退使用 git |
-| SDK 表面膨胀 | `13.2` | `NucleaAPI` 冻结 10 个注册方法、Hook 冻结 9 个、`__all__` 快照测试 |
+| SDK 表面膨胀 | `13.2` | `KaryviaAPI` 冻结 10 个注册方法、Hook 冻结 9 个、`__all__` 快照测试 |
 | 内建能力获得特权 | `13.10` | `builtins/` 禁止 import `kernel/`，架构测试断言 |
 | 内建工具集扩张 | `13.10`、`BAS-008` | 6 工具冻结清单 + 三条准入判定 + 评审门槛 |
 | 异步资源泄漏 | `13.3` | 所有插件任务经 `api.ctx.spawn_task()`；停止超时 + 孤儿任务表 |
@@ -1990,7 +1990,7 @@ a 步同样不再是「补基线测试」：`D32` 起就改成直接读旧实现
 
 | # | 问题 | 结论 | 主要依据 | 验证方式 |
 | --- | --- | --- | --- | --- |
-| 1 | 插件发现方式 | entry point 组 `nucleamind.plugins` + 配置显式路径；发现与启用分离 | 启动开销可控（`NFR-401`）；安装≠启用（`DST-002`） | 启动开销回归指标；`tests/plugins/test_discovery.py` |
+| 1 | 插件发现方式 | entry point 组 `karyvia.plugins` + 配置显式路径；发现与启用分离 | 启动开销可控（`NFR-401`）；安装≠启用（`DST-002`） | 启动开销回归指标；`tests/plugins/test_discovery.py` |
 | 2 | 插件信任边界 | 受信任同进程插件；安装并启用即完全信任；资源门面只提供可复用约束 | `13.7` 不给虚假承诺；极简 Kernel、一切皆插件 | 文档与架构守卫 |
 | 3 | Capability arity | 按 kind 固定 arity（见 §6.1 表）；内建 priority 基准 0；覆盖必须显式声明 | `SDK-003`、`EDG-102` 禁止顺序决定 | registry 冲突分支全覆盖单测 |
 | 4 | 内建能力发布方式 | 同仓库同 wheel 的独立子包 `builtins/`，受 `R4` 约束 | `DST-001`、`DST-003` | `test_builtin_no_privilege.py` |

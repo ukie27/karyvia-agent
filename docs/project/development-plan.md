@@ -1,4 +1,4 @@
-# NucleaMind 模块化开发方案
+# Karyvia 模块化开发方案
 
 - 状态：评审后修订
 - 更新时间：2026-08-10
@@ -71,7 +71,7 @@
 
 ### 2.4 两处相对技术方案的顺序调整
 
-**其一：重构提前到最前面（`D00`）。** 技术方案初稿曾约定「首版不引入 `nucleamind`
+**其一：重构提前到最前面（`D00`）。** 技术方案初稿曾约定「首版不引入 `karyvia`
 包名前缀，重命名等 Kernel 稳定后再做」。改为最先做，理由是重命名成本随代码量单调
 上升，而此刻仍能把变更限制在结构、导入和明列的对外名称；遗留业务与配置行为可用
 现有基线验证。等新架构写完再动，要改的就不止今天这 2979 个导入点了。
@@ -83,7 +83,7 @@
 双路径开关要求两套实现长期共存、双份测试，成本远高于收益——回退用 git 即可。
 
 两处调整合起来的效果：`D00` 之后，`legacy/` 内部代码在阶段 1–7 期间**完全不动**，
-新 Kernel 在同一仓库内以独立入口 `nm` 并行生长。任何阶段中止都不影响现有可用功能。
+新 Kernel 在同一仓库内以独立入口 `karyvia` 并行生长。任何阶段中止都不影响现有可用功能。
 
 ## 3. 模块地图
 
@@ -107,12 +107,12 @@
                        ├─ D17 session_jsonl    ├─ D20 tools_fs
                        ├─ D18 context_basic    ├─ D21 tools_shell
                        ├─ D19 model_openai     └─ D22 commands_core
-                       └─ D23 cli_entry + runtime/embed 组装 + nm 入口
+                       └─ D23 cli_entry + runtime/embed 组装 + karyvia 入口
                      |
 阶段 6  开箱可用     D24 首次运行体验与开箱可用验收 ★
                      |
 阶段 7  插件运行时   D25 Manifest 与发现 ── D26 资源门面与 PluginContext
-                       ── D27 两阶段加载 ── D28 生命周期 ── D29 nm plugins 与诊断
+                       ── D27 两阶段加载 ── D28 生命周期 ── D29 karyvia plugins 与诊断
                        ── D30 示例插件与 Plugin Runtime 验收 ★
                      |
 阶段 8  遗留路径清理 D31 遗留 Agent 路径切换与删除
@@ -145,21 +145,21 @@ A0  捕获行为基线（必须在任何改动之前）
     scripts/test_snapshot.py capture --out migration-snapshot/before.json
     产物提交入库，D00 验收通过后删除
 
-A1  git mv nanobot/ src/nucleamind/legacy/
+A1  git mv nanobot/ src/karyvia/legacy/
     用 git mv 保留历史，使 git log --follow 仍可追溯
 
 A2  scripts/migrate_names.py 机械重写
-    导入前缀   nanobot.        ->  nucleamind.legacy.       （约 2979 处）
+    导入前缀   nanobot.        ->  karyvia.legacy.       （约 2979 处）
     同时处理：字符串形式的模块路径、pytest testpaths、basedpyright include、
               构建资源路径和 docstring 中的模块引用
     不处理：  NANOBOT_*、~/.nanobot/、camelCase 配置别名等遗留运行契约
 
 A3  pyproject.toml 重写
-    name = "nucleamind"；packages = ["src/nucleamind"]
-    [project.scripts] nm = "nucleamind.runtime.cli.main:app"     # 唯一命令
-    [project.entry-points."nucleamind.plugins"] 组建立（暂空）
+    name = "karyvia"；packages = ["src/karyvia"]
+    [project.scripts] karyvia = "karyvia.runtime.cli.main:app"     # 唯一命令
+    [project.entry-points."karyvia.plugins"] 组建立（暂空）
     hatch include / sdist / wheel 路径全部更新
-    新增 runtime/legacy_entry.py，作为 nm legacy 到遗留 CLI 的唯一过渡适配器
+    新增 runtime/legacy_entry.py，作为 karyvia legacy 到遗留 CLI 的唯一过渡适配器
 ```
 
 **A0 不可省略。** D00 的验收标准是「与重构前逐项一致」，但「重构前」这个状态只存在于
@@ -188,7 +188,7 @@ compare  --before <path> --after <path>
 
 | 原始路径前缀 | 根标签 | 说明 |
 | --- | --- | --- |
-| `src/nucleamind/legacy/` | `pkg` | 重构后的包内测试 |
+| `src/karyvia/legacy/` | `pkg` | 重构后的包内测试 |
 | `nanobot/` | `pkg` | 重构前的包内测试 |
 | `tests/legacy/` | `tests` | 重构后的独立测试 |
 | `tests/` | `tests` | 重构前的独立测试 |
@@ -198,14 +198,14 @@ compare  --before <path> --after <path>
 `nanobot/channels/...` 归一后相撞。路径分隔符统一为 `/`，消除 Windows 与 Linux 差异。
 
 **新层不写长期兼容垫片**（技术方案 §4.5）：不保留 `nanobot` 命令别名；后续新 Kernel
-只读 `NUCLEAMIND_*`、`~/.nucleamind/instances/<instance>/` 和 snake_case 配置，不双读旧格式。
+只读 `KARYVIA_*`、`~/.karyvia/instances/<instance>/` 和 snake_case 配置，不双读旧格式。
 但 `legacy/` 在被删除前继续读取 `NANOBOT_*`、`~/.nanobot/` 和原 camelCase 配置，
 以便 D00 能验证遗留功能没有被结构迁移破坏。
 
 `legacy/` 内部代码在迁移期仍需可运行——这不是兼容层，而是尚未改写完的实现。
-入口收敛为 `nm legacy <原 nanobot 参数>` 单个子命令：只有一个命令名，
+入口收敛为 `karyvia legacy <原 nanobot 参数>` 单个子命令：只有一个命令名，
 旧功能在明确的临时命名空间下可达，`D31` 随 `legacy/agent/` 一并删除。
-此时 `runtime/cli/main.py` 只是最小骨架，仅暴露 `nm legacy` 与 `nm --version`，
+此时 `runtime/cli/main.py` 只是最小骨架，仅暴露 `karyvia legacy` 与 `karyvia --version`，
 真正的子命令在 `D23` 落地。
 
 `runtime/legacy_entry.py` 是 `R6` 的唯一迁移期例外，只转发参数、退出码和标准流。
@@ -220,11 +220,11 @@ compare  --before <path> --after <path>
 
 ```text
 migration-snapshot/before.json    # A0 产物，D00 验收通过后删除
-src/nucleamind/legacy/            # 原 nanobot/ 全部内容
-src/nucleamind/{contracts,kernel,sdk,builtins,runtime,embed}/__init__.py
-src/nucleamind/runtime/cli/main.py  # 最小入口：nm legacy + nm --version
-src/nucleamind/runtime/legacy_entry.py # R6 唯一过渡适配器
-src/nucleamind/legacy/README.md   # 隔离规则与迁移状态
+src/karyvia/legacy/            # 原 nanobot/ 全部内容
+src/karyvia/{contracts,kernel,sdk,builtins,runtime,embed}/__init__.py
+src/karyvia/runtime/cli/main.py  # 最小入口：karyvia legacy + karyvia --version
+src/karyvia/runtime/legacy_entry.py # R6 唯一过渡适配器
+src/karyvia/legacy/README.md   # 隔离规则与迁移状态
 plugins/  examples/plugins/  deploy/
 tests/legacy/                     # 原 tests/ 中针对遗留代码的用例
 scripts/test_snapshot.py          # 一次性工具，D00 验收通过后删除
@@ -245,7 +245,7 @@ docs/                             # 记录新层不读取旧实例目录；legac
 
 # 2. 打包与入口
 .venv\Scripts\python.exe -m pip install -e .
-nm --version && nm legacy --help                      # 唯一命令 + 遗留子命令可用
+karyvia --version && karyvia legacy --help                      # 唯一命令 + 遗留子命令可用
 .venv\Scripts\python.exe -m build
 
 # 3. 静态检查与债务基线
@@ -259,13 +259,13 @@ uv run --no-sync basedpyright
   带来的采集变化，若无则应为空）。
 - 两次 capture 的采集错误列表均为空——有模块导入失败时用例会静默消失，
   此时用例数相符也不能作为通过依据。
-- `nm legacy` 对原 `NANOBOT_*`、`~/.nanobot/` 和 camelCase 配置的读取行为保持不变。
+- `karyvia legacy` 对原 `NANOBOT_*`、`~/.nanobot/` 和 camelCase 配置的读取行为保持不变。
 - `python -m build` 产物包含 `templates/`、`skills/`、`web/dist/` 等非 Python 资源。
-- 仓库根目录下不存在可被误导入的 `nucleamind/` 目录（`src/` 布局生效）。
-- `git log --follow src/nucleamind/legacy/agent/loop.py` 能看到重构前的历史。
+- 仓库根目录下不存在可被误导入的 `karyvia/` 目录（`src/` 布局生效）。
+- `git log --follow src/karyvia/legacy/agent/loop.py` 能看到重构前的历史。
 - 新层检索确认无意外旧名：
-  `rg -i "nanobot" src/nucleamind --glob "!legacy/**"` 只允许命中迁移说明与
-  `nm legacy`；`legacy/` 中的旧环境变量、配置键和历史叙述不计为遗漏。
+  `rg -i "nanobot" src/karyvia --glob "!legacy/**"` 只允许命中迁移说明与
+  `karyvia legacy`；`legacy/` 中的旧环境变量、配置键和历史叙述不计为遗漏。
 
 验收通过后，在同一 PR 的收尾 commit 中删除 `migration-snapshot/`、`scripts/test_snapshot.py`
 与 `scripts/migrate_names.py`——它们是 D00 专用设施，留在仓库里只会误导后续开发。
@@ -294,16 +294,16 @@ pyproject.toml                                   # ruff 分层规则集
 
 **要点**（技术方案 §3.1、§12.1、§12.4）
 
-- 边界检查用 `ast.parse` 遍历 `src/nucleamind/` 各层与 `plugins/`，
+- 边界检查用 `ast.parse` 遍历 `src/karyvia/` 各层与 `plugins/`，
   收集 `Import` / `ImportFrom` 的模块名后断言 `R1`–`R6`。
 - `R6` 是**单向**规则：断言新层不 import `legacy/`，但允许 `legacy/` import 新层。
   实现时不要写成对称检查。唯一例外是精确文件
-  `src/nucleamind/runtime/legacy_entry.py`，并额外断言没有第二个例外。
+  `src/karyvia/runtime/legacy_entry.py`，并额外断言没有第二个例外。
 - 新层此时只有空骨架，检查必须对**空目录返回通过**而不是报错，
   否则 `D01` 自身无法验收。同时要有「注入违规样例必须失败」的反向测试，
   证明守卫真的会拦。
 - ruff 规则分层：新层加 `C901`、`PLR0915`、`TRY`、`ASYNC`；
-  用 `[tool.ruff.lint.per-file-ignores]` 让 `src/nucleamind/legacy/` 保留原规则集。
+  用 `[tool.ruff.lint.per-file-ignores]` 让 `src/karyvia/legacy/` 保留原规则集。
 - 沿用既有约定：**不引入 `ruff format`**。
 
 **验收**
@@ -334,14 +334,14 @@ pyproject.toml                                   # ruff 分层规则集
 
 - `SessionKey` 是结构化 dataclass，提供 `storage_id()` 且分隔符转义可逆——
   这是 `EDG-203` 的根，必须有「不同输入不可能产生同一 storage_id」的测试。
-- `NucleaError` 构造时即完成 `detail` 脱敏，不依赖日志层。
+- `KaryviaError` 构造时即完成 `detail` 脱敏，不依赖日志层。
 - `ErrorCategory` 11 个取值全部落地；错误码常量集中在一处，禁止散落字面量。
 - `RuntimeEvent` 带 `Correlation` 与单调 `sequence`。
 
 **验收**
 
 - `storage_id()` 往返与冲突测试：`("a","b:c")` 与 `("a:b","c")` 必须产出不同 id。
-- `NucleaError` 携带哨兵密钥时，`user_message`、`detail`、`repr` 均不含哨兵值。
+- `KaryviaError` 携带哨兵密钥时，`user_message`、`detail`、`repr` 均不含哨兵值。
 - `contracts/` 不 import 任何本项目模块（由 D01 守卫自动覆盖）。
 
 **规模**：约 350 行。**风险**：低，但 `SessionKey` 编码一旦发布即为持久化契约，需评审。
@@ -403,18 +403,18 @@ pyproject.toml                                   # ruff 分层规则集
 **交付**
 
 ```text
-src/nucleamind/sdk/__init__.py       # __all__ 规范性清单
-src/nucleamind/sdk/api.py            # NucleaAPI Protocol（9 方法）
-src/nucleamind/sdk/manifest.py       # PluginManifest / CapabilityDecl
-src/nucleamind/sdk/version.py        # SDK_VERSION
-src/nucleamind/sdk/testing/fakes.py  # Fake 实现
-src/nucleamind/sdk/testing/contracts.py  # 5 个契约测试基类骨架
+src/karyvia/sdk/__init__.py       # __all__ 规范性清单
+src/karyvia/sdk/api.py            # KaryviaAPI Protocol（9 方法）
+src/karyvia/sdk/manifest.py       # PluginManifest / CapabilityDecl
+src/karyvia/sdk/version.py        # SDK_VERSION
+src/karyvia/sdk/testing/fakes.py  # Fake 实现
+src/karyvia/sdk/testing/contracts.py  # 5 个契约测试基类骨架
 tests/sdk/test_public_surface.py
 ```
 
 **要点**（技术方案 §7.2、§7.5、§7.6）
 
-- `NucleaAPI` 恰好 9 个注册方法 + `ctx`，其中包含可覆盖内建 CLI 的
+- `KaryviaAPI` 恰好 9 个注册方法 + `ctx`，其中包含可覆盖内建 CLI 的
   `register_cli_entry()`。
 - `testing.py` 第一版提供 `FakeModelProvider`（可脚本化返回 tool_call 序列）、
   `InMemorySessionStore`、`RecordingHook`，以及 5 个契约测试基类的空骨架。
@@ -424,7 +424,7 @@ tests/sdk/test_public_surface.py
 **验收**
 
 - `test_public_surface.py` 建立 `__all__` 快照；手动增删一个导出会让测试失败。
-- `NucleaAPI` 方法数断言为 9，并断言 `register_cli_entry` 存在。
+- `KaryviaAPI` 方法数断言为 9，并断言 `register_cli_entry` 存在。
 - 导入 `sdk.manifest` 的耗时与副作用测试：无网络、无文件写入。
 - `sdk/` 只 import `contracts/`（D01 守卫覆盖）。
 
@@ -702,18 +702,18 @@ Hook 与 Context 逻辑应尽量下沉到 `hooks.py` 和 Provider 侧。
 **交付**
 
 ```text
-src/nucleamind/builtins/registry.py       # BUILTIN_MANIFESTS 静态清单（此时为空元组）
-src/nucleamind/kernel/plugins/host.py      # NucleaAPI 宿主实现：统一注册到 RegistrationBatch
-src/nucleamind/kernel/plugins/builtin_loader.py   # 静态内建清单 bootstrap
-src/nucleamind/runtime/wiring.py          # 组装根：registry ← builtins（R5 的唯一落点）
-src/nucleamind/sdk/testing/contracts.py   # 补全 5 个契约测试基类
+src/karyvia/builtins/registry.py       # BUILTIN_MANIFESTS 静态清单（此时为空元组）
+src/karyvia/kernel/plugins/host.py      # KaryviaAPI 宿主实现：统一注册到 RegistrationBatch
+src/karyvia/kernel/plugins/builtin_loader.py   # 静态内建清单 bootstrap
+src/karyvia/runtime/wiring.py          # 组装根：registry ← builtins（R5 的唯一落点）
+src/karyvia/sdk/testing/contracts.py   # 补全 5 个契约测试基类
 tests/architecture/test_builtin_no_privilege.py
 tests/architecture/test_kernel_runs_without_builtins.py
 ```
 
 **要点**（技术方案 §6.1 末段、§8、§12.3）
 
-- 本模块先落地唯一的 Host `NucleaAPI` 实现。内建 bootstrap 和 D27 的外部插件 loader
+- 本模块先落地唯一的 Host `KaryviaAPI` 实现。内建 bootstrap 和 D27 的外部插件 loader
   都通过它把能力写入 `RegistrationBatch`；**不允许存在内建专用注册 API**
   （`SDK-007`）。
 - D16 的 `host.py` 只实现注册分派，并接收外部注入的 `PluginContext`；本阶段测试使用
@@ -726,7 +726,7 @@ tests/architecture/test_kernel_runs_without_builtins.py
 
 **验收**
 
-- `builtins/` 不 import `nucleamind.kernel.*`（架构测试断言，`BAS-005`）。
+- `builtins/` 不 import `karyvia.kernel.*`（架构测试断言，`BAS-005`）。
 - 用同一个 Host API 分别注册一个 Fake builtin 和 Fake plugin，断言 registry 结果结构一致，
   只允许 `ProviderId` 不同。
 - 禁用全部可禁用内建实现后，Kernel 用 Fake 能力仍能跑通一次 turn（`NFR-701`）。
@@ -872,19 +872,19 @@ tests/architecture/test_kernel_runs_without_builtins.py
 
 **规模**：约 400 行 + 350 行测试。**风险**：低。
 
-### D23 内建 CLI 能力、runtime/embed 组装与 nm 入口
+### D23 内建 CLI 能力、runtime/embed 组装与 karyvia 入口
 
 **依赖**：D17–D22、D14
 
 **交付**
 
 ```text
-src/nucleamind/builtins/cli_entry/   # 内建 CLI 能力：stdin/stdout ↔ 消息契约
-src/nucleamind/runtime/cli/main.py   # nm 可执行程序：argv 解析与进程入口
-src/nucleamind/runtime/cli/commands/ # nm run / config / session（plugins 见 D29）
-src/nucleamind/runtime/bootstrap.py  # 启动序列（§10.1 的 10 步）
-src/nucleamind/runtime/instance.py   # AgentInstance：就绪 / 运行 / 停止
-src/nucleamind/embed/__init__.py     # 嵌入式 Python SDK 薄门面
+src/karyvia/builtins/cli_entry/   # 内建 CLI 能力：stdin/stdout ↔ 消息契约
+src/karyvia/runtime/cli/main.py   # karyvia 可执行程序：argv 解析与进程入口
+src/karyvia/runtime/cli/commands/ # karyvia run / config / session（plugins 见 D29）
+src/karyvia/runtime/bootstrap.py  # 启动序列（§10.1 的 10 步）
+src/karyvia/runtime/instance.py   # AgentInstance：就绪 / 运行 / 停止
+src/karyvia/embed/__init__.py     # 嵌入式 Python SDK 薄门面
 tests/builtins/test_cli_entry.py
 tests/runtime/test_bootstrap.py
 tests/embed/test_embed.py
@@ -964,7 +964,7 @@ tests/embed/test_embed.py
 
 **要点**（技术方案 §7.1、§7.2）
 
-- 两条来源：entry point 组 `nucleamind.plugins` + 配置显式路径 `plugins.paths`。
+- 两条来源：entry point 组 `karyvia.plugins` + 配置显式路径 `plugins.paths`。
 - **不做 site-packages 全量扫描**，不做目录自动加载。
 - 发现与启用分离：只有 `plugins.enabled` 列出的插件才导入其模块。
 - 缺少 `sdk_range` 等兼容字段直接判定校验失败并列出字段路径（借鉴 OpenClaw
@@ -1016,7 +1016,7 @@ tests/embed/test_embed.py
 
 - 阶段 A（校验，不导入实现）7 个子步骤；阶段 B（加载）按拓扑序 5 个子步骤。
 - 阶段 B 用 `RegistrationBatch`（D06 已实现），setup 抛异常即整体回滚。
-- 外部插件必须复用 D16 的 Host `NucleaAPI` 注册实现；本模块只能补充受限
+- 外部插件必须复用 D16 的 Host `KaryviaAPI` 注册实现；本模块只能补充受限
   `PluginContext`、加载计划与错误编排，不得复制注册分派逻辑。
 - 阶段 A 失败记入报告，继续启动不依赖该插件的部分。
 - 未启用任何外部插件时，外部发现、依赖解析和生命周期阶段为空；Runtime 仍通过
@@ -1036,7 +1036,7 @@ tests/embed/test_embed.py
 | 全部插件禁用 | 实例按内建基线正常启动（`PLG-007`、`EDG-101`） |
 | 覆盖目标不存在 | 启动错误（复用 D06 语义） |
 
-- 插件不 import `nucleamind.kernel.*`（架构测试，`PLG-002`）。
+- 插件不 import `karyvia.kernel.*`（架构测试，`PLG-002`）。
 
 **规模**：约 550 行 + 650 行测试。**风险**：高。分支最多的模块，验收表必须逐条对齐。
 
@@ -1063,25 +1063,25 @@ tests/embed/test_embed.py
 
 **规模**：约 400 行 + 450 行测试。**风险**：中高，异步资源清理是 `13.3` 点名的难点。
 
-### D29 nm plugins 命令与诊断输出
+### D29 karyvia plugins 命令与诊断输出
 
 **依赖**：D28、D22
 
-**交付**：`builtins/commands_core/` 扩展、`nm plugins` 子命令、`tests/plugins/test_cli_plugins.py`
+**交付**：`builtins/commands_core/` 扩展、`karyvia plugins` 子命令、`tests/plugins/test_cli_plugins.py`
 
 **要点**（技术方案 §10.4、§10.5）
 
-- `nm plugins list / enable / disable / uninstall / purge`。
+- `karyvia plugins list / enable / disable / uninstall / purge`。
 - `uninstall` 默认保留插件状态目录；`purge` 需 `--confirm` 且先打印将删除的路径与体积
   （`EDG-505`）。
-- `nm capabilities` 打印 shadowed 关系，覆盖不静默。
+- `karyvia capabilities` 打印 shadowed 关系，覆盖不静默。
 
 **验收**
 
 - `enable` / `disable` 只改配置，不在当前进程生效（首版不热更新，需求 §4.2）。
 - `uninstall` 后状态目录仍存在。
 - `purge --confirm` 前打印路径与体积；无 `--confirm` 时拒绝执行。
-- `nm capabilities` 输出中 shadowed 关系可读且包含 provider 标识（`NFR-502`）。
+- `karyvia capabilities` 输出中 shadowed 关系可读且包含 provider 标识（`NFR-502`）。
 
 **规模**：约 350 行 + 350 行测试。**风险**：低。
 
@@ -1092,8 +1092,8 @@ tests/embed/test_embed.py
 **交付**
 
 ```text
-examples/plugins/nucleamind-plugin-echo-tool/       # 新增一个 TOOL 能力
-examples/plugins/nucleamind-plugin-session-memory/  # 覆盖内建 SESSION_STORE 为内存实现
+examples/plugins/karyvia-plugin-echo-tool/       # 新增一个 TOOL 能力
+examples/plugins/karyvia-plugin-session-memory/  # 覆盖内建 SESSION_STORE 为内存实现
   两者均为完整独立发行包（pyproject + src/ + tests/），通过 entry point 被发现
 tests/e2e/test_plugin_runtime.py
 docs/ 插件开发入门文档
@@ -1110,10 +1110,10 @@ docs/ 插件开发入门文档
 | --- | --- |
 | 1 | 不修改 engine / orchestrator 即可加载外部插件 |
 | 2 | 插件注册的工具参与真实 turn |
-| 3 | 覆盖内建 session store，`nm capabilities` 显示 shadowed 关系 |
+| 3 | 覆盖内建 session store，`karyvia capabilities` 显示 shadowed 关系 |
 | 4 | 禁用覆盖插件后插件能力退出，未被单独禁用的内建能力重新生效 |
 | 5 | 配置错误 / SDK 不兼容 / 运行失败三类各有稳定错误码与诊断输出 |
-| 6 | 示例插件不 import `nucleamind.kernel.*` |
+| 6 | 示例插件不 import `karyvia.kernel.*` |
 | 7 | 内建与插件 session store 通过同一套 `SessionStoreContract` |
 | 8 | 原能力关键行为有回归测试或明确迁移说明 |
 
@@ -1127,7 +1127,7 @@ docs/ 插件开发入门文档
 
 **依赖**：D30
 
-**交付**：`legacy/agent/` 删除、`legacy/cli/` 删除、`nm legacy` 子命令删除、
+**交付**：`legacy/agent/` 删除、`legacy/cli/` 删除、`karyvia legacy` 子命令删除、
 `runtime/legacy_entry.py` 与 D01 中对应的 `R6` 白名单删除、
 `legacy/api/server.py` 与 WebUI gateway 改为调用新 Kernel、
 `tests/baseline/` 与对应 `tests/legacy/` 用例删除
@@ -1141,7 +1141,7 @@ docs/ 插件开发入门文档
 
 | 调用方 | 处置 |
 | --- | --- |
-| `legacy/cli/agent.py`、`legacy/cli/commands.py` | 删除。`nm` 已有完整 CLI（`D23`） |
+| `legacy/cli/agent.py`、`legacy/cli/commands.py` | 删除。`karyvia` 已有完整 CLI（`D23`） |
 | `legacy/api/server.py` | 改为调用 `runtime/instance.py`；本身在 `D32+` 迁为插件 |
 | `legacy/nanobot.py` SDK 门面 | 删除，由 `embed/` 取代（`D23` 已落地） |
 
@@ -1159,8 +1159,8 @@ docs/ 插件开发入门文档
    200 行改造。删掉 `legacy/cli/` 之后 gateway / webui / api 本来也失去了唯一启动入口。
    `webui/` 前端源码保留但暂时没有后端。
 2. **OpenAI 兼容接口是新层重写的官方插件，不是改造 `legacy/api/server.py`。**
-   落点 `plugins/nucleamind-plugin-openai-api/`（一条 `CHANNEL` 能力）+ 通用无头命令
-   `nm serve`。做成 Channel 是硬约束：出站增量只经 `deliver` 路由回注册过的 Channel，
+   落点 `plugins/karyvia-plugin-openai-api/`（一条 `CHANNEL` 能力）+ 通用无头命令
+   `karyvia serve`。做成 Channel 是硬约束：出站增量只经 `deliver` 路由回注册过的 Channel，
    `instance.submit()` 要等整条 turn 跑完才返回，用它做不出 SSE。
 3. **删除范围是「Agent 路径及其依赖方」，不是整个 `legacy/`。** 保留 `providers/`、
    `channels/`（去掉 websocket）、`session/`、`cron/`、`command/`、`config/`、`utils/`、
@@ -1171,12 +1171,12 @@ docs/ 插件开发入门文档
 
 - `legacy/agent/`、`legacy/cli/` 目录不再存在，全仓库无悬挂引用
   （`rg "legacy\.agent|legacy\.cli" src/ tests/` 无命中）。
-- `nm legacy` 子命令已删除，`nm --help` 中不再出现。
+- `karyvia legacy` 子命令已删除，`karyvia --help` 中不再出现。
 - `runtime/legacy_entry.py` 与架构测试中的精确白名单已删除；此后 `R6` 恢复为无例外。
 - `legacy/api/server.py` 的现有测试在改用新 Kernel 后全部通过。
 - `tests/baseline/` 与 `legacy/agent` 相关的 `tests/legacy/` 用例已删除。
 - `scripts/legacy_debt.py` 数字显著下降（约 19000 行 agent + 6500 行 cli）。
-- 端到端：`nm` 交互式会话与 `legacy/api/server.py` 的 OpenAI 兼容接口均可完成一次 turn。
+- 端到端：`karyvia` 交互式会话与 `legacy/api/server.py` 的 OpenAI 兼容接口均可完成一次 turn。
 
 **规模**：主要是删除 + `api/server.py` 约 200 行改造。
 **风险**：中。风险从「双路径长期共存」降为「一次性切换」，但需确认 `api/server.py`
@@ -1216,13 +1216,13 @@ docs/ 插件开发入门文档
 | D20 | tools_fs | 5 | D16 | 1150 | 中高 |
 | D21 | tools_shell | 5 | D16 | 850 | 高 |
 | D22 | commands_core | 5 | D16 D13 | 750 | 低 |
-| D23 | cli_entry + runtime/embed + nm 入口 | 5 | D17–D22 D14 | 1300 | 中 |
+| D23 | cli_entry + runtime/embed + karyvia 入口 | 5 | D17–D22 D14 | 1300 | 中 |
 | D24 | 开箱可用验收 ★ | 6 | D17–D23 | 750 | 中 |
 | D25 | Manifest 与发现 | 7 | D24 | 900 | 中 |
 | D26 | 资源门面与 Context | 7 | D25 D11 | 850 | 中 |
 | D27 | 两阶段加载 | 7 | D26 D06 | 1200 | 高 |
 | D28 | 插件生命周期 | 7 | D27 | 850 | 中高 |
-| D29 | nm plugins 与诊断 | 7 | D28 D22 | 700 | 低 |
+| D29 | karyvia plugins 与诊断 | 7 | D28 D22 | 700 | 低 |
 | D30 | 示例插件与验收 ★ | 7 | D29 | 850 | 低 |
 | D31 | 遗留 Agent 路径切换与删除 | 8 | D30 | 200 + 删除 | 中 |
 | D32 | 官方插件：Anthropic Model Provider | 三 P1 | D30 | 1400 | 中 |

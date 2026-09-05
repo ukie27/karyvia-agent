@@ -21,17 +21,17 @@ from collections.abc import Sequence
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     CapabilityRef,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
     Plugin,
     PluginId,
     ProviderId,
 )
-from nucleamind.kernel.registry import (
+from karyvia.kernel.registry import (
     CapabilityRegistry,
     Registration,
     ResolutionReport,
@@ -441,7 +441,7 @@ def test_report_ok_and_raise_if_failed() -> None:
         [make(CapabilityKind.TOOL, "fs.read", ACME, overrides="builtin:fs.read")]
     ).report
     assert not broken.ok
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         broken.raise_if_failed()
     assert excinfo.value.code is ErrorCode.CAPABILITY_OVERRIDE_TARGET_MISSING
 

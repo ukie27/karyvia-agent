@@ -11,9 +11,9 @@ import json
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, JsonValue, NucleaError
-from nucleamind.kernel.config import PluginEntry, validate_config
-from nucleamind.kernel.config.plugin_blocks import (
+from karyvia.contracts import ErrorCode, JsonValue, KaryviaError
+from karyvia.kernel.config import PluginEntry, validate_config
+from karyvia.kernel.config.plugin_blocks import (
     ENTRY_KEYS,
     RESERVED_PLUGIN_KEYS,
     entries_to_json,
@@ -55,7 +55,7 @@ def test_reserved_keys_are_not_plugin_ids() -> None:
 
 def test_an_unknown_top_level_field_is_still_rejected() -> None:
     """`extra="forbid"` 只在 `plugins` 小节里让位给插件 id，别处一个字都没松。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         validate_config({"turn": {"nope": 1}})
     assert caught.value.code is ErrorCode.CONFIG_UNKNOWN_FIELD
 
@@ -74,7 +74,7 @@ def test_malformed_entries_report_their_pointer(
     document: dict[str, JsonValue], pointer: str
 ) -> None:
     """每处问题都要带 JSON Pointer（`CFG-001`），否则用户不知道该改哪一行。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         validate_config(document)
     pointers = [item["pointer"] for item in caught.value.detail["errors"]]
     assert pointer in pointers
@@ -82,7 +82,7 @@ def test_malformed_entries_report_their_pointer(
 
 def test_all_problems_are_reported_at_once() -> None:
     """改一个键、重启、再看到下一个错误不是可接受的启动体验。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         validate_config(_plugins(a=3, b={"nope": 1}))
     assert len(caught.value.detail["errors"]) == 2
 
@@ -93,7 +93,7 @@ def test_entry_keys_are_exactly_config_and_secrets() -> None:
 
 
 def test_the_diagnostic_view_keeps_the_reference_literal() -> None:
-    """`/config` 与 `nm config show` 看到的是 `${VAR}` 字面量，不是明文（`CFG-003`）。"""
+    """`/config` 与 `karyvia config show` 看到的是 `${VAR}` 字面量，不是明文（`CFG-003`）。"""
     config = validate_config(_plugins(acme={"secrets": {"api_key": "${OPENAI_API_KEY}"}}))
     document = json.dumps(config.to_json(), ensure_ascii=False)
     assert "${OPENAI_API_KEY}" in document

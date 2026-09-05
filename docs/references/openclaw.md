@@ -2,7 +2,7 @@
 
 ## 定位
 
-`references/openclaw` 是 NucleaMind 研究插件生态、插件宿主边界和 OpenClaw 兼容层的主要参考项目。OpenClaw 规模很大，默认只研究公开契约和最小官方插件实例。
+`references/openclaw` 是 Karyvia 研究插件生态、插件宿主边界和 OpenClaw 兼容层的主要参考项目。OpenClaw 规模很大，默认只研究公开契约和最小官方插件实例。
 
 ## 优先入口
 

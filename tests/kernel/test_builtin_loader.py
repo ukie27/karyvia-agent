@@ -19,15 +19,15 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
     Plugin,
     PluginId,
 )
-from nucleamind.kernel.plugins import (
+from karyvia.kernel.plugins import (
     CapabilityDeclaration,
     CapabilityHost,
     LoadRequest,
@@ -36,8 +36,8 @@ from nucleamind.kernel.plugins import (
     import_setup,
     load_into,
 )
-from nucleamind.kernel.registry import CapabilityRegistry, RegistrationBatch
-from nucleamind.sdk.testing import ECHO_SPEC, EchoTool, FakeModelProvider, FakePluginContext
+from karyvia.kernel.registry import CapabilityRegistry, RegistrationBatch
+from karyvia.sdk.testing import ECHO_SPEC, EchoTool, FakeModelProvider, FakePluginContext
 
 # ------------------------------------------------------------------------------------ 夹具
 
@@ -307,12 +307,12 @@ def test_import_setup_resolves_a_real_entry_point(
 
 @pytest.mark.parametrize(
     "target",
-    ["no-colon", ":setup", "d16_probe:", "nucleamind.does_not_exist:setup"],
+    ["no-colon", ":setup", "d16_probe:", "karyvia.does_not_exist:setup"],
     ids=["无冒号", "缺模块名", "缺属性名", "模块不存在"],
 )
 def test_import_setup_reports_a_bad_entry_point(target: str) -> None:
     """不让 `ImportError` 直接冒泡：「插件坏了」与「Kernel 坏了」必须可区分。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         import_setup(target)
     assert excinfo.value.code is ErrorCode.PLUGIN_LOAD_FAILED
     assert excinfo.value.detail["setup"] == target
@@ -324,6 +324,6 @@ def test_import_setup_rejects_a_non_callable_attribute(
     module = tmp_path / "d16_notfn.py"
     module.write_text("setup = 42\n", encoding="utf-8")
     monkeypatch.syspath_prepend(str(tmp_path))
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         import_setup("d16_notfn:setup")
     assert excinfo.value.code is ErrorCode.PLUGIN_LOAD_FAILED

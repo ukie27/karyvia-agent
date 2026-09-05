@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import inspect
 
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS, TOOLS_FILE
-from nucleamind.builtins.tools_file import (
+from karyvia.builtins.registry import BUILTIN_MANIFESTS, TOOLS_FILE
+from karyvia.builtins.tools_file import (
     CONFIG_MAX_FILE_BYTES_KEY,
     FILE_SEND_SPEC,
     TOOL_NAME,
@@ -13,19 +13,19 @@ from nucleamind.builtins.tools_file import (
     resolve_max_file_bytes,
     setup,
 )
-from nucleamind.contracts import (
+from karyvia.contracts import (
     AttachmentSource,
     ErrorCode,
     JsonValue,
-    NucleaError,
+    KaryviaError,
     RiskLevel,
     ToolCall,
     ToolHandler,
     ToolInvocation,
     ToolSpec,
 )
-from nucleamind.sdk import FileAccess
-from nucleamind.sdk.testing import (
+from karyvia.sdk import FileAccess
+from karyvia.sdk.testing import (
     FakePluginContext,
     ManualCancel,
     ToolContract,
@@ -41,9 +41,9 @@ class MemoryFiles:
 
     async def read_bytes(self, path: str) -> bytes:
         if ".." in path.replace("\\", "/").split("/"):
-            raise NucleaError(ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE, "路径越界。")
+            raise KaryviaError(ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE, "路径越界。")
         if path not in self.files:
-            raise NucleaError(ErrorCode.PERSISTENCE_READ_FAILED, "读取失败。")
+            raise KaryviaError(ErrorCode.PERSISTENCE_READ_FAILED, "读取失败。")
         return self.files[path]
 
     async def read_text(self, path: str) -> str:

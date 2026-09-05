@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from nucleamind.contracts import ErrorCode, NucleaError, TurnId
-from nucleamind.kernel.routing import (
+from karyvia.contracts import ErrorCode, KaryviaError, TurnId
+from karyvia.kernel.routing import (
     DEFAULT_DEDUP_CAPACITY,
     DEFAULT_DEDUP_TTL_MS,
     DedupCache,
@@ -151,7 +151,7 @@ def test_hit_reports_how_long_ago_the_message_was_first_seen() -> None:
 @pytest.mark.parametrize(("capacity", "ttl_ms"), [(0, 1000), (-1, 1000), (10, 0), (10, -5)])
 def test_non_positive_bounds_are_rejected(capacity: int, ttl_ms: int) -> None:
     """容量为 0 的去重表什么都不去重，那比没有去重更难查——构造时就拦掉。"""
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         DedupCache(capacity=capacity, ttl_ms=ttl_ms)
 
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED

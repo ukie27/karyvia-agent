@@ -1,4 +1,4 @@
-# NucleaMind 仓库开发指南
+# Karyvia Agent 仓库开发指南
 
 本文件只保留当前仍然有效、会影响代码判断的规则。项目现状、架构地图、常见改动路径和历史
 分别见：
@@ -14,7 +14,7 @@
 
 ## 1. 目标与边界
 
-NucleaMind 是一个轻量、模块化、可扩展的 Agent Kernel。核心只保留运行一个 Agent 所需的
+Karyvia 是一个轻量、模块化、可扩展的 Agent Kernel。核心只保留运行一个 Agent 所需的
 机制：消息与公开契约、Turn 执行、Session 并发、Context 组装、能力注册、插件加载、基础
 配置和可观测性。
 
@@ -33,7 +33,7 @@ NucleaMind 是一个轻量、模块化、可扩展的 Agent Kernel。核心只�
 ## 2. 仓库层次与依赖方向
 
 ```text
-src/nucleamind/
+src/karyvia/
 ├── contracts/   # 公开数据契约；纯类型与纯函数
 ├── kernel/      # 通用机制；只依赖 contracts 与 kernel 内部
 ├── sdk/         # 插件作者的唯一宿主 API；只依赖 contracts/sdk
@@ -47,7 +47,7 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 
 依赖规则由 AST 测试强制执行：
 
-- `contracts/` 不依赖任何 NucleaMind 内部层。
+- `contracts/` 不依赖任何 Karyvia 内部层。
 - `kernel/` 不导入 `sdk/`、`builtins/`、`runtime/` 或 `embed/`。
 - `sdk/` 不导入 `kernel/`、`builtins/`、`runtime/` 或 `embed/`。
 - `builtins/` 与插件只依赖 `sdk` 和 `contracts`，不享有私有特权。
@@ -63,11 +63,11 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 
 - `SessionKey.storage_id()` 是已发布的持久化编码，必须可逆且无碰撞。
 - `ErrorCode` 与 `CODE_CATEGORIES` 是错误码唯一来源；禁止散落错误码字面量。
-- `NucleaError.category` 由错误码推导，调用方不能另传一份分类。
+- `KaryviaError.category` 由错误码推导，调用方不能另传一份分类。
 - `contracts.errors.redact()` / `scrub()` 在数据构造时脱敏；不要把责任推给日志 sink。
 - `contracts.SecretStr` 是唯一密钥包装类型；明文只通过 `reveal()` 短暂取得。
 - SDK 当前为 `5.0.0`。`sdk.__all__`、`sdk.testing.__all__`、
-  `CapabilityKind`、`NucleaAPI` 和 manifest schema 都受兼容承诺约束。
+  `CapabilityKind`、`KaryviaAPI` 和 manifest schema 都受兼容承诺约束。
 - Session JSONL 格式是持久化契约，修改必须先设计迁移。
 
 公开表面优先做纯新增。需要破坏性修改时，不要写长期双读兼容垫片；明确版本、迁移边界、
@@ -90,14 +90,14 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 - `kernel/registry/resolution.py` 是能力冲突、覆盖和遮蔽语义的唯一来源。覆盖不由加载顺序
   决定。
 - 注册必须经过 `RegistrationBatch`，保证插件 `setup()` 失败时整批回滚。
-- `CapabilityHost` 是唯一 `NucleaAPI` 实现；内建和外部插件走同一条注册路径。
+- `CapabilityHost` 是唯一 `KaryviaAPI` 实现；内建和外部插件走同一条注册路径。
 - manifest 的 `capabilities` 是有约束力的全集：未声明却注册、声明却未注册都必须失败。
 - `overrides` 以原始字符串跨层传递，统一由 `contracts.parse_capability_target()` 解析。
 - manifest 通常不要显式写默认 `priority=100`；内建基准为 0，只有确有排序意图时才写。
-- 生产发现只读取 `~/.nucleamind/plugins.json` 中由 `nm` 管理的全局候选；不扫描环境，
+- 生产发现只读取 `~/.karyvia/plugins.json` 中由 `karyvia` 管理的全局候选；不扫描环境，
   不从实例配置读取代码路径。manifest 解析和项目规则在 `runtime/inventory.py`。
 - 安装、更新、卸载是全局操作，要求所有实例停止；实例只管理启用、配置和业务状态。
-  全局数据直接位于 `~/.nucleamind/`，不要增加 `global/` 中间目录。
+  全局数据直接位于 `~/.karyvia/`，不要增加 `global/` 中间目录。
 - 未启用插件不得被导入。entry point 名、候选名和 manifest `id` 必须一致。
 - `kernel/plugins/loader.py` 只负责依赖、排序和 schema 等机制；项目级判定在
   `runtime/plugin_plan.py`。
@@ -163,8 +163,8 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 
 ### Config
 
-- 命名实例统一位于 `~/.nucleamind/instances/<name>/`；`--instance-dir` 才能使用任意外部
-  路径。不要把实例重新平铺到 NucleaMind home 顶层。
+- 命名实例统一位于 `~/.karyvia/instances/<name>/`；`--instance-dir` 才能使用任意外部
+  路径。不要把实例重新平铺到 Karyvia home 顶层。
 - 配置优先级只在 `sources.collect_layers()` 定义：default < `config.json` < env < CLI。
 - 字段只在 `schema.SECTION_SPECS` 声明；字段形状积木只在 `fields.py`。
 - 默认值常量放 `defaults.py`；`json_schema.py` 是派生物，不是第二份真相。

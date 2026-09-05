@@ -17,7 +17,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     UNTRUSTED_DATA_PREFIX,
     AttachmentRef,
     AttachmentSource,
@@ -29,15 +29,15 @@ from nucleamind.contracts import (
     HookContext,
     HookName,
     HookOutcome,
-    NucleaError,
+    KaryviaError,
     Role,
     Sensitivity,
     SessionMessage,
     SessionSnapshot,
     TrustLevel,
 )
-from nucleamind.kernel.registry import CapabilityRegistry
-from nucleamind.kernel.turn import (
+from karyvia.kernel.registry import CapabilityRegistry
+from karyvia.kernel.turn import (
     CancelToken,
     RegisteredContextProvider,
     assemble,
@@ -45,7 +45,7 @@ from nucleamind.kernel.turn import (
     estimate_tokens,
     replay_messages,
 )
-from nucleamind.kernel.turn.request_size import estimate_messages_tokens
+from karyvia.kernel.turn.request_size import estimate_messages_tokens
 
 from ._engine_support import CORRELATION
 from ._orchestrator_support import FakeContextProvider, binding, fragment
@@ -130,7 +130,7 @@ async def test_providers_are_called_concurrently_and_ordered_by_binding() -> Non
 
 
 async def test_provider_failure_is_skipped_and_recorded() -> None:
-    failures: list[NucleaError] = []
+    failures: list[KaryviaError] = []
     context = await build(
         bindings=[
             binding(FakeContextProvider(error=RuntimeError("挂了")), name="broken"),
@@ -144,7 +144,7 @@ async def test_provider_failure_is_skipped_and_recorded() -> None:
 
 
 async def test_provider_timeout_does_not_block_the_turn() -> None:
-    failures: list[NucleaError] = []
+    failures: list[KaryviaError] = []
     context = await build(
         bindings=[binding(FakeContextProvider(hang=True), name="memory")],
         provider_timeout_ms=10,
@@ -342,7 +342,7 @@ def test_estimate_tokens_is_zero_for_empty_text() -> None:
 
 async def test_an_empty_assembly_is_refused_rather_than_sent() -> None:
     """空请求发出去只会换回一个供应商侧的报错，不如在这里说清楚。"""
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         await build(user_input="")
     assert caught.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -397,6 +397,6 @@ def test_context_providers_from_rejects_a_foreign_payload() -> None:
         batch.add(CapabilityKind.CONTEXT, "basic", object())
     registry.freeze(registry.registrations)
 
-    with pytest.raises(NucleaError) as caught:
+    with pytest.raises(KaryviaError) as caught:
         context_providers_from(registry)
     assert caught.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED

@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     AttachmentRef,
     AttachmentSource,
     Builtin,
@@ -33,15 +33,15 @@ from nucleamind.contracts import (
     ErrorCode,
     InboundMessage,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     Plugin,
     PluginId,
     Sender,
     SessionKey,
     TurnId,
 )
-from nucleamind.kernel.registry import CapabilityRegistry, resolve_into
-from nucleamind.kernel.routing import (
+from karyvia.kernel.registry import CapabilityRegistry, resolve_into
+from karyvia.kernel.routing import (
     DEFAULT_COMMAND_PREFIX,
     CommandIndex,
     Dispatcher,
@@ -49,7 +49,7 @@ from nucleamind.kernel.routing import (
     build_command_index,
     parse_command,
 )
-from nucleamind.kernel.turn.cancel import CancelToken
+from karyvia.kernel.turn.cancel import CancelToken
 
 CORRELATION = Correlation(
     instance_id=InstanceId("inst"),
@@ -176,7 +176,7 @@ def test_alias_collision_is_caught_at_startup() -> None:
         )
     resolve_into(registry)
 
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         build_command_index(registry)
 
     assert exc.value.code is ErrorCode.PLUGIN_REGISTRATION_CONFLICT
@@ -193,7 +193,7 @@ def test_alias_colliding_with_another_command_name_is_a_conflict() -> None:
         batch.add(CapabilityKind.COMMAND, second.name, RegisteredCommand(second, StubHandler()))
     resolve_into(registry)
 
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         build_command_index(registry)
 
     assert exc.value.code is ErrorCode.PLUGIN_REGISTRATION_CONFLICT
@@ -205,7 +205,7 @@ def test_wrong_payload_shape_is_a_kernel_invariant_violation() -> None:
         batch.add(CapabilityKind.COMMAND, "help", "不是 RegisteredCommand")
     resolve_into(registry)
 
-    with pytest.raises(NucleaError) as exc:
+    with pytest.raises(KaryviaError) as exc:
         build_command_index(registry)
 
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
@@ -424,9 +424,9 @@ async def test_the_session_stays_usable_after_a_command_blows_up() -> None:
     assert after_text.disposition is Disposition.MODEL_TURN
 
 
-async def test_a_nuclea_error_from_the_handler_is_passed_through_intact() -> None:
+async def test_a_karyvia_error_from_the_handler_is_passed_through_intact() -> None:
     """实现方给出的诊断信息比 Kernel 能编的更准，原样带上。"""
-    raised = NucleaError(ErrorCode.PERMISSION_DENIED, "你没有权限读那个目录。")
+    raised = KaryviaError(ErrorCode.PERMISSION_DENIED, "你没有权限读那个目录。")
     dispatcher = dispatcher_for((HELP, StubHandler(raises=raised)))
 
     outcome = await dispatcher.dispatch(message("/help"), CORRELATION, CancelToken())
@@ -448,7 +448,7 @@ async def test_base_exception_is_not_swallowed() -> None:
 def test_empty_prefix_is_rejected() -> None:
     """空前缀会让每条普通消息都被当成命令解析。"""
     for prefix in ("", " ", "/ "):
-        with pytest.raises(NucleaError) as exc:
+        with pytest.raises(KaryviaError) as exc:
             Dispatcher(index_of((HELP, StubHandler())), prefix=prefix)
         assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 

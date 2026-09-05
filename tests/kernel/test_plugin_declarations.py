@@ -12,13 +12,13 @@ from __future__ import annotations
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     ErrorCode,
-    NucleaError,
+    KaryviaError,
 )
-from nucleamind.kernel.plugins import CapabilityDeclaration, LoadRequest
+from karyvia.kernel.plugins import CapabilityDeclaration, LoadRequest
 
 
 def test_a_declaration_carries_its_slot() -> None:
@@ -31,13 +31,13 @@ def test_a_declaration_carries_its_slot() -> None:
 @pytest.mark.parametrize("name", ["", " ", "a" * 300, "bad\x00name"], ids=repr)
 def test_a_malformed_capability_name_is_rejected(name: str) -> None:
     """名字的形状借 `CapabilityRef` 校验——与 manifest 侧同一份实现。"""
-    with pytest.raises(NucleaError):
+    with pytest.raises(KaryviaError):
         CapabilityDeclaration(kind=CapabilityKind.TOOL, name=name)
 
 
 def test_a_malformed_override_target_is_rejected() -> None:
     """覆盖目标只用 `parse_capability_target()` 解码，不在这里另写正则。"""
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         CapabilityDeclaration(kind=CapabilityKind.TOOL, name="fs.read", overrides="垃圾串")
     assert excinfo.value.code is ErrorCode.INPUT_MALFORMED
 
@@ -55,7 +55,7 @@ def test_a_negative_priority_is_rejected() -> None:
 
     在这里也拦一次，是为了让错误指回**声明**而不是指回某次注册——用户要改的是 manifest。
     """
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         CapabilityDeclaration(kind=CapabilityKind.TOOL, name="fs.read", priority=-1)
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
@@ -68,7 +68,7 @@ def test_zero_priority_is_allowed() -> None:
 def test_a_load_request_rejects_duplicate_declarations() -> None:
     """同一提供方重复声明同一能力：manifest 侧已拦，这里是第二道（内建清单不走 manifest）。"""
     duplicate = CapabilityDeclaration(kind=CapabilityKind.TOOL, name="fs.read")
-    with pytest.raises(NucleaError) as excinfo:
+    with pytest.raises(KaryviaError) as excinfo:
         LoadRequest(
             plugin_id="probe",
             provider=Builtin(),

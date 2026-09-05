@@ -5,7 +5,7 @@
 不负责：判断插件本身对不对（那是各插件自己的测试树）、CI 的其余步骤。
 
 **为什么这条规则值得一个守卫。** `pytest` 的 `testpaths` 收集整个 `plugins/`，而每棵插件
-测试树第一行就 `import nucleamind_plugin_<id>`；插件经 entry point 被发现，没 editable
+测试树第一行就 `import karyvia_plugin_<id>`；插件经 entry point 被发现，没 editable
 装进环境就**根本 import 不到**。因此清单漏一个的后果不是「少跑几个用例」，而是**收集期
 `ModuleNotFoundError` 直接中断整个作业**。
 

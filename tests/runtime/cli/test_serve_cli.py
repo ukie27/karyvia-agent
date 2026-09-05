@@ -1,4 +1,4 @@
-"""`nm serve` 的命令层行为（`D31`）。
+"""`karyvia serve` 的命令层行为（`D31`）。
 
 职责：验参数解析、首次运行分支与「没有任何 Channel 时的退出码」。
 不负责：HTTP 协议与真实 turn（`tests/e2e/test_openai_api.py`）。
@@ -15,9 +15,9 @@ from pathlib import Path
 
 import pytest
 
-from nucleamind.runtime.cli.commands.serve import _channel_overrides
-from nucleamind.runtime.cli.main import app
-from nucleamind.runtime.first_run import (
+from karyvia.runtime.cli.commands.serve import _channel_overrides
+from karyvia.runtime.cli.main import app
+from karyvia.runtime.first_run import (
     MODEL_API_KEY_ENV,
     MODEL_PLUGIN_ID,
     MODEL_SECRET_NAME,
@@ -33,13 +33,13 @@ def test_serve_appears_in_the_top_level_usage(capsys: pytest.CaptureFixture[str]
 
 def test_bad_flags_return_two(capsys: pytest.CaptureFixture[str]) -> None:
     assert app(["serve", "--bogus"]) == 2
-    assert "nm serve" in capsys.readouterr().err
+    assert "karyvia serve" in capsys.readouterr().err
 
 
 def test_help_returns_two_with_usage(capsys: pytest.CaptureFixture[str]) -> None:
     """`--help` 与参数错走同一条出口：这条命令没有自己的帮助页，只有一行用法。"""
     assert app(["serve", "--help"]) == 2
-    assert "nm serve" in capsys.readouterr().err
+    assert "karyvia serve" in capsys.readouterr().err
 
 
 def test_a_dangling_port_value_is_rejected() -> None:
@@ -62,7 +62,7 @@ def test_no_arguments_is_valid() -> None:
 def test_serve_on_a_fresh_instance_generates_a_config_and_stops(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """与 `nm run` 完全同一条首次运行分支：只生成、只指路（§10.1 步骤 2）。"""
+    """与 `karyvia run` 完全同一条首次运行分支：只生成、只指路（§10.1 步骤 2）。"""
     root = tmp_path / "fresh"
     assert app(["serve", "--instance-dir", str(root)]) == 0
     assert (root / "config.json").exists()
@@ -80,4 +80,4 @@ def test_serve_without_any_channel_returns_one(
         plugins={MODEL_PLUGIN_ID: {"secrets": {MODEL_SECRET_NAME: f"${{{MODEL_API_KEY_ENV}}}"}}},
     )
     assert app(["serve", "--instance-dir", str(tmp_path)]) == 1
-    assert "nm plugins list" in capsys.readouterr().err
+    assert "karyvia plugins list" in capsys.readouterr().err

@@ -2,28 +2,28 @@
 
 从零到第一次对话，再到装上第一个插件。
 
-这篇讲**怎么把 NucleaMind 跑起来**。字段含义与优先级见
+这篇讲**怎么把 Karyvia 跑起来**。字段含义与优先级见
 [`configuration.md`](./configuration.md)，命令的完整参数见 [`cli.md`](./cli.md)，
 容器与常驻部署见 [`deployment.md`](./deployment.md)。
 
 ## 1. 安装
 
-需要 Python 3.11 或更新。**NucleaMind 没有发布到 PyPI**——从 PyPI 装 `nanobot-ai` 装到的
+需要 Python 3.11 或更新。**Karyvia 没有发布到 PyPI**——从 PyPI 装 `nanobot-ai` 装到的
 是上游项目，不是本仓库。从本地检出装：
 
 ```bash
-git clone <本仓库地址> NucleaMind
-cd NucleaMind
+git clone <本仓库地址> Karyvia
+cd Karyvia
 
 python -m venv .venv
 .venv/bin/python -m pip install -e .          # Windows：.venv\Scripts\python.exe
 ```
 
-装完之后 `nm` 就在虚拟环境的 `bin/`（Windows 是 `Scripts\`）里：
+装完之后 `karyvia` 就在虚拟环境的 `bin/`（Windows 是 `Scripts\`）里：
 
 ```bash
-nm --version
-nm --help
+karyvia --version
+karyvia --help
 ```
 
 宿主只有四个第三方依赖（pydantic / httpx / jsonschema / packaging）。**能力所需的包由
@@ -33,14 +33,14 @@ nm --help
 ## 2. 生成配置
 
 ```bash
-nm init
+karyvia init
 ```
 
 它在实例目录里建两个文件，**已经存在的 `config.json` 一个字节都不会动**：
 
 ```text
-~/.nucleamind/instances/default/
-├── config.json          # 你的配置，只有 nm init 建它、只有 nm plugins enable 改它
+~/.karyvia/instances/default/
+├── config.json          # 你的配置，只有 karyvia init 建它、只有 karyvia plugins enable 改它
 └── config.schema.json   # 派生的 JSON Schema，供编辑器补全，运行期忽略
 ```
 
@@ -64,7 +64,7 @@ nm init
 ```
 
 其余四十多个字段都有默认值，不写进模板是刻意的：全倒进去会让它们变成你不敢动的噪声，
-而且每一个都会被 `nm config show --origins` 记成「来自 config.json」，
+而且每一个都会被 `karyvia config show --origins` 记成「来自 config.json」，
 「我改过什么」这个问题就永远答不上来了。
 
 ## 3. 给上模型凭据
@@ -75,7 +75,7 @@ nm init
 export OPENAI_API_KEY=sk-...        # Windows：set OPENAI_API_KEY=sk-...
 ```
 
-`nm init` 的输出会告诉你还差哪个变量。凭据引用的完整语义（没有 `${VAR:-默认值}` 回退、
+`karyvia init` 的输出会告诉你还差哪个变量。凭据引用的完整语义（没有 `${VAR:-默认值}` 回退、
 没有转义、空变量按缺失处理）见 [`configuration.md` 的 `${VAR}` 一节](./configuration.md#5-var-凭据引用)。
 
 **用本地模型服务不需要凭据。** Ollama / vLLM / LM Studio 都是 OpenAI 兼容接口，
@@ -95,7 +95,7 @@ export OPENAI_API_KEY=sk-...        # Windows：set OPENAI_API_KEY=sk-...
 ## 4. 第一次对话
 
 ```bash
-nm run
+karyvia run
 ```
 
 进入交互式会话：每行输入是一轮对话，`Ctrl-C` 中断当前这一轮并继续，再按一次退出；
@@ -104,7 +104,7 @@ nm run
 跑一条就退出用 `-p`（退出码反映这一轮的终态：`0` 正常、`130` 被中断、`1` 失败）：
 
 ```bash
-nm run -p "用一句话介绍你自己"
+karyvia run -p "用一句话介绍你自己"
 ```
 
 试试内建命令——它们和插件提供的命令走完全同一条分流路径：
@@ -121,36 +121,36 @@ nm run -p "用一句话介绍你自己"
 
 ## 5. 装一个官方插件
 
-官方插件是**独立发行包**，由 NucleaMind 的全局插件管理器安装：
+官方插件是**独立发行包**，由 Karyvia 的全局插件管理器安装：
 
 ```bash
-nm plugins install plugins/nucleamind-plugin-web
+karyvia plugins install plugins/karyvia-plugin-web
 ```
 
 全局安装**不等于实例启用**（`DST-002`：安装 ≠ 启用）。没有写进 `plugins.enabled` 的候选
 连 manifest 都不会被读——这既是安全边界，也是启动开销的边界：
 
 ```bash
-nm plugins list          # 看看发现了哪些、状态是什么
-nm plugins enable web    # 写进 config.json 的 plugins.enabled（下次启动生效）
+karyvia plugins list          # 看看发现了哪些、状态是什么
+karyvia plugins enable web    # 写进 config.json 的 plugins.enabled（下次启动生效）
 ```
 
 然后确认它真的生效了：
 
 ```bash
-nm capabilities          # 生效 / 被覆盖 / 已禁用 / 冲突，四段都印
+karyvia capabilities          # 生效 / 被覆盖 / 已禁用 / 冲突，四段都印
 ```
 
 七个官方插件（`--no-deps` 是刻意的，平台 SDK 由你按需另装）：
 
 ```bash
-nm plugins install --no-deps plugins/nucleamind-plugin-openai-api
-nm plugins install --no-deps plugins/nucleamind-plugin-anthropic
-nm plugins install --no-deps plugins/nucleamind-plugin-feishu
-nm plugins install --no-deps plugins/nucleamind-plugin-web
-nm plugins install --no-deps plugins/nucleamind-plugin-mcp
-nm plugins install --no-deps plugins/nucleamind-plugin-memory
-nm plugins install --no-deps plugins/nucleamind-plugin-cron
+karyvia plugins install --no-deps plugins/karyvia-plugin-openai-api
+karyvia plugins install --no-deps plugins/karyvia-plugin-anthropic
+karyvia plugins install --no-deps plugins/karyvia-plugin-feishu
+karyvia plugins install --no-deps plugins/karyvia-plugin-web
+karyvia plugins install --no-deps plugins/karyvia-plugin-mcp
+karyvia plugins install --no-deps plugins/karyvia-plugin-memory
+karyvia plugins install --no-deps plugins/karyvia-plugin-cron
 ```
 
 每个插件自己带一份 README（配置表 + 已知边界 + 刻意不做的事），清单见
@@ -164,12 +164,12 @@ nm plugins install --no-deps plugins/nucleamind-plugin-cron
 
 ## 7. 常驻跑一个 Channel
 
-`nm run` 把进程交给 CLI 入口，在 `nohup` / systemd 下没有意义。要常驻的是 `nm serve`：
+`karyvia run` 把进程交给 CLI 入口，在 `nohup` / systemd 下没有意义。要常驻的是 `karyvia serve`：
 
 ```bash
-nm plugins install plugins/nucleamind-plugin-openai-api
-nm plugins enable openai-api
-nm serve                      # 默认监听 127.0.0.1:8760
+karyvia plugins install plugins/karyvia-plugin-openai-api
+karyvia plugins enable openai-api
+karyvia serve                      # 默认监听 127.0.0.1:8760
 ```
 
 它启动全部已启用的 Channel 能力并等信号。飞书和 cron 调度器用的是同一条命令

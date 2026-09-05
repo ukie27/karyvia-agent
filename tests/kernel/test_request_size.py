@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     ModelMessage,
     ModelRequest,
     RiskLevel,
@@ -12,11 +12,11 @@ from nucleamind.contracts import (
     TokenUsage,
     ToolSpec,
 )
-from nucleamind.kernel.turn.request_size import (
+from karyvia.kernel.turn.request_size import (
     TokenAccounting,
     estimate_request_tokens,
 )
-from nucleamind.sdk.testing import make_correlation
+from karyvia.sdk.testing import make_correlation
 
 
 def _request(

@@ -25,7 +25,7 @@ from collections.abc import AsyncIterator, Mapping
 
 import pytest
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     CancelSignal,
     Channel,
     ContextFragment,
@@ -46,7 +46,7 @@ from nucleamind.contracts import (
     ToolResult,
     ToolSpec,
 )
-from nucleamind.sdk.testing import (
+from karyvia.sdk.testing import (
     ECHO_SPEC,
     ChannelContract,
     ContextProviderContract,

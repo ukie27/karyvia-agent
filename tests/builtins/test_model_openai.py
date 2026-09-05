@@ -36,8 +36,8 @@ from typing import Final
 import httpx
 import pytest
 
-from nucleamind.builtins import model_openai as model_openai_module
-from nucleamind.builtins.model_openai import (
+from karyvia.builtins import model_openai as model_openai_module
+from karyvia.builtins.model_openai import (
     AUTH_MODES,
     CAPABILITY_NAME,
     CHAT_COMPLETIONS_PATH,
@@ -69,19 +69,19 @@ from nucleamind.builtins.model_openai import (
     setup,
     strip_lone_surrogates,
 )
-from nucleamind.builtins.registry import BUILTIN_MANIFESTS, MODEL_OPENAI
-from nucleamind.contracts import (
+from karyvia.builtins.registry import BUILTIN_MANIFESTS, MODEL_OPENAI
+from karyvia.contracts import (
     Builtin,
     CapabilityKind,
     ChunkKind,
     ErrorCategory,
     ErrorCode,
     JsonValue,
+    KaryviaError,
     ModelCapability,
     ModelChunk,
     ModelMessage,
     ModelRequest,
-    NucleaError,
     ProviderId,
     Role,
     SamplingParams,
@@ -90,11 +90,11 @@ from nucleamind.contracts import (
     ToolCall,
     ToolSpec,
 )
-from nucleamind.kernel.observability import prepare_payload
-from nucleamind.kernel.plugins import model_providers_from
-from nucleamind.runtime.wiring import wire_capabilities
-from nucleamind.sdk import PluginContext
-from nucleamind.sdk.testing import (
+from karyvia.kernel.observability import prepare_payload
+from karyvia.kernel.plugins import model_providers_from
+from karyvia.runtime.wiring import wire_capabilities
+from karyvia.sdk import PluginContext
+from karyvia.sdk.testing import (
     FakePluginContext,
     ManualCancel,
     ModelProviderContract,
@@ -396,7 +396,7 @@ class TestResponseDecoding:
             finish_reason="tool_calls",
             tool_calls=[{"id": "c1", "function": {"name": "FS-Read!", "arguments": "{}"}}],
         )
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             decode_response(body, model_id=MODEL_ID)
         assert caught.value.category is ErrorCategory.EXTERNAL_SERVICE
 
@@ -406,7 +406,7 @@ class TestResponseDecoding:
             finish_reason="tool_calls",
             tool_calls=[{"id": "c1", "function": {"name": "fs.read", "arguments": "{not json"}}],
         )
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             decode_response(body, model_id=MODEL_ID)
         assert caught.value.code is ErrorCode.EXTERNAL_MODEL_PROVIDER
 
@@ -432,7 +432,7 @@ class TestResponseDecoding:
         assert decode_usage({}).total_tokens == 0
 
     def test_a_malformed_body_is_an_external_error(self) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             decode_response({"choices": []}, model_id=MODEL_ID)
         assert caught.value.category is ErrorCategory.EXTERNAL_SERVICE
 
@@ -544,7 +544,7 @@ class TestStreaming:
         stream = "data: " + json.dumps({"choices": [{"delta": {"content": "半"}}]}) + "\n\ndata: {not json\n\n"
         provider = make_provider(lambda _: httpx.Response(200, text=stream))
         seen: list[ModelChunk] = []
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             async for chunk in provider.stream(make_request(stream=True), ManualCancel()):
                 seen.append(chunk)
         assert seen[0].text == "半"
@@ -555,7 +555,7 @@ class TestStreaming:
         """一片都没吐过就失败，没有「已产生的内容」需要收尾。"""
         provider = make_provider(lambda _: httpx.Response(500, json={}))
         seen: list[ModelChunk] = []
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             async for chunk in provider.stream(make_request(stream=True), ManualCancel()):
                 seen.append(chunk)
         assert seen == []
@@ -565,7 +565,7 @@ class TestStreaming:
         provider = make_provider(
             ok_handler(), **{CONFIG_CAPABILITIES_KEY: ["tool_calls"]}
         )
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await collect(provider, make_request(stream=True))
         assert caught.value.category is ErrorCategory.CAPABILITY_MISSING
 
@@ -670,7 +670,7 @@ class TestFaultMapping:
             raise httpx.ConnectError("refused")
 
         provider = make_provider(boom)
-        with pytest.raises(NucleaError):
+        with pytest.raises(KaryviaError):
             await provider.complete(make_request(), ManualCancel())
 
 
@@ -731,7 +731,7 @@ class TestCredentialNeverLeaks:
             )
 
         provider = make_provider(handler)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await provider.complete(make_request(), ManualCancel())
         error = caught.value
         assert SENTINEL_KEY not in repr(error)
@@ -745,7 +745,7 @@ class TestCredentialNeverLeaks:
             return httpx.Response(401, json={"error": {"message": SENTINEL_KEY}})
 
         provider = make_provider(handler)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await provider.complete(make_request(), ManualCancel())
         payload = prepare_payload({"error": dict(caught.value.detail)})
         assert SENTINEL_KEY not in json.dumps(payload, ensure_ascii=False)
@@ -772,7 +772,7 @@ class TestCancellation:
         provider = make_provider(handler)
         cancel = ManualCancel()
         cancel.request()
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await provider.complete(make_request(), cancel)
         assert caught.value.category is ErrorCategory.CANCELLED
         assert calls == []
@@ -782,7 +782,7 @@ class TestCancellation:
         provider = make_provider(lambda _: httpx.Response(200, text=stream))
         cancel = ManualCancel()
         cancel.request()
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await collect(provider, make_request(stream=True), cancel)
         assert caught.value.category is ErrorCategory.CANCELLED
 
@@ -799,7 +799,7 @@ class TestCancellation:
         provider = make_provider(lambda _: httpx.Response(200, text=stream))
         cancel = ManualCancel()
         seen: list[ModelChunk] = []
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             async for chunk in provider.stream(make_request(stream=True), cancel):
                 seen.append(chunk)
                 cancel.request()  # 收到第一片就叫停。
@@ -834,7 +834,7 @@ class TestSettings:
             make_context(**{CONFIG_MODELS_KEY: {MODEL_ID: {"context_window_tokens": 8192}}})
         )
         assert settings.describe(MODEL_ID).context_window_tokens == 8192
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             settings.describe("gpt-typo")
         assert caught.value.category is ErrorCategory.CAPABILITY_MISSING
 
@@ -873,13 +873,13 @@ class TestSettings:
         ],
     )
     def test_bad_configuration_is_rejected(self, key: str, value: JsonValue) -> None:
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings(make_context(**{key: value}))
         assert caught.value.category is ErrorCategory.CONFIG
 
     def test_an_unknown_key_inside_a_model_entry_is_reported_separately(self) -> None:
         """「你多写了一个键」与「你的值写错了」补救动作不同，因此码也不同。"""
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             resolve_settings(
                 make_context(**{CONFIG_MODELS_KEY: {MODEL_ID: {"windows": 100}}})
             )
@@ -895,7 +895,7 @@ class TestSettings:
             def register_model_provider(self, name: str, provider: object) -> None:
                 raise AssertionError("配置非法时不该注册任何东西")
 
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             setup(RefusingApi())  # type: ignore[arg-type]
         assert caught.value.category is ErrorCategory.CONFIG
 
@@ -931,7 +931,7 @@ class TestSettings:
 
     def test_a_missing_credential_reports_the_configuration_problem(self) -> None:
         missing_credential = FakePluginContext(config={}, secrets={})
-        with pytest.raises(NucleaError) as missing:
+        with pytest.raises(KaryviaError) as missing:
             missing_credential.secret(SECRET_NAME)
         assert missing.value.code is ErrorCode.CONFIG_SECRET_MISSING
 
@@ -1036,7 +1036,7 @@ class TestHttpClient:
     async def test_a_non_json_success_body_is_an_external_error(self) -> None:
         """200 但正文不是 JSON——中转服务返回一页 HTML 错误页是常见情形。"""
         provider = make_provider(lambda _: httpx.Response(200, text="<html>oops</html>"))
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await provider.complete(make_request(), ManualCancel())
         assert caught.value.category is ErrorCategory.EXTERNAL_SERVICE
 
@@ -1052,7 +1052,7 @@ class TestHttpClient:
 
         provider = make_provider(handler, **{CONFIG_STREAM_IDLE_TIMEOUT_KEY: 30})
         seen: list[ModelChunk] = []
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             async for chunk in provider.stream(make_request(stream=True), ManualCancel()):
                 seen.append(chunk)
         assert caught.value.code is ErrorCode.TIMEOUT_MODEL_REQUEST
@@ -1069,7 +1069,7 @@ class TestHttpClient:
             return httpx.Response(200, content=dies())
 
         provider = make_provider(handler)
-        with pytest.raises(NucleaError) as caught:
+        with pytest.raises(KaryviaError) as caught:
             await collect(provider, make_request(stream=True))
         assert caught.value.category is ErrorCategory.EXTERNAL_SERVICE
 

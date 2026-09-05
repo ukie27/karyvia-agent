@@ -14,7 +14,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable, Iterable, Sequence
 from datetime import UTC, datetime
 
-from nucleamind.contracts import (
+from karyvia.contracts import (
     AttachmentRef,
     Builtin,
     CancelSignal,
@@ -29,7 +29,7 @@ from nucleamind.contracts import (
     FragmentScope,
     InboundMessage,
     InstanceId,
-    NucleaError,
+    KaryviaError,
     OutboundMessage,
     RuntimeEvent,
     Sender,
@@ -41,15 +41,15 @@ from nucleamind.contracts import (
     ToolResult,
     TrustLevel,
 )
-from nucleamind.kernel.observability import EventBus
-from nucleamind.kernel.routing import (
+from karyvia.kernel.observability import EventBus
+from karyvia.kernel.routing import (
     CommandIndex,
     DedupCache,
     Dispatcher,
     RegisteredCommand,
     SessionScheduler,
 )
-from nucleamind.kernel.turn import (
+from karyvia.kernel.turn import (
     ContextProviderBinding,
     OrchestratorDeps,
     RetryPolicy,
@@ -58,7 +58,7 @@ from nucleamind.kernel.turn import (
     TurnOrchestrator,
     TurnReceipt,
 )
-from nucleamind.sdk.testing import StaticTurnContextCompactor
+from karyvia.sdk.testing import StaticTurnContextCompactor
 
 from ._engine_support import ScriptedProvider
 
@@ -167,7 +167,7 @@ class FailingStore(FakeSessionStore):
     """写入必失败的存储（`SES-003`）。"""
 
     async def append(self, key: SessionKey, messages: Sequence[SessionMessage]) -> None:
-        raise NucleaError(ErrorCode.PERSISTENCE_WRITE_FAILED, "磁盘满了。")
+        raise KaryviaError(ErrorCode.PERSISTENCE_WRITE_FAILED, "磁盘满了。")
 
 
 # ------------------------------------------------------------------------------- context
@@ -205,7 +205,7 @@ class FakeContextProvider:
 def binding(
     provider: FakeContextProvider, *, name: str = "basic", priority: int = 0
 ) -> ContextProviderBinding:
-    from nucleamind.contracts import Builtin
+    from karyvia.contracts import Builtin
 
     return ContextProviderBinding(provider=provider, owner=Builtin(), name=name, priority=priority)
 
