@@ -66,12 +66,24 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 - `NucleaError.category` 由错误码推导，调用方不能另传一份分类。
 - `contracts.errors.redact()` / `scrub()` 在数据构造时脱敏；不要把责任推给日志 sink。
 - `contracts.SecretStr` 是唯一密钥包装类型；明文只通过 `reveal()` 短暂取得。
-- SDK 当前为 `4.0.0`。`sdk.__all__`、`sdk.testing.__all__`、
+- SDK 当前为 `5.0.0`。`sdk.__all__`、`sdk.testing.__all__`、
   `CapabilityKind`、`NucleaAPI` 和 manifest schema 都受兼容承诺约束。
 - Session JSONL 格式是持久化契约，修改必须先设计迁移。
 
 公开表面优先做纯新增。需要破坏性修改时，不要写长期双读兼容垫片；明确版本、迁移边界、
 失败方式和移除时间，再集中实施。流程见 [`change-guide.md`](./docs/project/change-guide.md)。
+
+### 兼容性与迁移判断
+
+- 默认按当前版本的需求直接修改，不要因为代码曾经有旧实现、旧字段、旧数据或旧调用方式，
+  就自行增加兼容分支、别名、双读双写、降级回退或长期弃用垫片。
+- 只有已有明确的兼容承诺、当前持久化契约/迁移要求，或用户明确要求保留旧行为时，才实现
+  旧版本兼容。测试失败、个人推测或“以后可能有人使用”不构成兼容授权。
+- 如果判断兼容确实可能必要，但会改变当前设计、扩大公开表面或增加维护成本，先向用户说明
+  需要兼容的具体对象、原因和代价，并询问是否保留；在得到确认前按当前需求实现，不擅自做
+  兼容决策。
+- 经用户确认后，兼容实现必须限定范围，明确版本边界、迁移路径、失败方式和移除条件；不要
+  把一次性的历史过渡逻辑变成无期限的运行时分支。
 
 ## 4. 能力注册与插件运行时
 
@@ -129,8 +141,9 @@ tests/           # 按层镜像；integration/e2e 验证组装后的骨架
 - Context 预算统一按最终结构化 `ModelRequest` 估算，并预留模型输出与安全余量；
   `ContextFragment.estimated_tokens` 只作为来源元数据，不参与 Kernel 预算判断。Provider 的
   实际输入 usage 只在请求形态与消息前缀一致时作为增量估算锚点，否则恢复完整请求估算。
-- `COMPACTOR` 只负责持久化会话压缩，`TURN_COMPACTOR` 只负责 Turn 内临时压缩；Kernel
-  负责触发、目标预算与最终校验。插件失败直接报错，不保留确定性请求级硬裁剪回退。
+- `TURN_COMPACTOR` 是唯一压缩能力；Kernel 在每次模型请求边界触发、校验并立即应用摘要。
+  只有精确覆盖初始 Session 连续前缀的摘要才在 Turn 收口时持久化，临时 Context、Memory
+  或本 Turn 工具往返参与过的摘要只服务当前 Turn。插件失败直接报错，不保留硬裁剪回退。
 - `ToolInvoker.invoke()` 约定不抛，并必须在 `timeout_ms + grace` 内返回。超时先请求子令牌
   取消，宽限后仍不返回则登记孤儿和未知副作用；不要直接 `task.cancel()`。
 

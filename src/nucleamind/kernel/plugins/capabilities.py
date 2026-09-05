@@ -1,6 +1,6 @@
-"""七个单值能力的注册载荷与取回函数（技术方案 §6.1）。
+"""六个单值能力的注册载荷与取回函数（技术方案 §6.1）。
 
-职责：为 `MODEL` / `SESSION_STORE` / `CHANNEL` / `MEMORY` / `CLI_ENTRY` / `COMPACTOR` /
+职责：为 `MODEL` / `SESSION_STORE` / `CHANNEL` / `MEMORY` / `CLI_ENTRY` /
 `TURN_COMPACTOR` 定义注册载荷（`Registered*`）和从冻结 Registry 取回生效实现的函数，
 并在取回时核对载荷形状。
 不负责：注册（`host.py`）、判定谁生效（`kernel/registry/resolution.py`）、使用这些实现
@@ -33,7 +33,6 @@ from nucleamind.contracts import (
     CapabilityRef,
     Channel,
     CliEntry,
-    ContextCompactor,
     ErrorCode,
     MemoryProvider,
     ModelProvider,
@@ -49,13 +48,11 @@ __all__ = [
     "CapabilityBinding",
     "ChannelBinding",
     "CliEntryBinding",
-    "ContextCompactorBinding",
     "TurnContextCompactorBinding",
     "MemoryProviderBinding",
     "ModelProviderBinding",
     "RegisteredChannel",
     "RegisteredCliEntry",
-    "RegisteredContextCompactor",
     "RegisteredTurnContextCompactor",
     "RegisteredMemoryProvider",
     "RegisteredModelProvider",
@@ -63,7 +60,6 @@ __all__ = [
     "SessionStoreBinding",
     "channels_from",
     "cli_entry_from",
-    "context_compactors_from",
     "turn_context_compactors_from",
     "memory_providers_from",
     "model_providers_from",
@@ -113,13 +109,6 @@ class RegisteredCliEntry:
 
 
 @dataclass(frozen=True, slots=True)
-class RegisteredContextCompactor:
-    """`CapabilityKind.COMPACTOR` 的注册载荷形状。"""
-
-    compactor: ContextCompactor
-
-
-@dataclass(frozen=True, slots=True)
 class RegisteredTurnContextCompactor:
     """`CapabilityKind.TURN_COMPACTOR` 的注册载荷形状。"""
 
@@ -161,7 +150,6 @@ SessionStoreBinding: TypeAlias = CapabilityBinding[SessionStore]
 ChannelBinding: TypeAlias = CapabilityBinding[Channel]
 MemoryProviderBinding: TypeAlias = CapabilityBinding[MemoryProvider]
 CliEntryBinding: TypeAlias = CapabilityBinding[CliEntry]
-ContextCompactorBinding: TypeAlias = CapabilityBinding[ContextCompactor]
 TurnContextCompactorBinding: TypeAlias = CapabilityBinding[TurnContextCompactor]
 
 
@@ -253,18 +241,6 @@ def memory_providers_from(registry: CapabilityRegistry) -> tuple[MemoryProviderB
     """
     return _bindings_of(
         registry, CapabilityKind.MEMORY, RegisteredMemoryProvider, lambda item: item.provider
-    )
-
-
-def context_compactors_from(
-    registry: CapabilityRegistry,
-) -> tuple[ContextCompactorBinding, ...]:
-    """取回全部生效的上下文压缩策略（MULTI_UNIQUE，由配置显式选用）。"""
-    return _bindings_of(
-        registry,
-        CapabilityKind.COMPACTOR,
-        RegisteredContextCompactor,
-        lambda item: item.compactor,
     )
 
 

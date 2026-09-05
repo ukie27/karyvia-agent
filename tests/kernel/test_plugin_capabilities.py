@@ -1,4 +1,4 @@
-"""五个单值 kind 的载荷形状与取回函数测试（`D16`，技术方案 §6.1 的缺口）。
+"""六个单值 kind 的载荷形状与取回函数测试（`D16`，技术方案 §6.1 的缺口）。
 
 三条主线：
 
@@ -34,7 +34,6 @@ from nucleamind.kernel.plugins import (
     CapabilityHost,
     channels_from,
     cli_entry_from,
-    context_compactors_from,
     memory_providers_from,
     model_providers_from,
     session_store_from,
@@ -48,7 +47,6 @@ from nucleamind.sdk.testing import (
     FakePluginContext,
     InMemorySessionStore,
     NullChannel,
-    StaticContextCompactor,
     StaticTurnContextCompactor,
 )
 
@@ -58,7 +56,6 @@ _SINGLE_KINDS = (
     CapabilityKind.MODEL,
     CapabilityKind.CHANNEL,
     CapabilityKind.MEMORY,
-    CapabilityKind.COMPACTOR,
     CapabilityKind.TURN_COMPACTOR,
     CapabilityKind.SESSION_STORE,
     CapabilityKind.CLI_ENTRY,
@@ -81,7 +78,7 @@ def frozen_with(
 
 
 def wired(*, provider: ProviderId | None = None) -> CapabilityRegistry:
-    """经真 Host 注册五类单值能力，解析并冻结。"""
+    """经真 Host 注册六类单值能力，解析并冻结。"""
     registry = CapabilityRegistry()
     batch = registry.batch(provider or Builtin())
     host = CapabilityHost(
@@ -94,9 +91,6 @@ def wired(*, provider: ProviderId | None = None) -> CapabilityRegistry:
     host.register_model_provider(CapabilityKind.MODEL.value, FakeModelProvider())
     host.register_channel(CapabilityKind.CHANNEL.value, NullChannel())
     host.register_memory_provider(CapabilityKind.MEMORY.value, FakeMemoryProvider())
-    host.register_context_compactor(
-        CapabilityKind.COMPACTOR.value, StaticContextCompactor()
-    )
     host.register_turn_compactor(
         CapabilityKind.TURN_COMPACTOR.value, StaticTurnContextCompactor()
     )
@@ -117,7 +111,6 @@ def test_every_single_valued_kind_round_trips_through_the_host() -> None:
     assert len(model_providers_from(registry)) == 1
     assert len(channels_from(registry)) == 1
     assert len(memory_providers_from(registry)) == 1
-    assert len(context_compactors_from(registry)) == 1
     assert len(turn_context_compactors_from(registry)) == 1
 
     store = session_store_from(registry)
@@ -156,7 +149,6 @@ def test_an_empty_registry_yields_empty_tuples_and_none() -> None:
     assert model_providers_from(registry) == ()
     assert channels_from(registry) == ()
     assert memory_providers_from(registry) == ()
-    assert context_compactors_from(registry) == ()
     assert turn_context_compactors_from(registry) == ()
     assert session_store_from(registry) is None
     assert cli_entry_from(registry) is None
@@ -171,7 +163,6 @@ def test_an_empty_registry_yields_empty_tuples_and_none() -> None:
         (CapabilityKind.MODEL, model_providers_from),
         (CapabilityKind.CHANNEL, channels_from),
         (CapabilityKind.MEMORY, memory_providers_from),
-        (CapabilityKind.COMPACTOR, context_compactors_from),
         (CapabilityKind.TURN_COMPACTOR, turn_context_compactors_from),
         (CapabilityKind.SESSION_STORE, session_store_from),
         (CapabilityKind.CLI_ENTRY, cli_entry_from),

@@ -69,8 +69,6 @@ from .command import (  # noqa: E402
     Disposition,
 )
 from .compaction import (  # noqa: E402
-    CompactionRequest,
-    CompactionResult,
     TurnCompactionRequest,
     TurnCompactionResult,
     TurnContextUnit,
@@ -131,7 +129,6 @@ from .protocols import (  # noqa: E402
     CliEntry,
     CommandHandler,
     CompactionModel,
-    ContextCompactor,
     ContextProvider,
     HookHandler,
     InstanceView,
@@ -187,11 +184,8 @@ __all__ = [
     "CommandParam",
     "CommandResult",
     "CommandSpec",
-    "CompactionRequest",
-    "CompactionResult",
     "CompactionModel",
     "Concurrency",
-    "ContextCompactor",
     "ContextFragment",
     "ContextProvider",
     "Correlation",

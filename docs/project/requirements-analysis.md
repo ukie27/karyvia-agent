@@ -148,7 +148,7 @@ Kernel 自带以下默认实现，使实例在不安装任何插件时即可完�
 | Model Provider | 至少一种主流协议的最小适配 | 可被 Model Provider 插件覆盖或新增 |
 | Session | 基础持久化会话历史与恢复 | 通过 Session 接口整体替换 |
 | Context Provider | 系统指令、会话历史投影和最终消息渲染 | 通过 Context 接口替换或追加 Provider |
-| Turn Compactor | 模型—工具迭代期间的临时请求压缩 | 通过 `TURN_COMPACTOR` 能力整体替换 |
+| Turn Compactor | 每次模型请求边界的统一压缩；安全的 Session 前缀在 Turn 收口时持久化 | 通过 `TURN_COMPACTOR` 能力整体替换 |
 | 基础工具集 | 文件读、写、编辑、列目录、内容检索、Shell 执行 | 可整体或按工具禁用，可被同名插件覆盖 |
 | 命令处理 | 帮助、配置查看、会话与插件状态等最小命令集 | 插件可注册新命令 |
 | 配置与凭据 | 配置文件加载、校验与 Secret 引用 | 不可禁用 |
@@ -177,6 +177,9 @@ Kernel 自带以下默认实现，使实例在不安装任何插件时即可完�
 - `BAS-011`：每个可执行模型 Turn 的实例必须有一个生效的 `TURN_COMPACTOR`。内建
   `basic` 是默认实现，不是 Kernel 里的隐式备用算法；用户显式选中的实现缺失时应
   拒绝启动，运行失败时应终止当前 Turn，不得静默切换策略。
+- `BAS-012`：压缩器不接触 Session。Kernel 只持久化能按消息来源精确映射到 Turn 初始
+  Session 连续前缀的摘要，并在当前 Turn 的 Transcript 追加完成后推进压缩水位；混入
+  Context、Memory 或本 Turn 消息的摘要不得写回 Session。
 
 ### 7.4 最小可用发行组合
 
@@ -369,13 +372,15 @@ Kernel 单独存在时应可被嵌入和测试。面向用户的最小可用组�
 - `CTX-005`：Context Provider 失败时，应跳过该 Provider 并记录原因。
 - `CTX-006`：内建默认 Context Provider 必须在无 Memory、无检索插件的情况下产出可用上下文。
 - `CTX-007`：Turn Compactor 只能用摘要替换可压缩逻辑单元的连续前缀。一条 assistant
-  工具调用与它的全部 tool 结果必须作为不可拆分单元；系统消息和当前用户输入不得被替换。
-- `CTX-008`：Turn 压缩摘要只作为当前 Turn 内的不可信数据传递，不调用
-  `SessionStore.compact()`，不改写 Transcript 中的真实工具调用与结果，不改变工具执行顺序。
+  工具调用与它的全部 tool 结果必须作为不可拆分单元；所有系统消息和当前用户输入不得被
+  替换。
+- `CTX-008`：Turn 压缩摘要按不可信数据立即用于当前 Turn。只有精确覆盖初始 Session 连续
+  前缀的摘要才在 Turn 收口时调用 `SessionStore.compact()`；混入临时来源或本 Turn 消息的
+  摘要不得持久化，也不得改写 Transcript 中的真实工具调用与结果或改变工具执行顺序。
 - `CTX-009`：Turn Compactor 可按次使用一个绑定当前已选模型、Correlation、取消和剩余
   时间的窄门面。该门面只发起无工具、非流式请求，且不得递归进入 Turn 压缩。
-- `CTX-010`：Context Builder、持久化压缩与 Turn 临时压缩必须共享同一份完整请求计量和
-  预算事实；片段自报估算不得直接决定丢弃或压缩。
+- `CTX-010`：Context Builder 与请求级压缩必须共享同一份完整请求计量和预算事实；片段
+  自报估算不得直接决定丢弃或压缩。
 - `CTX-011`：Provider 返回实际输入 usage 时，Kernel 应将其作为相同 Session、相同请求形态
   与相同消息前缀的计量锚点，只估算锚点后的新增内容；无法匹配锚点时恢复完整请求估算。
   Provider 明确报告上下文超限且尚未产生实质输出时，Kernel 最多压缩并重试一次。
@@ -568,7 +573,7 @@ Kernel 单独存在时应可被嵌入和测试。面向用户的最小可用组�
 | `source` | 是 | Provider 和数据来源 |
 | `content` | 是 | 提供给模型的内容 |
 | `priority` | 是 | 来源侧的相对重要性元数据 |
-| `estimated_tokens` | 是 | SDK 4.x 的来源侧诊断提示；不作为 Kernel 预算真相 |
+| `estimated_tokens` | 是 | SDK 的来源侧诊断提示；不作为 Kernel 预算真相 |
 | `scope` | 是 | Agent、用户、Session 或 Workspace 范围 |
 | `sensitivity` | 否 | 敏感级别和传播限制 |
 | `expires_at` | 否 | 内容失效时间 |

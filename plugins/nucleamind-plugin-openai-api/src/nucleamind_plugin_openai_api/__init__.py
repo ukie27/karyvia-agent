@@ -72,7 +72,7 @@ SECRET_NAME: Final = "api_key"
 MANIFEST: Final = PluginManifest(
     id="openai-api",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind_plugin_openai_api:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.CHANNEL, name=CAPABILITY_NAME),),
     config_schema={

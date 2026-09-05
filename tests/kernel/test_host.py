@@ -39,7 +39,6 @@ from nucleamind.kernel.plugins import (
     CapabilityHost,
     RegisteredChannel,
     RegisteredCliEntry,
-    RegisteredContextCompactor,
     RegisteredMemoryProvider,
     RegisteredModelProvider,
     RegisteredSessionStore,
@@ -64,7 +63,6 @@ from nucleamind.sdk.testing import (
     InMemorySessionStore,
     NullChannel,
     RecordingHook,
-    StaticContextCompactor,
     StaticContextProvider,
     StaticTurnContextCompactor,
 )
@@ -87,11 +85,10 @@ def make_host(
 
 
 def register_everything(host: CapabilityHost[FakePluginContext]) -> None:
-    """一个把 11 类能力全注册一遍的 `setup`，两种身份共用它。"""
+    """一个把 10 类能力全注册一遍的 `setup`，两种身份共用它。"""
     host.register_tool(ECHO_SPEC, EchoTool())
     host.register_command(CommandSpec(name="ping", description="ping"), _NullCommand())
     host.register_context_provider("ctx", StaticContextProvider())
-    host.register_context_compactor("compact", StaticContextCompactor())
     host.register_turn_compactor("turn-compact", StaticTurnContextCompactor())
     host.register_model_provider("model", FakeModelProvider())
     host.register_channel("chan", NullChannel())
@@ -105,7 +102,6 @@ ALL_DECLARATIONS = (
     declare(CapabilityKind.TOOL, ECHO_SPEC.name),
     declare(CapabilityKind.COMMAND, "ping"),
     declare(CapabilityKind.CONTEXT, "ctx"),
-    declare(CapabilityKind.COMPACTOR, "compact"),
     declare(CapabilityKind.TURN_COMPACTOR, "turn-compact"),
     declare(CapabilityKind.MODEL, "model"),
     declare(CapabilityKind.CHANNEL, "chan"),
@@ -134,8 +130,8 @@ def test_host_satisfies_the_nuclea_api_protocol() -> None:
     assert isinstance(host, NucleaAPI)
 
 
-def test_eleven_methods_cover_eleven_kinds() -> None:
-    """11 个注册方法与 `CapabilityKind` 的 11 个取值一一对应，不多不少。"""
+def test_ten_methods_cover_ten_kinds() -> None:
+    """10 个注册方法与 `CapabilityKind` 的 10 个取值一一对应，不多不少。"""
     registry, batch, host = make_host(*ALL_DECLARATIONS)
     register_everything(host)
     batch.commit()
@@ -186,7 +182,6 @@ def test_the_same_host_gives_builtin_and_plugin_identical_structure() -> None:
         (CapabilityKind.TOOL, RegisteredTool),
         (CapabilityKind.COMMAND, RegisteredCommand),
         (CapabilityKind.CONTEXT, RegisteredContextProvider),
-        (CapabilityKind.COMPACTOR, RegisteredContextCompactor),
         (CapabilityKind.TURN_COMPACTOR, RegisteredTurnContextCompactor),
         (CapabilityKind.MODEL, RegisteredModelProvider),
         (CapabilityKind.CHANNEL, RegisteredChannel),

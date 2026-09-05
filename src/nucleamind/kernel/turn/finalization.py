@@ -7,8 +7,11 @@
 from __future__ import annotations
 
 from nucleamind.contracts import (
+    EventName,
     HookContext,
     HookName,
+    Role,
+    SessionMessage,
     StreamState,
     TurnOutcome,
     TurnStatus,
@@ -55,6 +58,33 @@ async def finish_turn(
     if records:
         try:
             await deps.sessions.append(state.correlation.session_key, records)
+            pending = (
+                state.session_compaction.pending if state.session_compaction is not None else None
+            )
+            if pending is not None:
+                await deps.sessions.compact(
+                    state.correlation.session_key,
+                    pending.through,
+                    SessionMessage(
+                        message_id=f"compaction-{state.correlation.turn_id}",
+                        role=Role.USER,
+                        content=pending.summary.content,
+                        created_at=deps.clock(),
+                        turn_id=state.correlation.turn_id,
+                        metadata={
+                            "compactor": deps.turn_compactor.name,
+                            "provider": str(deps.turn_compactor.owner),
+                        },
+                    ),
+                )
+                deps.bus.publish(
+                    EventName.SESSION_COMPACTED,
+                    correlation=state.correlation,
+                    payload={
+                        "through": pending.through,
+                        "compactor": deps.turn_compactor.name,
+                    },
+                )
         # `SES-003`：写失败不得伪装成功，即使模型那边已经答完了。
         except Exception as error:
             outcome = outcome_without_engine(

@@ -263,8 +263,7 @@ class TestSchema:
         config = validate_config({})
         assert config.turn.max_iterations > 0
         assert config.workspace.root is None
-        assert config.context.compactor is None
-        assert config.context.compactor_timeout_ms == 3_000
+        assert config.context.turn_compactor == "basic"
 
     def test_unknown_key_rejected_with_pointer_and_suggestion(self) -> None:
         """`CFG-001`：未知字段用自己的码，不被笼统的「配置无效」吞掉。"""
@@ -282,6 +281,13 @@ class TestSchema:
         with pytest.raises(NucleaError) as caught:
             validate_config({"turn": {"maxIterations": 4}})
         assert "max_iterations" in caught.value.detail["errors"][0]["reason"]
+
+    @pytest.mark.parametrize("field", ["compactor", "compactor_timeout_ms"])
+    def test_removed_context_compactor_fields_are_rejected(self, field: str) -> None:
+        with pytest.raises(NucleaError) as caught:
+            validate_config({"context": {field: "removed"}})
+        assert caught.value.code is ErrorCode.CONFIG_UNKNOWN_FIELD
+        assert caught.value.detail["errors"][0]["pointer"] == f"/context/{field}"
 
     def test_unknown_section_is_reported(self) -> None:
         with pytest.raises(NucleaError) as caught:
@@ -415,7 +421,7 @@ class TestSchema:
         与上面两条同理：`schema.py` 不能 import `kernel.turn`（会把 engine 与 asyncio 拖上
         配置路径），代价就是这张对照表。
         """
-        from nucleamind.kernel.turn import compaction, context_builder, hooks, turn_compaction
+        from nucleamind.kernel.turn import context_builder, hooks, turn_compaction
 
         config = validate_config({})
         assert config.hooks.observer_timeout_ms == hooks.DEFAULT_OBSERVER_TIMEOUT_MS
@@ -423,10 +429,6 @@ class TestSchema:
         assert (
             config.context.provider_timeout_ms
             == context_builder.DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS
-        )
-        assert (
-            config.context.compactor_timeout_ms
-            == compaction.DEFAULT_COMPACTOR_TIMEOUT_MS
         )
         assert config.context.turn_compactor == "basic"
         assert (

@@ -1,6 +1,6 @@
 """Host API：插件与 Kernel 之间的注册面与受限运行时（技术方案 §7.5）。
 
-职责：声明 `NucleaAPI`（恰好 11 个能力注册方法 + `ctx`）、`PluginContext` 及其生命周期和
+职责：声明 `NucleaAPI`（恰好 10 个能力注册方法 + `ctx`）、`PluginContext` 及其生命周期和
 四个资源访问器 Protocol（`fs` / `net` / `shell` / `secret`），以及配套的 `HttpResponse`、
 `ShellResult`。
 不负责：实现注册与冲突判定、构造 `PluginContext` 或决定插件加载结果。
@@ -12,7 +12,7 @@
 
 三件必须在这一层说清楚的事：
 
-- **11 个注册方法与 `CapabilityKind` 的 11 个取值一一对应**，不多不少。多出一个方法就等于
+- **10 个注册方法与 `CapabilityKind` 的 10 个取值一一对应**，不多不少。多出一个方法就等于
   多出一类没有冲突语义的能力（`CAPABILITY_ARITY` 会 KeyError），少一个就等于某类能力
   只能靠 Kernel 内部特权注册——那正是 `BAS-005`「内建能力不享受特权」要堵的路。
 - **安装并启用插件即表示完全信任它**。资源访问器提供一致的路径、超时、SSRF 防护和密钥
@@ -35,7 +35,6 @@ from nucleamind.contracts import (
     CliEntry,
     CommandHandler,
     CommandSpec,
-    ContextCompactor,
     ContextProvider,
     EventName,
     HookHandler,
@@ -346,7 +345,7 @@ class PluginContext(Protocol):
 
 @runtime_checkable
 class NucleaAPI(Protocol):
-    """插件的注册面（§7.5）。**恰好 11 个注册方法 + `ctx`**。
+    """插件的注册面（§7.5）。**恰好 10 个注册方法 + `ctx`**。
 
     形态对应 Pi 的 `ExtensionAPI`：`setup(api)` 拿到它，在**同步返回前**完成全部注册。
     注册先进 `RegistrationBatch` 暂存区，`setup` 正常返回才一次性并入 registry；中途抛
@@ -392,20 +391,11 @@ class NucleaAPI(Protocol):
         """
         ...
 
-    def register_context_compactor(self, name: str, compactor: ContextCompactor) -> None:
-        """注册一个上下文压缩策略（`CapabilityKind.COMPACTOR`，MULTI_UNIQUE）。
-
-        注册或安装不会自动启用；只有 `context.compactor` 显式选中该名字时 Kernel 才调用。
-
-        **异常约定**：同 `register_tool()`。
-        """
-        ...
-
     def register_turn_compactor(self, name: str, compactor: TurnContextCompactor) -> None:
-        """注册 Turn 内临时上下文压缩策略（`TURN_COMPACTOR`，MULTI_UNIQUE）。
+        """注册统一上下文压缩策略（`TURN_COMPACTOR`，MULTI_UNIQUE）。
 
-        实现只处理当前模型请求的临时投影，不得读写 Session。Runtime 必须显式选中一个
-        生效实现，默认由内建 `basic` 提供。
+        实现只处理当前模型请求的投影，不得读写 Session。Kernel 会在 Turn 收口时持久化
+        能够映射到 Session 连续前缀的摘要。Runtime 必须选中一个生效实现。
 
         **异常约定**：同 `register_tool()`。
         """

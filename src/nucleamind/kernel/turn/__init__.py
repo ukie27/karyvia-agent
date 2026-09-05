@@ -33,12 +33,6 @@ from .cancel import (
     Checkpoint,
     CheckpointOwner,
 )
-from .compaction import (
-    DEFAULT_COMPACTOR_TIMEOUT_MS,
-    CompactionApplied,
-    CompactionPolicy,
-    compact_once,
-)
 from .context_builder import (
     DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS,
     AssembledContext,
@@ -48,7 +42,6 @@ from .context_builder import (
     assemble,
     context_providers_from,
     estimate_tokens,
-    reassemble_history,
     replay_messages,
 )
 from .deps import ENGINE_HOOKS, EngineDeps, HookDispatcher, ToolInvoker
@@ -170,9 +163,6 @@ __all__ = [
     "CheckpointOwner",
     "ContextProviderBinding",
     "ContextBudget",
-    "CompactionApplied",
-    "CompactionPolicy",
-    "DEFAULT_COMPACTOR_TIMEOUT_MS",
     "DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS",
     "DEFAULT_INTERCEPTOR_TIMEOUT_MS",
     "DEFAULT_MAX_ITERATIONS",
@@ -250,7 +240,6 @@ __all__ = [
     "bindings_from",
     "blocked_result",
     "context_providers_from",
-    "compact_once",
     "emit_outbound",
     "engine_deps",
     "escaped_result",
@@ -263,7 +252,6 @@ __all__ = [
     "outcome_without_engine",
     "partition_tool_batches",
     "project_units",
-    "reassemble_history",
     "replay_messages",
     "render_message_content",
     "retry_delay_ms",

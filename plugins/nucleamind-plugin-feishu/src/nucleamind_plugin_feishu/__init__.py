@@ -150,7 +150,7 @@ CONFIG_SCHEMA: Final[ManifestJsonSchema] = {
 MANIFEST: Final = PluginManifest(
     id="feishu",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind_plugin_feishu:setup",
     # **不写 `overrides`**（它不取代任何内建）、**不写 `priority`**（默认值 100 会被原样
     # 采纳，而内建基准是 0——`D16` 记的坑）。

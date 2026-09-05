@@ -31,7 +31,7 @@ from nucleamind.contracts import (
 from nucleamind.kernel.routing import SubmitOutcome, SubmitStatus
 
 from .cancel import CancelToken, Checkpoint
-from .compaction import compact_once
+from .compaction import SessionCompactionTracker
 from .context_builder import assemble
 from .engine import run_turn
 from .events import (
@@ -264,32 +264,7 @@ class TurnOrchestrator:
             stream=deps.stream,
             timeout_ms=deps.limits.turn_timeout_ms,
         )
-        model_info = deps.model_info or deps.model.describe(deps.model_id)
-        compacted = await compact_once(
-            snapshot=snapshot,
-            context=context,
-            request=request,
-            user_input=user_input,
-            correlation=state.correlation,
-            cancel=token,
-            sessions=deps.sessions,
-            policy=deps.compactor,
-            budget=deps.limits.resolve_context_budget(model_info),
-            accounting=deps.token_accounting,
-            now=deps.clock(),
-        )
-        if compacted is not None:
-            deps.bus.publish(
-                EventName.SESSION_COMPACTED,
-                correlation=state.correlation,
-                payload={
-                    "through": compacted.through,
-                    "messages": len(compacted.snapshot.messages),
-                    "compactor": deps.compactor.name if deps.compactor is not None else None,
-                },
-            )
-            context = compacted.context
-            request = replace(request, messages=context.messages)
+        state.session_compaction = SessionCompactionTracker(context.session_history)
         state.transcript.add_inputs(batch)
         terminal = await self._drive(request, state, token)
         if isinstance(terminal, TurnCompleted) and terminal.truncated:
@@ -360,7 +335,7 @@ class TurnOrchestrator:
         """驱动 engine 并翻译事件流，返回终态事件。"""
         deps = self._deps
         state.ledger = BudgetLedger(deps.limits)
-        engine = engine_deps(deps, state.ledger, request)
+        engine = engine_deps(deps, state.ledger, request, state.session_compaction)
         watchdog = asyncio.ensure_future(self._watchdog(token, deps.limits.turn_timeout_ms))
         terminal: TurnEvent | None = None
         try:

@@ -3,9 +3,9 @@
 职责：导出 `SDK_VERSION`，并按 PEP 440 判定插件声明的 `sdk_range` 是否兼容当前 SDK。
 不负责：决定不兼容插件的处置方式，也不负责主程序版本；SDK 与发行包独立演进。
 
-SDK 4.1 新增 Turn Compactor 注册能力与按次模型门面。外部插件不能决定宿主是否
-中断，其加载与运行故障进入诊断；宿主发布的内建基线错误仍由 Runtime 拒绝启动。插件应
-声明 `>=4.0,<5.0`。
+SDK 5.0 删除独立 Context Compactor，统一保留请求级 Turn Compactor 与按次模型门面。
+外部插件不能决定宿主是否中断，其加载与运行故障进入诊断；宿主发布的内建基线错误仍由
+Runtime 拒绝启动。插件应声明 `>=5.0,<6.0`。
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from nucleamind.contracts import ErrorCode, NucleaError
 __all__ = ["SDK_VERSION", "is_compatible", "parse_sdk_range"]
 
 #: 当前 SDK 版本（语义化版本，PEP 440 可解析）。插件用 `sdk_range` 声明兼容范围。
-SDK_VERSION: Final = "4.1.0"
+SDK_VERSION: Final = "5.0.0"
 
 #: 预解析当前版本；插件校验会重复调用 `is_compatible()`，无需每次解析同一字面量。
 _CURRENT: Final = Version(SDK_VERSION)

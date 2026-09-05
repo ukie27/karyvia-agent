@@ -87,7 +87,6 @@ from .plugin_plan import discover_plugins
 from .selection import (
     missing_capability,
     require_sessions,
-    select_compactor,
     select_model,
     select_recall,
     select_turn_compactor,
@@ -438,7 +437,6 @@ def _assemble(
         context_providers=context_providers_from(registry),
         model_info=model_info,
         context_provider_timeout_ms=config.context.provider_timeout_ms,
-        compactor=select_compactor(registry, config),
         deliver=deliver,
         memory=select_recall(registry, config),
         retry=config.retry.to_policy(),

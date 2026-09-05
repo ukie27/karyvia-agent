@@ -19,11 +19,11 @@ from dataclasses import replace
 from datetime import UTC, datetime
 
 from nucleamind.contracts import (
+    UNTRUSTED_DATA_PREFIX,
     AttachmentRef,
     AttachmentSource,
     CancelReason,
     CommandResult,
-    CompactionResult,
     Concurrency,
     Correlation,
     Disposition,
@@ -40,12 +40,13 @@ from nucleamind.contracts import (
     StreamState,
     ToolResult,
     TrustLevel,
+    TurnCompactionResult,
     TurnId,
     TurnStatus,
 )
 from nucleamind.contracts.message import MAX_ATTACHMENTS
 from nucleamind.kernel.routing import ConcurrencyPolicy, SessionScheduler
-from nucleamind.kernel.turn import CompactionPolicy, RetryPolicy, TurnLimits, TurnReceipt
+from nucleamind.kernel.turn import RetryPolicy, TurnCompactionPolicy, TurnLimits, TurnReceipt
 from nucleamind.kernel.turn.transcript import Transcript, TurnState
 
 from ._engine_support import (
@@ -82,7 +83,7 @@ def names(harness) -> list[str]:  # noqa: ANN001
 class ScriptedCompactor:
     def __init__(
         self,
-        result: CompactionResult | None = None,
+        result: TurnCompactionResult | None = None,
         *,
         error: Exception | None = None,
     ) -> None:
@@ -90,18 +91,18 @@ class ScriptedCompactor:
         self.error = error
         self.calls = 0
 
-    async def compact(self, request, cancel):  # noqa: ANN001, ANN202
-        del request, cancel
+    async def compact(self, request, model, cancel):  # noqa: ANN001, ANN202
+        del request, model, cancel
         self.calls += 1
         if self.error is not None:
             raise self.error
         return self.result
 
 
-def compaction_policy(compactor: ScriptedCompactor) -> CompactionPolicy:
+def compaction_policy(compactor: ScriptedCompactor) -> TurnCompactionPolicy:
     from nucleamind.contracts import Builtin
 
-    return CompactionPolicy(compactor=compactor, name="summary", owner=Builtin())
+    return TurnCompactionPolicy(compactor=compactor, name="summary", owner=Builtin())
 
 
 def old_message(index: int, role: Role, content: str) -> SessionMessage:
@@ -111,6 +112,12 @@ def old_message(index: int, role: Role, content: str) -> SessionMessage:
         content=content,
         created_at=NOW,
     )
+
+
+class CompactFailingStore(FakeSessionStore):
+    async def compact(self, key, through, summary):  # noqa: ANN001, ANN202
+        del key, through, summary
+        raise NucleaError(ErrorCode.PERSISTENCE_WRITE_FAILED, "压缩写入失败。")
 
 
 # ------------------------------------------------------------------ A 事件序列
@@ -481,13 +488,13 @@ async def test_request_pressure_compacts_and_reuses_the_collected_fragments() ->
         ]
     )
     provider = Provider()
-    compactor = ScriptedCompactor(CompactionResult(through=2, content="前情摘要"))
+    compactor = ScriptedCompactor(TurnCompactionResult(through_units=2, summary="前情摘要"))
     harness = build(
         ScriptedProvider([text_response("新回答")]),
         store=store,
         context_providers=[binding(provider)],
-        compactor=compaction_policy(compactor),
-        limits=TurnLimits(context_max_tokens=45),
+        turn_compactor=compaction_policy(compactor),
+        limits=TurnLimits(context_max_tokens=80),
     )
 
     receipt = await harness.send()
@@ -497,10 +504,55 @@ async def test_request_pressure_compacts_and_reuses_the_collected_fragments() ->
     assert compactor.calls == 1
     assert provider.calls == 1
     assert len(store.compactions) == 1
+    assert store.operations == ["append", "compact"]
+    _, _, persisted = store.compactions[0]
+    assert persisted.role is Role.USER
+    assert persisted.content.startswith(UNTRUSTED_DATA_PREFIX)
     assert names(harness).count("session.compacted") == 1
     event = harness.events.of(EventName.SESSION_COMPACTED)[0]
     assert event.payload["through"] == 2
-    assert harness.provider.requests[0].messages[0].content == "前情摘要"
+    assert "前情摘要" in harness.provider.requests[0].messages[0].content
+
+
+async def test_summary_covering_transient_context_is_not_persisted() -> None:
+    store = FakeSessionStore([old_message(1, Role.USER, "旧问题" * 30)])
+    provider = Provider((fragment(content="临时检索" * 30, trust=TrustLevel.UNTRUSTED),))
+    compactor = ScriptedCompactor(TurnCompactionResult(through_units=2, summary="本轮摘要"))
+    harness = build(
+        ScriptedProvider([text_response("新回答")]),
+        store=store,
+        context_providers=[binding(provider)],
+        turn_compactor=compaction_policy(compactor),
+        limits=TurnLimits(context_max_tokens=80),
+    )
+
+    receipt = await harness.send()
+
+    assert receipt.outcome is not None
+    assert receipt.outcome.status is TurnStatus.COMPLETED
+    assert compactor.calls == 1
+    assert store.compactions == []
+    assert names(harness).count("session.compacted") == 0
+
+
+async def test_session_compaction_write_failure_fails_the_turn() -> None:
+    store = CompactFailingStore([old_message(1, Role.USER, "旧问题" * 60)])
+    compactor = ScriptedCompactor(TurnCompactionResult(through_units=1, summary="前情摘要"))
+    harness = build(
+        ScriptedProvider([text_response("新回答")]),
+        store=store,
+        turn_compactor=compaction_policy(compactor),
+        limits=TurnLimits(context_max_tokens=80),
+    )
+
+    receipt = await harness.send()
+
+    assert receipt.outcome is not None
+    assert receipt.outcome.status is TurnStatus.FAILED
+    assert receipt.outcome.error is not None
+    assert receipt.outcome.error.code is ErrorCode.PERSISTENCE_WRITE_FAILED
+    assert len(store.appends) == 1
+    assert names(harness).count("session.compacted") == 0
 
 
 async def test_oversized_persistent_summary_fails_before_persistence() -> None:
@@ -511,12 +563,12 @@ async def test_oversized_persistent_summary_fails_before_persistence() -> None:
         ]
     )
     compactor = ScriptedCompactor(
-        CompactionResult(through=2, content="很长的摘要" * 30)
+        TurnCompactionResult(through_units=2, summary="很长的摘要" * 30)
     )
     harness = build(
         ScriptedProvider([text_response("新回答")]),
         store=store,
-        compactor=compaction_policy(compactor),
+        turn_compactor=compaction_policy(compactor),
         limits=TurnLimits(context_max_tokens=35),
     )
 
@@ -525,7 +577,7 @@ async def test_oversized_persistent_summary_fails_before_persistence() -> None:
     assert receipt.outcome is not None
     assert receipt.outcome.status is TurnStatus.FAILED
     assert receipt.outcome.error is not None
-    assert receipt.outcome.error.code is ErrorCode.PLUGIN_HOOK_FAILED
+    assert receipt.outcome.error.code is ErrorCode.INPUT_TOO_LARGE
     assert compactor.calls == 1
     assert store.compactions == []
 
@@ -536,7 +588,7 @@ async def test_persistent_compactor_failure_fails_the_turn() -> None:
     harness = build(
         ScriptedProvider([text_response("仍然回答")]),
         store=store,
-        compactor=compaction_policy(compactor),
+        turn_compactor=compaction_policy(compactor),
         limits=TurnLimits(context_max_tokens=60),
     )
 
@@ -545,7 +597,7 @@ async def test_persistent_compactor_failure_fails_the_turn() -> None:
     assert receipt.outcome is not None
     assert receipt.outcome.status is TurnStatus.FAILED
     assert receipt.outcome.error is not None
-    assert receipt.outcome.error.code is ErrorCode.PLUGIN_HOOK_FAILED
+    assert receipt.outcome.error.code is ErrorCode.PLUGIN_TURN_COMPACTION_FAILED
     assert compactor.calls == 1
     assert store.compactions == []
     assert harness.provider.requests == []

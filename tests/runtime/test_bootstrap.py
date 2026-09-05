@@ -297,7 +297,7 @@ async def test_a_failing_cli_override_falls_back_to_the_builtin(tmp_path: Path) 
     broken = PluginManifest(
         id="cli-broken",
         version="0.1.0",
-        sdk_range=">=4.0.0,<5.0.0",
+        sdk_range=">=5.0.0,<6.0.0",
         setup="tests.runtime.test_bootstrap:setup_broken_cli",
         capabilities=(
             CapabilityDecl(
@@ -323,14 +323,14 @@ async def test_cli_fallback_stops_the_discarded_setup_attempt(
     tracked = PluginManifest(
         id="tracked-setup",
         version="0.1.0",
-        sdk_range=">=4.0.0,<5.0.0",
+        sdk_range=">=5.0.0,<6.0.0",
         setup="tests.runtime.test_bootstrap:setup_with_side_effects",
         capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="startup.probe"),),
     )
     broken = PluginManifest(
         id="cli-broken",
         version="0.1.0",
-        sdk_range=">=4.0.0,<5.0.0",
+        sdk_range=">=5.0.0,<6.0.0",
         setup="tests.runtime.test_bootstrap:setup_broken_cli",
         capabilities=(
             CapabilityDecl(
@@ -376,14 +376,14 @@ async def test_optional_setup_failure_keeps_prior_plugin_resources_owned(
     tracked = PluginManifest(
         id="tracked-setup",
         version="0.1.0",
-        sdk_range=">=4.0.0,<5.0.0",
+        sdk_range=">=5.0.0,<6.0.0",
         setup="tests.runtime.test_bootstrap:setup_with_side_effects",
         capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="startup.probe"),),
     )
     failing = PluginManifest(
         id="optional-failure",
         version="0.1.0",
-        sdk_range=">=4.0.0,<5.0.0",
+        sdk_range=">=5.0.0,<6.0.0",
         setup="tests.runtime.test_bootstrap:setup_optional_failure",
         capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="startup.fail"),),
     )

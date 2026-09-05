@@ -1,11 +1,11 @@
 """§10.1 步骤 8：从已冻结的 registry 里按配置挑出必需能力。
 
-职责：模型供应商与模型标识、会话存储、长期记忆召回与压缩策略的能力选择：配置指名一个、
+职责：模型供应商与模型标识、会话存储、长期记忆召回与 Turn 压缩策略的能力选择：配置指名一个、
 registry 里找它，找不到就以稳定错误码拒绝启动。
 不负责：注册能力（`wiring.py`）、解析覆盖（`kernel/registry/`）、装 `OrchestratorDeps`
 （`bootstrap.py::_assemble`）、只读诊断（`inspect.py`）。
 
-模型、会话存储、记忆和压缩策略的选择集中在这里，避免装配流程与只读诊断各自形成一套
+模型、会话存储、记忆和 Turn 压缩策略的选择集中在这里，避免装配流程与只读诊断各自形成一套
 “配置如何指向能力”的判定。
 
 **它们都不发事件、不写盘**：只读 registry 与配置，要么返回实现体，要么抛
@@ -18,20 +18,18 @@ from __future__ import annotations
 from nucleamind.contracts import ErrorCode, ModelInfo, ModelProvider, NucleaError, SessionStore
 from nucleamind.kernel.config import NucleaConfig
 from nucleamind.kernel.plugins import (
-    context_compactors_from,
     memory_providers_from,
     model_providers_from,
     session_store_from,
     turn_context_compactors_from,
 )
 from nucleamind.kernel.registry import CapabilityRegistry
-from nucleamind.kernel.turn import CompactionPolicy, MemoryRecall, select_memory
+from nucleamind.kernel.turn import MemoryRecall, select_memory
 from nucleamind.kernel.turn.turn_compaction import TurnCompactionPolicy
 
 __all__ = [
     "missing_capability",
     "require_sessions",
-    "select_compactor",
     "select_model",
     "select_recall",
     "select_turn_compactor",
@@ -94,33 +92,6 @@ def select_recall(registry: CapabilityRegistry, config: NucleaConfig) -> MemoryR
         timeout_ms=config.memory.recall_timeout_ms,
         priority_floor=config.memory.fragment_priority,
         critical=config.memory.critical,
-    )
-
-
-def select_compactor(
-    registry: CapabilityRegistry, config: NucleaConfig
-) -> CompactionPolicy | None:
-    """按 `context.compactor` 显式选择压缩策略；未配置就是禁用。"""
-    wanted = config.context.compactor
-    if wanted is None:
-        return None
-    bindings = context_compactors_from(registry)
-    chosen = next((binding for binding in bindings if binding.name == wanted), None)
-    if chosen is None:
-        raise NucleaError(
-            ErrorCode.CAPABILITY_MISSING,
-            "配置里指定的 Context Compactor 没有注册。",
-            detail={
-                "pointer": "/context/compactor",
-                "wanted": wanted,
-                "available": [binding.name for binding in bindings],
-            },
-        )
-    return CompactionPolicy(
-        compactor=chosen.value,
-        name=chosen.name,
-        owner=chosen.owner,
-        timeout_ms=config.context.compactor_timeout_ms,
     )
 
 

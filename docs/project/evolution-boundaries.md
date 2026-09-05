@@ -40,7 +40,7 @@
 
 ### 插件与 SDK
 
-- SDK 4.x 的公开名称、Protocol 签名、Manifest 字段和注册语义承担兼容承诺。
+- SDK 5.x 的公开名称、Protocol 签名、Manifest 字段和注册语义承担兼容承诺。
 - 内建与外部插件使用同一个 Host、Registry、冲突解析和生命周期。
 - 覆盖结果由声明和确定性 resolution 决定，不依赖 import/setup 顺序。
 - `PluginContext` 暴露窄资源门面，不暴露 Runtime/Kernel 内部对象。

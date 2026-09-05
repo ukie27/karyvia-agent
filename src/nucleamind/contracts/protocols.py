@@ -1,7 +1,7 @@
 """能力接口：Kernel 与能力实现之间唯一的行为契约（技术方案 §5.1、需求 §9.3 `SDK-001`）。
 
-职责：声明 11 个能力 Protocol（`ModelProvider` / `ToolHandler` / `ContextProvider` /
-`ContextCompactor` / `TurnContextCompactor` / `SessionStore` / `MemoryProvider` / `Channel` /
+职责：声明 10 个能力 Protocol（`ModelProvider` / `ToolHandler` / `ContextProvider` /
+`TurnContextCompactor` / `SessionStore` / `MemoryProvider` / `Channel` /
 `CommandHandler` / `HookHandler` / `CliEntry`）与四个支撑用的只读/动作面（`CancelSignal` /
 `CompactionModel` / `InstanceView` / `TurnControl`），
 并在每个方法的 docstring 上固定写明**异常约定**与**取消语义**。
@@ -27,12 +27,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from .capability import HookContext, HookOutcome
 from .command import CommandInvocation, CommandResult, CommandSpec
-from .compaction import (
-    CompactionRequest,
-    CompactionResult,
-    TurnCompactionRequest,
-    TurnCompactionResult,
-)
+from .compaction import TurnCompactionRequest, TurnCompactionResult
 from .context import ContextFragment, FragmentScope
 from .ids import Correlation, SessionKey, TurnId
 from .message import InboundMessage, OutboundMessage
@@ -49,7 +44,6 @@ __all__ = [
     "CliEntry",
     "CommandHandler",
     "ContextProvider",
-    "ContextCompactor",
     "CompactionModel",
     "HookHandler",
     "InstanceView",
@@ -293,27 +287,6 @@ class ContextProvider(Protocol):
 
 
 @runtime_checkable
-class ContextCompactor(Protocol):
-    """会话历史的压缩策略。"""
-
-    async def compact(
-        self,
-        request: CompactionRequest,
-        cancel: CancelSignal,
-    ) -> CompactionResult | None:
-        """返回压缩建议，或以 `None` 表示本轮不压缩。
-
-        Kernel 负责触发、校验与持久化；实现只决定摘要内容和压缩水位。
-
-        **异常约定**：可以抛 `NucleaError`，并会直接终止当前 Turn。普通异常由 Kernel
-        转成插件失败；空摘要、倒退或越界水位同样直接失败，不做确定性裁剪回退。
-        **取消语义**：在模型调用等外部操作前检查 `cancel`；收到取消后尽快停止并抛
-        `CANCELLED` 类错误。Kernel 不会取消已经开始的 Session 持久化。
-        """
-        ...
-
-
-@runtime_checkable
 class CompactionModel(Protocol):
     """Turn Compactor 按次获得的当前模型窄门面。"""
 
@@ -339,7 +312,7 @@ class CompactionModel(Protocol):
 
 @runtime_checkable
 class TurnContextCompactor(Protocol):
-    """模型—工具迭代期间的临时上下文压缩策略。"""
+    """模型请求边界上的统一上下文压缩策略。"""
 
     async def compact(
         self,

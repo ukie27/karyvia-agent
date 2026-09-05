@@ -27,7 +27,6 @@ from . import plugin_blocks as blocks
 from .defaults import (
     DEFAULT_CHANNEL_CONCURRENCY,
     DEFAULT_COMMAND_PREFIX,
-    DEFAULT_COMPACTOR_TIMEOUT_MS,
     DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS,
     DEFAULT_DEDUP_CAPACITY,
     DEFAULT_DEDUP_TTL_MS,
@@ -145,11 +144,7 @@ class ContextSection:
 
     #: 单个 Context Provider 的独立超时。超时后记录故障并跳过（`CTX-005`、`EDG-302`）。
     provider_timeout_ms: int = DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS
-    #: `COMPACTOR` 能力名。`None` = 不改写 Session，超限仍由 Turn Compactor 处理。
-    compactor: str | None = None
-    #: 单次 compactor 调用预算；超时或非法结果直接终止当前 Turn。
-    compactor_timeout_ms: int = DEFAULT_COMPACTOR_TIMEOUT_MS
-    #: 每轮模型请求超限时使用的临时压缩能力；生产实例必须能解析到该名字。
+    #: 每轮模型请求超限时使用的统一压缩能力；生产实例必须能解析到该名字。
     turn_compactor: str = DEFAULT_TURN_COMPACTOR
     #: 单次 Turn Compactor 调用的总预算，也约束它通过窄门面发出的模型调用。
     turn_compactor_timeout_ms: int = DEFAULT_TURN_COMPACTOR_TIMEOUT_MS

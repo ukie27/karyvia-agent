@@ -49,8 +49,7 @@
 | Tool | `register_tool` | `kernel/turn/invoker.py` |
 | Command | `register_command` | `kernel/routing/dispatcher.py` |
 | Context | `register_context_provider` | `kernel/turn/context_builder.py` |
-| Compactor | `register_context_compactor` | `kernel/turn/compaction.py` |
-| Turn Compactor | `register_turn_compactor` | `kernel/turn/turn_compaction.py` |
+| Turn Compactor | `register_turn_compactor` | `kernel/turn/turn_compaction.py`；可持久化水位映射在 `compaction.py` |
 | Hook | `api.on` | `kernel/turn/hooks.py` |
 | Model | `register_model_provider` | Runtime selection → Engine deps |
 | Channel | `register_channel` | Runtime instance/input pump |
@@ -63,8 +62,7 @@
 
 ## 4. 新增一种 CapabilityKind
 
-这是 SDK 兼容新增，不是普通 Enum 修改。以 `COMPACTOR` 的加入方式为模板，用 `rg` 搜索现有
-十一种 kind，至少贯通以下位置：
+这是 SDK 兼容新增，不是普通 Enum 修改。用 `rg` 搜索现有十种 kind，至少贯通以下位置：
 
 1. `contracts/capability.py`：Enum、arity 表、引用/解析约束。
 2. `contracts`：该能力的公开 Protocol、请求与结果契约。
@@ -156,7 +154,8 @@
 
 Turn 内请求增长不通过增加 Engine 槽位处理：在 Orchestrator 的 model 装配边界包装
 `TurnCompactingModel`，策略由 `TURN_COMPACTOR` 插件提供。修改时必须同时验证完整
-`ModelRequest` 估算、工具往返不可拆分、摘要仅在当前 Turn 传递，以及 Session 不发生写入。
+`ModelRequest` 估算、工具往返不可拆分，以及消息来源映射：只有覆盖初始 Session 连续前缀
+的摘要可在 Transcript 追加后持久化；混入临时 Context 或本 Turn 消息时不得推进水位。
 
 ## 9. 修改持久化契约
 

@@ -43,7 +43,7 @@ MANIFEST: Final = PluginManifest(
     version="0.1.0",
     # SDK 兼容区间由**插件**声明，宿主据此判断要不要加载（`SDK-005`）。落在区间外时
     # 拒绝加载并报 `PLUGIN_SDK_INCOMPATIBLE`，不带病运行。
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind_plugin_echo_tool:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name=TOOL_NAME),),
     config_schema={

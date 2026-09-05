@@ -119,9 +119,10 @@ OutboundMessage → Channel.deliver / CLI
 - Session 槽位在 `turn.started` 之前取得，保证 started 一定有后续终态。
 - Engine 不认识 Session、EventBus、Manifest、配置和具体插件。
 - Model 重试在首个用户可见分片之前发生；工具执行和 `MAX_TOKENS` 续写共享同一 ledger。
-- 每轮 Hook 产出最终 `ModelRequest` 后，`TurnCompactingModel` 估算完整请求；超限时只调用
-  当前 `TURN_COMPACTOR`，不改 Session、Transcript、Engine 事件顺序或工具执行顺序。
-- Session 存储、Context、Memory、持久化 Compactor、Turn Compactor、Model、Tool、Hook 和 Command 都来自 Registry，
+- 每轮 Hook 产出最终 `ModelRequest` 后，`TurnCompactingModel` 估算完整请求；超限时调用
+  当前 `TURN_COMPACTOR`。摘要立即用于当前请求；只有覆盖初始 Session 连续前缀的结果在
+  Turn 收口时、Transcript 追加之后持久化，不改变 Engine 事件或工具执行顺序。
+- Session 存储、Context、Memory、Turn Compactor、Model、Tool、Hook 和 Command 都来自 Registry，
   不是直接实例列表。
 
 ## 4. 插件启动链路
@@ -213,8 +214,7 @@ producer ── bus.publish(name, correlation, payload, error)
 | 新工具 | `TOOL` 插件和 `PluginContext` 资源服务 | 把 Runtime/Kernel 私有对象交给插件 |
 | 发送 workspace 文件 | `file.send` → `ToolResult.attachments` → Channel | 让工具直接调用平台 SDK |
 | 新 Context 来源 | `CONTEXT` 能力 | 把产品 prompt 写死在 Context Builder |
-| 新持久化历史压缩策略 | `COMPACTOR` 能力 | 让模型实现偷偷改历史 |
-| 新 Turn 内临时压缩策略 | `TURN_COMPACTOR` 能力 | 把算法写进 Engine 或读写 Session |
+| 新上下文压缩策略 | `TURN_COMPACTOR` 能力 | 把算法写进 Engine 或让插件读写 Session |
 | 新 Memory 后端 | `MEMORY` 能力 | 把存储策略塞进 Session Store |
 | 新命令 | `COMMAND` 能力 | 给 Runtime CLI/Dispatcher 写内建特例 |
 | 新横切观测 | EventBus 普通订阅者或 `HOOK` | 给 Engine 增加 EventBus 槽 |

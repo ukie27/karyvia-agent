@@ -25,7 +25,7 @@ from nucleamind.sdk.version import SDK_VERSION
 VALID: Final[dict[str, object]] = {
     "id": "memory-sqlite",
     "version": "0.1.0",
-    "sdk_range": ">=4.0,<5.0",
+    "sdk_range": ">=5.0,<6.0",
     "setup": "nucleamind_plugin_memory_sqlite.plugin:setup",
     "capabilities": [{"kind": "memory", "name": "sqlite"}],
 }

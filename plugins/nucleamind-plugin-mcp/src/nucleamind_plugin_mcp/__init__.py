@@ -158,7 +158,7 @@ CONFIG_SCHEMA: Final[ManifestJsonSchema] = {
 MANIFEST: Final = PluginManifest(
     id="mcp",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind_plugin_mcp:setup",
     capabilities=(
         # **一条命名空间声明**（`D38-A`）：远端工具名要连上 server 才知道，而 manifest

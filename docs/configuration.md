@@ -188,23 +188,17 @@ Session 的等待上限。保留旧字段会按未知配置拒绝启动，避免
 | 字段 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `provider_timeout_ms` | 正整数 | `3000` | 单个 Context Provider 的独立超时。超时后记录故障并跳过 |
-| `compactor` | 字符串或 `null` | `null` | `COMPACTOR` 能力的名字。`null` = 不改写 Session，超限仍由 Turn Compactor 处理；**写了却不存在是启动失败** |
-| `compactor_timeout_ms` | 正整数 | `3000` | 单次 Context Compactor 调用预算。超时、异常或非法结果直接使当前 Turn 失败 |
 | `turn_compactor` | 字符串 | `"basic"` | `TURN_COMPACTOR` 能力的名字。该能力必选；写了却不存在或禁用唯一提供方都会使启动失败 |
-| `turn_compactor_timeout_ms` | 正整数 | `120000` | 每次 Turn 内临时压缩的超时上限；超时终止当前 Turn，不切换另一策略 |
+| `turn_compactor_timeout_ms` | 正整数 | `120000` | 每次请求级压缩的超时上限；超时终止当前 Turn，不切换另一策略 |
 
 注意 `context_max_tokens` **不在这里**：它是 turn 的六项预算之一。
-安装或注册 Context Compactor **不会自动启用**；必须显式设置 `context.compactor`。
-Kernel 在完整请求接近输入上限且存在可压缩会话历史时至多尝试一次持久化压缩。摘要正文和
-水位由插件决定；Kernel 在写入 Session **之前**用统一计量器验证压缩后的完整请求达到目标，
-然后才持久化。插件失败或结果未达到目标会直接终止当前 Turn，不回退到确定性硬裁剪。
-
-`turn_compactor` 是另一条能力边界。它在 Engine 每轮最终 `ModelRequest` 即将发送前检查
+`turn_compactor` 是唯一压缩能力。它在 Engine 每轮最终 `ModelRequest` 即将发送前检查
 完整请求（包括消息、工具 schema、工具参数和 provider blocks）。预算已预留模型最大输出
 空间、5% 安全余量，并把压缩目标设为触发线的 80%。超限时，策略只能用
-摘要替换可压缩单元的连续前缀，工具调用与它的全部结果永远是同一单元。这种摘要
-仅存在于当前 Turn 的模型请求投影，不会调用 `SessionStore.compact()`、改写 Transcript
-或丢失真实工具结果。内建 `basic` 默认启用；策略运行失败、返回非法结果或压缩后仍超限时，
+摘要替换可压缩单元的连续前缀，工具调用与它的全部结果永远是同一单元。摘要立即用于当前
+Turn；若它只覆盖初始 Session 的连续前缀，Kernel 会先追加本 Turn 的 Transcript，再调用
+`SessionStore.compact()` 持久化摘要和水位。混入 Context、Memory 或本 Turn 工具往返的摘要
+不会写入 Session。内建 `basic` 默认启用；策略运行失败、返回非法结果或压缩后仍超限时，
 当前 Turn 明确失败，Kernel 不再执行隐式裁剪或回落到另一策略。Provider 返回实际输入
 usage 时，Kernel 会把实际请求保存为相同 Session 的计量锚点；模型、工具、采样参数和消息
 前缀保持一致的后续请求只估算新增尾部，任一项变化则恢复完整请求估算。若 Provider 仍以

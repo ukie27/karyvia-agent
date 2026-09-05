@@ -1,7 +1,8 @@
-"""Turn 内模型请求压缩的通用机制。
+"""模型请求边界上的统一上下文压缩机制。
 
 职责：把最终请求投影为不可拆分单元、调用选中的插件、校验连续前缀结果，并以状态化
-`ModelProvider` 包装器把摘要延续到同一 Turn 的后续迭代。
+`ModelProvider` 包装器把摘要延续到同一 Turn 的后续迭代；可映射的 Session 前缀交给
+`SessionCompactionTracker` 登记。
 不负责：提供压缩算法、读写 Session、改变 Engine 的迭代/工具预算或增加 Engine 依赖槽。
 
 Kernel 没有备用压缩策略。插件超时、抛异常、返回非法结果或压缩后仍超预算都会终止当前
@@ -35,14 +36,18 @@ from nucleamind.contracts import (
     TurnCompactionRequest,
     TurnCompactionResult,
     TurnContextCompactor,
-    TurnContextUnit,
-    TurnContextUnitKind,
     wrap_untrusted,
 )
 from nucleamind.kernel.observability import EventBus
 
+from .compaction import SessionCompactionTracker
 from .limits import BudgetLedger
-from .request_size import ContextBudget, TokenAccounting, estimate_messages_tokens
+from .request_size import ContextBudget, TokenAccounting
+from .turn_compaction_projection import (
+    Projection,
+    project,
+    project_units,
+)
 
 __all__ = [
     "DEFAULT_TURN_COMPACTOR_TIMEOUT_MS",
@@ -53,9 +58,6 @@ __all__ = [
 
 DEFAULT_TURN_COMPACTOR_TIMEOUT_MS = 120_000
 _SUMMARY_SOURCE = "turn-compactor"
-_CURRENT_USER_CHANGED = "before_model_request 删除或改写了当前用户输入。"
-_ORPHAN_TOOL_RESULT = "工具结果缺少紧邻的 assistant 调用声明。"
-_TOOL_EXCHANGE_MISMATCH = "assistant 工具调用与 tool 结果不完整匹配。"
 _SUBSTANTIVE_CHUNKS = frozenset(
     {ChunkKind.TEXT, ChunkKind.REASONING, ChunkKind.TOOL_CALL}
 )
@@ -77,107 +79,6 @@ class TurnCompactionPolicy:
             name=self.name,
             provider=self.owner,
         )
-
-
-@dataclass(frozen=True, slots=True)
-class _Span:
-    unit: TurnContextUnit
-    start: int
-    stop: int
-
-
-@dataclass(frozen=True, slots=True)
-class _Projection:
-    messages: tuple[ModelMessage, ...]
-    spans: tuple[_Span, ...]
-
-    @property
-    def units(self) -> tuple[TurnContextUnit, ...]:
-        return tuple(span.unit for span in self.spans)
-
-
-def project_units(
-    messages: Sequence[ModelMessage], protected_user: ModelMessage
-) -> tuple[TurnContextUnit, ...]:
-    """公开纯投影入口；结构非法时立即失败，不把修复责任交给插件。"""
-    return _project(tuple(messages), protected_user, None).units
-
-
-def _project(
-    messages: tuple[ModelMessage, ...],
-    protected_user: ModelMessage,
-    accounting: TokenAccounting | None,
-) -> _Projection:
-    protected_index = _protected_user_index(messages, protected_user)
-    spans: list[_Span] = []
-    index = 0
-    while index < len(messages):
-        message = messages[index]
-        if message.role is Role.SYSTEM or index == protected_index:
-            index += 1
-            continue
-        if message.tool_calls:
-            stop = index + 1 + len(message.tool_calls)
-            exchange = messages[index:stop]
-            _validate_exchange(exchange)
-            _append_span(
-                spans, exchange, index, stop, TurnContextUnitKind.TOOL_EXCHANGE, accounting
-            )
-            index = stop
-            continue
-        if message.role is Role.TOOL:
-            raise _structure_error(_ORPHAN_TOOL_RESULT)
-        kind = (
-            TurnContextUnitKind.CONTINUATION
-            if index > protected_index and message.role is Role.ASSISTANT
-            else TurnContextUnitKind.BASE
-        )
-        _append_span(spans, (message,), index, index + 1, kind, accounting)
-        index += 1
-    return _Projection(messages, tuple(spans))
-
-
-def _protected_user_index(
-    messages: tuple[ModelMessage, ...], protected_user: ModelMessage
-) -> int:
-    matches = [index for index, message in enumerate(messages) if message == protected_user]
-    if not matches:
-        raise _structure_error(_CURRENT_USER_CHANGED)
-    return matches[-1]
-
-
-def _validate_exchange(messages: tuple[ModelMessage, ...]) -> None:
-    assistant = messages[0]
-    results = messages[1:]
-    expected = [call.call_id for call in assistant.tool_calls]
-    actual = [message.tool_call_id for message in results if message.role is Role.TOOL]
-    if len(results) != len(expected) or len(actual) != len(expected) or set(actual) != set(expected):
-        raise _structure_error(_TOOL_EXCHANGE_MISMATCH)
-
-
-def _append_span(
-    spans: list[_Span],
-    messages: tuple[ModelMessage, ...],
-    start: int,
-    stop: int,
-    kind: TurnContextUnitKind,
-    accounting: TokenAccounting | None,
-) -> None:
-    unit = TurnContextUnit(
-        unit_id=f"unit-{len(spans) + 1}",
-        kind=kind,
-        messages=messages,
-        estimated_tokens=(
-            accounting.estimate_messages(messages)
-            if accounting is not None
-            else estimate_messages_tokens(messages)
-        ),
-    )
-    spans.append(_Span(unit, start, stop))
-
-
-def _structure_error(message: str) -> NucleaError:
-    return NucleaError(ErrorCode.KERNEL_INVARIANT_VIOLATED, message)
 
 
 class _BoundCompactionModel:
@@ -277,6 +178,7 @@ class TurnCompactingModel:
         "_prepared",
         "_protected_user",
         "_source",
+        "_session_compaction",
     )
 
     def __init__(
@@ -290,6 +192,7 @@ class TurnCompactingModel:
         accounting: TokenAccounting,
         protected_user: ModelMessage,
         model_info: ModelInfo,
+        session_compaction: SessionCompactionTracker | None = None,
     ) -> None:
         self._inner = inner
         self._accounting = accounting
@@ -299,6 +202,7 @@ class TurnCompactingModel:
         self._budget = budget
         self._protected_user = protected_user
         self._info = model_info
+        self._session_compaction = session_compaction
         self._source: tuple[ModelMessage, ...] = ()
         self._prepared: tuple[ModelMessage, ...] = ()
 
@@ -352,7 +256,11 @@ class TurnCompactingModel:
             self._remember(source, current.messages)
             return current
 
-        projection = _project(current.messages, self._protected_user, self._accounting)
+        projection = project(
+            current.messages,
+            self._protected_user,
+            self._accounting,
+        )
         if not projection.spans:
             raise self._too_large(estimated)
         target = self._budget.target_limit
@@ -379,6 +287,7 @@ class TurnCompactingModel:
         final_size = self._accounting.estimate_request(compacted)
         if final_size > target:
             raise self._too_large(final_size)
+        self._record_session_compaction(projection, result)
         self._remember(source, compacted.messages)
         return compacted
 
@@ -422,7 +331,7 @@ class TurnCompactingModel:
             ) from error
 
     def _rebuild(
-        self, projection: _Projection, result: TurnCompactionResult
+        self, projection: Projection, result: TurnCompactionResult
     ) -> tuple[ModelMessage, ...]:
         through = result.through_units
         summary = result.summary.strip()
@@ -453,6 +362,24 @@ class TurnCompactingModel:
             if index not in removed:
                 messages.append(message)
         return tuple(messages)
+
+    def _record_session_compaction(
+        self,
+        projection: Projection,
+        result: TurnCompactionResult,
+    ) -> None:
+        if self._session_compaction is None:
+            return
+        covered = tuple(
+            message
+            for span in projection.spans[: result.through_units]
+            for message in span.unit.messages
+        )
+        summary = ModelMessage(
+            role=Role.USER,
+            content=wrap_untrusted(result.summary.strip(), source=_SUMMARY_SOURCE),
+        )
+        self._session_compaction.record(covered, summary)
 
     def _too_large(self, estimated: int) -> NucleaError:
         return NucleaError(

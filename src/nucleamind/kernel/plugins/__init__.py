@@ -1,7 +1,7 @@
 """插件运行时（宿主侧）：唯一的注册分派与静态清单 bootstrap（技术方案 §6.1、§7.3、§7.5）。
 
 职责：re-export `declarations`（注册意图的 kernel 投影）、`discovery`（两条显式来源的
-插件发现）、`host`（唯一的 Host `NucleaAPI` 实现）、`capabilities`（五个单值 kind 的载荷
+插件发现）、`host`（唯一的 Host `NucleaAPI` 实现）、`capabilities`（六个单值 kind 的载荷
 形状与取回函数）、`loader`（阶段 A 的依赖拓扑、配置校验与状态版本）与 `builtin_loader`
 （把一批 `LoadRequest` 跑成注册）与 `lifecycle`（阶段状态机、
 停止顺序与停止超时）的公开表面。
@@ -24,12 +24,10 @@ from .capabilities import (
     CapabilityBinding,
     ChannelBinding,
     CliEntryBinding,
-    ContextCompactorBinding,
     MemoryProviderBinding,
     ModelProviderBinding,
     RegisteredChannel,
     RegisteredCliEntry,
-    RegisteredContextCompactor,
     RegisteredMemoryProvider,
     RegisteredModelProvider,
     RegisteredSessionStore,
@@ -38,7 +36,6 @@ from .capabilities import (
     TurnContextCompactorBinding,
     channels_from,
     cli_entry_from,
-    context_compactors_from,
     memory_providers_from,
     model_providers_from,
     session_store_from,
@@ -90,7 +87,6 @@ __all__ = [
     "CapabilityHost",
     "ChannelBinding",
     "CliEntryBinding",
-    "ContextCompactorBinding",
     "TurnContextCompactorBinding",
     "Discovery",
     "EntryPointLister",
@@ -106,7 +102,6 @@ __all__ = [
     "PluginPhase",
     "RegisteredChannel",
     "RegisteredCliEntry",
-    "RegisteredContextCompactor",
     "RegisteredTurnContextCompactor",
     "RegisteredMemoryProvider",
     "RegisteredModelProvider",
@@ -120,7 +115,6 @@ __all__ = [
     "channels_from",
     "check_state_version",
     "cli_entry_from",
-    "context_compactors_from",
     "turn_context_compactors_from",
     "discover",
     "import_setup",

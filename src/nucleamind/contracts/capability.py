@@ -1,6 +1,6 @@
 """能力契约：能力标识、arity 表与 Hook 表面（技术方案 §6.1、§6.6、需求 §9.3）。
 
-职责：定义 `CapabilityKind` 的 11 个取值与每个 kind 的 arity 常量表、结构化的
+职责：定义 `CapabilityKind` 的 10 个取值与每个 kind 的 arity 常量表、结构化的
 `ProviderId`（`Builtin` | `Plugin`）与 `CapabilityRef`，以及冻结的 9 个 `HookName`、
 其观察者/拦截器分类和 Hook 的输入输出 `HookContext` / `HookOutcome`。
 不负责：注册、冲突解析、覆盖判定、Hook 的调度与超时——那些在 `kernel/registry/`、
@@ -73,16 +73,15 @@ _PLUGIN_TOKEN: Final = "plugin"
 
 
 class CapabilityKind(StrEnum):
-    """可注册的能力种类，恰好 11 个（技术方案 §6.1、`SDK-001`）。
+    """可注册的能力种类，恰好 10 个（技术方案 §6.1、`SDK-001`）。
 
-    与 `sdk.NucleaAPI` 的 11 个注册方法一一对应：新增 kind 等于新增注册方法，
+    与 `sdk.NucleaAPI` 的 10 个注册方法一一对应：新增 kind 等于新增注册方法，
     属于公开表面变化，须按 `NFR-104` 论证。
     """
 
     TOOL = "tool"
     COMMAND = "command"
     CONTEXT = "context"
-    COMPACTOR = "compactor"
     TURN_COMPACTOR = "turn_compactor"
     HOOK = "hook"
     CHANNEL = "channel"
@@ -111,14 +110,13 @@ class CapabilityArity(StrEnum):
 
 
 #: kind 到 arity 的唯一映射。
-#: 11 个 kind 全部登记，缺项会让 `CapabilityKind.arity` 直接 KeyError——这是刻意的：
+#: 10 个 kind 全部登记，缺项会让 `CapabilityKind.arity` 直接 KeyError——这是刻意的：
 #: 冲突语义未定的能力不该有注册路径。
 CAPABILITY_ARITY: Final[Mapping[CapabilityKind, CapabilityArity]] = MappingProxyType(
     {
         CapabilityKind.TOOL: CapabilityArity.MULTI_UNIQUE,
         CapabilityKind.COMMAND: CapabilityArity.MULTI_UNIQUE,
         CapabilityKind.CONTEXT: CapabilityArity.MULTI,
-        CapabilityKind.COMPACTOR: CapabilityArity.MULTI_UNIQUE,
         CapabilityKind.TURN_COMPACTOR: CapabilityArity.MULTI_UNIQUE,
         CapabilityKind.HOOK: CapabilityArity.MULTI,
         CapabilityKind.CHANNEL: CapabilityArity.MULTI_UNIQUE,

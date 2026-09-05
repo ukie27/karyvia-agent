@@ -45,9 +45,10 @@ NucleaMind 已经具备一套可运行、受架构守卫约束的 Agent Kernel �
 ### 对外表面
 
 - 包版本：`0.3.0`（alpha）。
-- SDK 版本：`4.1.0`；4.0 删除 manifest 的 `critical` 字段，4.1 新增 Turn Compactor 能力。外部插件故障统一隔离并进入
+- SDK 版本：`5.0.0`；5.0 删除独立 `COMPACTOR`，统一由请求级 `TURN_COMPACTOR` 压缩，并在
+  Turn 收口时持久化可精确映射的 Session 前缀。外部插件故障统一隔离并进入
   诊断；宿主发布的内建基线装配错误仍直接拒绝启动。
-- `NucleaAPI` 与 `CapabilityKind` 当前一一覆盖十一类能力。
+- `NucleaAPI` 与 `CapabilityKind` 当前一一覆盖十类能力。
 - `nm init`、`nm run`、`nm serve`、`nm config show`、`nm session`、
   `nm plugins`、`nm capabilities` 已可用。
 
@@ -81,7 +82,7 @@ MCP Server 适配、Cron 调度、OpenAI API 兼容服务。内建能力也只�
 - 配置优先级和 Secret 引用不落明文；
 - Turn 的取消检查点、预算、单终态和工具副作用边界；
 - 同 Session 单写者与去重优先的准入顺序；
-- SDK 4.x 已发布的名字、签名和 Manifest 语义；
+- SDK 5.x 已发布的名字、签名和 Manifest 语义；
 - 插件依赖方向与 Runtime 作为唯一组装根。
 
 它们可以演进，但需要显式版本或迁移，而不能在普通重构里顺手改变。完整分类见

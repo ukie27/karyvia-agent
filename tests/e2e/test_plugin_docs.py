@@ -65,15 +65,15 @@ def test_every_toml_block_parses(index: int) -> None:
     tomllib.loads(blocks("toml")[index])
 
 
-def test_the_doc_lists_exactly_the_eleven_registration_methods() -> None:
-    """文档说「恰好 11 个注册方法」，那就得真的是这 11 个。
+def test_the_doc_lists_exactly_the_ten_registration_methods() -> None:
+    """文档说「恰好 10 个注册方法」，那就得真的是这 10 个。
 
     多一个方法等于多一类没有冲突语义的能力，少一个等于某类能力只能靠内部特权注册——
     这句话在文档里是一条承诺，不是修辞。
     """
     listed = {name for name in re.findall(r"`(register_\w+|on)`", DOC.read_text(encoding="utf-8"))}
     actual = {name for name in dir(NucleaAPI) if name.startswith("register_")} | {"on"}
-    assert len(actual) == 11
+    assert len(actual) == 10
     assert actual <= listed, f"文档漏掉了：{sorted(actual - listed)}"
 
 

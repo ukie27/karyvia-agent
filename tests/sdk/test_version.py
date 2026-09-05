@@ -13,9 +13,9 @@ def test_sdk_version_is_a_valid_pep440_version() -> None:
     assert Version(SDK_VERSION)
 
 
-def test_sdk_version_is_four_point_x() -> None:
-    """插件关键性在明确的 major 边界一次性移除。"""
-    assert Version(SDK_VERSION).major == 4
+def test_sdk_version_is_five_point_x() -> None:
+    """双压缩公开表面在明确的 major 边界一次性移除。"""
+    assert Version(SDK_VERSION).major == 5
 
 
 @pytest.mark.parametrize(

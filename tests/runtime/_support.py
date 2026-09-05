@@ -85,7 +85,7 @@ def setup_fake_model(api: NucleaAPI) -> None:
 FAKE_MODEL: PluginManifest = PluginManifest(
     id="model-openai",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="tests.runtime._support:setup_fake_model",
     capabilities=(CapabilityDecl(kind=CapabilityKind.MODEL, name="fake"),),
 )
@@ -205,7 +205,7 @@ class ScriptedChannel:
 MULTI_CHANNEL: PluginManifest = PluginManifest(
     id="multi-channel",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="tests.runtime._support:setup_multi_channel",
     capabilities=(CapabilityDecl(kind=CapabilityKind.CHANNEL, name=MULTI_CHANNEL_ID),),
 )
@@ -271,7 +271,7 @@ class FakeMemoryProvider:
 FAKE_MEMORY: PluginManifest = PluginManifest(
     id="fake-memory",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="tests.runtime._support:setup_fake_memory",
     capabilities=(CapabilityDecl(kind=CapabilityKind.MEMORY, name=MEMORY_NAME),),
 )

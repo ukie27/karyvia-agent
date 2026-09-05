@@ -63,7 +63,6 @@ EXPECTED_ARITY: dict[CapabilityKind, CapabilityArity] = {
     CapabilityKind.TOOL: CapabilityArity.MULTI_UNIQUE,
     CapabilityKind.COMMAND: CapabilityArity.MULTI_UNIQUE,
     CapabilityKind.CONTEXT: CapabilityArity.MULTI,
-    CapabilityKind.COMPACTOR: CapabilityArity.MULTI_UNIQUE,
     CapabilityKind.TURN_COMPACTOR: CapabilityArity.MULTI_UNIQUE,
     CapabilityKind.HOOK: CapabilityArity.MULTI,
     CapabilityKind.CHANNEL: CapabilityArity.MULTI_UNIQUE,
@@ -132,9 +131,9 @@ def outcome() -> TurnOutcome:
 # ------------------------------------------------------------------------- arity 表
 
 
-def test_capability_kind_has_exactly_eleven_values() -> None:
-    """11 个 kind 与 `sdk.NucleaAPI` 的 11 个注册方法一一对应（技术方案 §7.5）。"""
-    assert len(CapabilityKind) == 11
+def test_capability_kind_has_exactly_ten_values() -> None:
+    """10 个 kind 与 `sdk.NucleaAPI` 的 10 个注册方法一一对应（技术方案 §7.5）。"""
+    assert len(CapabilityKind) == 10
 
 
 @pytest.mark.parametrize(("kind", "arity"), list(EXPECTED_ARITY.items()), ids=lambda x: str(x))

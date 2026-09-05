@@ -1,6 +1,6 @@
-"""唯一的 Host `NucleaAPI` 实现：把 11 个注册方法分派进 `RegistrationBatch`（技术方案 §7.5）。
+"""唯一的 Host `NucleaAPI` 实现：把 10 个注册方法分派进 `RegistrationBatch`（技术方案 §7.5）。
 
-职责：接住插件 `setup(api)` 里的 11 类注册调用，回查声明表取 `overrides` 与 `priority`，
+职责：接住插件 `setup(api)` 里的 10 类注册调用，回查声明表取 `overrides` 与 `priority`，
 包成对应 kind 的注册载荷，逐条放进批次；并在 `finish()` 时核对声明与实际注册一一对应。
 不负责：提交或回滚批次（那是 `builtin_loader.py`，因为 `setup` 返回给的是 loader 而不是
 Host）、构造 `PluginContext`、发现插件、判定谁最终生效
@@ -36,7 +36,6 @@ from nucleamind.contracts import (
     CliEntry,
     CommandHandler,
     CommandSpec,
-    ContextCompactor,
     ContextProvider,
     ErrorCode,
     HookHandler,
@@ -56,7 +55,6 @@ from nucleamind.kernel.turn import RegisteredContextProvider, RegisteredHook, Re
 from .capabilities import (
     RegisteredChannel,
     RegisteredCliEntry,
-    RegisteredContextCompactor,
     RegisteredMemoryProvider,
     RegisteredModelProvider,
     RegisteredSessionStore,
@@ -70,7 +68,7 @@ _ContextT = TypeVar("_ContextT")
 
 
 class CapabilityHost(Generic[_ContextT]):
-    """`NucleaAPI` 的宿主实现。恰好 11 个注册方法 + `ctx`，与 `CapabilityKind` 一一对应。
+    """`NucleaAPI` 的宿主实现。恰好 10 个注册方法 + `ctx`，与 `CapabilityKind` 一一对应。
 
     生命周期：由 loader 建好、交给 `setup(api)`、`setup` 返回后 loader 调 `finish()` 再
     `commit()`。Host 自己**从不提交**——`setup` 的返回时刻在 loader 的作用域里，而
@@ -107,7 +105,7 @@ class CapabilityHost(Generic[_ContextT]):
         """本插件的受限运行时。Host 只持有并转交，自己一个成员都不碰。"""
         return self._ctx
 
-    # ---------------------------------------------------------------------- 9 个注册方法
+    # --------------------------------------------------------------------- 10 个注册方法
 
     def register_tool(self, spec: ToolSpec, handler: ToolHandler) -> None:
         """注册一个工具。能力名取自 `spec.name`，声明与注册因此不可能对不上。"""
@@ -127,16 +125,8 @@ class CapabilityHost(Generic[_ContextT]):
             RegisteredContextProvider(provider=provider),
         )
 
-    def register_context_compactor(self, name: str, compactor: ContextCompactor) -> None:
-        """注册一个上下文压缩策略。"""
-        self._register(
-            CapabilityKind.COMPACTOR,
-            name,
-            RegisteredContextCompactor(compactor=compactor),
-        )
-
     def register_turn_compactor(self, name: str, compactor: TurnContextCompactor) -> None:
-        """注册一个 Turn 内临时上下文压缩策略。"""
+        """注册一个统一上下文压缩策略。"""
         self._register(
             CapabilityKind.TURN_COMPACTOR,
             name,

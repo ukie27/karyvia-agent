@@ -1,6 +1,6 @@
 """上下文压缩契约：插件输入与输出的纯数据形状。
 
-职责：定义持久化 `ContextCompactor` 与临时 `TurnContextCompactor` 的请求、单元与结果。
+职责：定义统一 `TurnContextCompactor` 的请求、单元与结果。
 不负责：决定何时压缩、校验或持久化结果、选择具体插件实现。
 """
 
@@ -11,34 +11,13 @@ from enum import StrEnum
 
 from .ids import Correlation
 from .model import ModelMessage, ModelRequest
-from .session import SessionSnapshot
 
 __all__ = [
-    "CompactionRequest",
-    "CompactionResult",
     "TurnCompactionRequest",
     "TurnCompactionResult",
     "TurnContextUnit",
     "TurnContextUnitKind",
 ]
-
-
-@dataclass(frozen=True, slots=True)
-class CompactionRequest:
-    """一次持久化上下文压缩请求。"""
-
-    snapshot: SessionSnapshot
-    target_tokens: int
-    correlation: Correlation
-    user_input: str
-
-
-@dataclass(frozen=True, slots=True)
-class CompactionResult:
-    """插件建议的压缩水位与摘要正文。"""
-
-    through: int
-    content: str
 
 
 class TurnContextUnitKind(StrEnum):

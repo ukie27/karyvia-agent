@@ -212,7 +212,7 @@ CONFIG_SCHEMA: Final[ManifestJsonSchema] = {
 MANIFEST: Final = PluginManifest(
     id="web",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind_plugin_web:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.TOOL, name=FETCH_TOOL),

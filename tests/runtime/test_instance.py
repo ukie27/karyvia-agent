@@ -99,7 +99,7 @@ async def test_a_failed_channel_start_is_isolated(tmp_path: Path) -> None:
         f"""
 id = "failing-channel"
 version = "0.1.0"
-sdk_range = ">=4.0.0,<5.0.0"
+sdk_range = ">=5.0.0,<6.0.0"
 setup = "tests.runtime.test_instance:setup_failing_channel"
 
 [[capabilities]]

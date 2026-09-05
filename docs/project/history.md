@@ -86,14 +86,23 @@ D40 是插件骨架成熟的重要证明：一个有调度器、工具和命令�
 - SDK `3.1.0` 增加插件激活与资源清理登记，后台任务从 setup 延迟到激活阶段。
 - 实例停止先请求 `SHUTDOWN` 业务取消并等待 Turn 收口，宽限耗尽后才强制取消任务。
 
+## D54：统一请求级压缩与持久化
+
+- SDK `5.0.0` 删除独立 `COMPACTOR`、`ContextCompactor`、对应注册方法和配置字段。
+- `TURN_COMPACTOR` 成为唯一压缩策略，在每次最终模型请求边界触发并立即应用摘要。
+- Kernel 只登记能按消息来源精确覆盖初始 Session 连续前缀的结果；Turn 收口时先追加
+  Transcript，再持久化摘要和水位。临时 Context、Memory 或本 Turn 消息不会写回 Session。
+- 4.x 插件迁移到 5.x 时需把 `ContextCompactor` 实现改为 `TurnContextCompactor`，删除
+  manifest 中的 `COMPACTOR` 声明及 `context.compactor` / `compactor_timeout_ms` 配置。
+
 ## 当前历史结论
 
-D00–D53 的主线不是不断把功能塞进宿主，而是反复证明以下骨架：
+D00–D54 的主线不是不断把功能塞进宿主，而是反复证明以下骨架：
 
 - 具体能力能从旧实现移到独立插件，宿主依赖随之减少；
 - Builtin 与 Plugin 可以共享一套注册、冲突、权限和生命周期；
-- Turn 横切能力可以通过包装层、Hook、Context、Memory、Compactor 或事件接入；
-- 已发布 SDK 的后续变化可以保持纯新增并由契约测试保护；
+- Turn 横切能力可以通过包装层、Hook、Context、Memory、Turn Compactor 或事件接入；
+- 已发布 SDK 的兼容新增保持纯新增，必要删除集中在明确 major 并由契约测试保护；
 - 无消费者的“已交付能力”会被继续追查并真正接线，而不是只停留在 manifest。
 
 下一阶段不以新增 D 编号或功能数量为目标。当前维护重点见 [`README.md`](./README.md)，未来

@@ -45,7 +45,7 @@ __all__ = [
 SESSION_JSONL: Final = PluginManifest(
     id="session-jsonl",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind.builtins.session_jsonl:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.SESSION_STORE, name="jsonl"),),
     config_schema={
@@ -70,7 +70,7 @@ SESSION_JSONL: Final = PluginManifest(
 CONTEXT_BASIC: Final = PluginManifest(
     id="context-basic",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind.builtins.context_basic:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.CONTEXT, name="basic"),),
     config_schema={
@@ -103,7 +103,7 @@ CONTEXT_BASIC: Final = PluginManifest(
 CONTEXT_COMPACT_BASIC: Final = PluginManifest(
     id="context-compact-basic",
     version="0.1.0",
-    sdk_range=">=4.1.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind.builtins.context_compact_basic:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.TURN_COMPACTOR, name="basic"),
@@ -120,7 +120,7 @@ CONTEXT_COMPACT_BASIC: Final = PluginManifest(
 MODEL_OPENAI: Final = PluginManifest(
     id="model-openai",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind.builtins.model_openai:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.MODEL, name="openai"),),
     config_schema={
@@ -227,7 +227,7 @@ MODEL_OPENAI: Final = PluginManifest(
 TOOLS_FS: Final = PluginManifest(
     id="tools-fs",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind.builtins.tools_fs:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.TOOL, name="fs.read"),
@@ -284,7 +284,7 @@ TOOLS_FS: Final = PluginManifest(
 TOOLS_FILE: Final = PluginManifest(
     id="tools-file",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind.builtins.tools_file:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="file.send"),),
     config_schema={
@@ -310,7 +310,7 @@ TOOLS_FILE: Final = PluginManifest(
 TOOLS_SHELL: Final = PluginManifest(
     id="tools-shell",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind.builtins.tools_shell:setup",
     capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="shell.exec"),),
     config_schema={
@@ -374,7 +374,7 @@ TOOLS_SHELL: Final = PluginManifest(
 COMMANDS_CORE: Final = PluginManifest(
     id="commands-core",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind.builtins.commands_core:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.COMMAND, name="help"),
@@ -423,7 +423,7 @@ COMMANDS_CORE: Final = PluginManifest(
 CLI_ENTRY: Final = PluginManifest(
     id="cli-entry",
     version="0.1.0",
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind.builtins.cli_entry:setup",
     capabilities=(
         CapabilityDecl(kind=CapabilityKind.CLI_ENTRY, name="stdio"),

@@ -40,6 +40,7 @@ from nucleamind.contracts import (
 )
 from nucleamind.contracts.message import MAX_ATTACHMENTS
 
+from .compaction import SessionCompactionTracker
 from .limits import BudgetLedger, TurnLimits
 
 __all__ = ["Transcript", "TurnState"]
@@ -180,6 +181,8 @@ class TurnState:
     #: `True` 表示答案因 `MAX_TOKENS` 停止被截断（`EDG-304`）。由 orchestrator 在
     #: 处理 `TurnCompleted` 事件时赋值，`_finish` 据此把出站消息改为 `CANCELLED` 状态。
     truncated: bool = False
+    #: 本轮请求压缩与初始 Session 水位的映射；没有模型输入的命令 Turn 不创建。
+    session_compaction: SessionCompactionTracker | None = None
 
     def collect_attachments(self, result: ToolResult) -> None:
         """收下一条工具结果里的附件。

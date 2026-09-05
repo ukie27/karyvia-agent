@@ -1,6 +1,6 @@
 """契约测试基类：可替换性的证明（技术方案 §12.3、`NFR-702`）。
 
-职责：为 8 类能力提供可继承的契约测试基类——实现方（内建或插件）继承对应基类并提供
+职责：为 7 类能力提供可继承的契约测试基类——实现方（内建或插件）继承对应基类并提供
 构造夹具，即获得全部通用用例。
 不负责：测某个具体实现的独有行为、提供夹具本身（那在 `fakes.py`）、启动 Kernel。
 
@@ -34,9 +34,6 @@ from nucleamind.contracts import (
     CancelSignal,
     Channel,
     ChunkKind,
-    CompactionRequest,
-    CompactionResult,
-    ContextCompactor,
     ContextFragment,
     ContextProvider,
     ErrorCategory,
@@ -77,7 +74,6 @@ from .fakes import ManualCancel, make_correlation
 
 __all__ = [
     "ChannelContract",
-    "ContextCompactorContract",
     "ContextProviderContract",
     "MemoryProviderContract",
     "ModelProviderContract",
@@ -261,35 +257,6 @@ class ContextProviderContract(_ContractBase):
             make_correlation(),
             ManualCancel(),
         )
-
-
-class ContextCompactorContract(_ContractBase):
-    """`ContextCompactor` 的通用契约（D51）。
-
-    Kernel 负责判定何时压缩、校验水位并持久化；本契约只冻结插件边界的可替换形状：
-    空会话不是异常，返回值只能是 `CompactionResult` 或 `None`。
-    """
-
-    def make_compactor(self) -> ContextCompactor:
-        self._required("make_compactor")
-        raise AssertionError  # pragma: no cover
-
-    def make_request(self) -> CompactionRequest:
-        return CompactionRequest(
-            snapshot=SessionSnapshot(
-                session_key=SessionKey(channel_id="contract", conversation_id="compactor")
-            ),
-            target_tokens=1_024,
-            correlation=make_correlation(),
-            user_input="继续",
-        )
-
-    async def test_compact_returns_a_result_or_none(self) -> None:
-        result = await self.make_compactor().compact(self.make_request(), ManualCancel())
-        assert result is None or isinstance(result, CompactionResult)
-
-    async def test_an_empty_session_is_not_an_error(self) -> None:
-        await self.make_compactor().compact(self.make_request(), ManualCancel())
 
 
 class TurnContextCompactorContract(_ContractBase):

@@ -26,9 +26,6 @@ from nucleamind.contracts import (
     CommandResult,
     CommandSpec,
     CompactionModel,
-    CompactionRequest,
-    CompactionResult,
-    ContextCompactor,
     ContextFragment,
     ContextProvider,
     Correlation,
@@ -66,12 +63,11 @@ from nucleamind.contracts.tool import SideEffect
 #: 公开表面快照：Protocol -> 成员名集合。新增或删除方法必须同步改这里（`NFR-104`）。
 #: `CancelSignal` / `InstanceView` / `TurnControl` 单列在 `SUPPORT_PROTOCOLS`：它们是
 #: 支撑类型（取消语义、实例只读视图、turn 控制面），**不是可注册能力**——
-#: `CAPABILITY_PROTOCOLS` 必须恒为 11，与 `CapabilityKind` 的 11 个取值一一对应。
+#: `CAPABILITY_PROTOCOLS` 必须恒为 10，与 `CapabilityKind` 的 10 个取值一一对应。
 CAPABILITY_PROTOCOLS: Final[dict[type, frozenset[str]]] = {
     ModelProvider: frozenset({"describe", "complete", "stream"}),
     ToolHandler: frozenset({"execute"}),
     ContextProvider: frozenset({"provide"}),
-    ContextCompactor: frozenset({"compact"}),
     TurnContextCompactor: frozenset({"compact"}),
     SessionStore: frozenset({"load", "append", "compact", "delete", "list_keys"}),
     MemoryProvider: frozenset({"remember", "recall", "forget"}),
@@ -107,12 +103,12 @@ def _members(protocol: type) -> frozenset[str]:
 # --------------------------------------------------------------------------- 快照
 
 
-def test_capability_protocol_count_is_eleven() -> None:
+def test_capability_protocol_count_is_ten() -> None:
     """`SDK-001` 的扩展类型数；它与 `sdk.NucleaAPI` 的注册方法一一对应。
 
-    `D04` 冻结了 8 个，`D05` 补上第 9 个 `CliEntry`，`D51` 新增第 10 个 Compactor。
+    可注册能力与 `CapabilityKind` 保持一一对应。
     """
-    assert len(CAPABILITY_PROTOCOLS) == 11
+    assert len(CAPABILITY_PROTOCOLS) == 10
 
 
 @pytest.mark.parametrize(
@@ -124,9 +120,9 @@ def test_protocol_surface_matches_snapshot(protocol: type, expected: frozenset[s
     assert _members(protocol) == expected
 
 
-def test_total_capability_members_is_twenty_three() -> None:
+def test_total_capability_members_is_twenty_two() -> None:
     """整体规模也进快照：接口数量受控是 `NFR-104` 的原话。"""
-    assert sum(len(names) for names in CAPABILITY_PROTOCOLS.values()) == 23
+    assert sum(len(names) for names in CAPABILITY_PROTOCOLS.values()) == 22
 
 
 @pytest.mark.parametrize(
@@ -224,13 +220,6 @@ class FakeContextProvider:
         self, snapshot: SessionSnapshot, correlation: Correlation, cancel: CancelSignal
     ) -> tuple[ContextFragment, ...]:
         return ()
-
-
-class FakeContextCompactor:
-    async def compact(
-        self, request: CompactionRequest, cancel: CancelSignal
-    ) -> CompactionResult | None:
-        return None
 
 
 class FakeCompactionModel:
@@ -357,7 +346,6 @@ FAKES: Final[list[tuple[type, object]]] = [
     (ModelProvider, FakeModelProvider()),
     (ToolHandler, FakeToolHandler()),
     (ContextProvider, FakeContextProvider()),
-    (ContextCompactor, FakeContextCompactor()),
     (CompactionModel, FakeCompactionModel()),
     (TurnContextCompactor, FakeTurnContextCompactor()),
     (SessionStore, FakeSessionStore()),

@@ -21,8 +21,8 @@
 4. **先渲染再计量**。`ContextFragment.estimated_tokens` 是插件提供的提示值，不再作为
    Kernel 的预算真相；最终消息和完整请求都使用 `request_size.py` 的同一把尺。
 
-本模块不做确定性硬裁剪。超预算请求统一进入持久化压缩或 Turn 临时压缩；插件失败直接
-终止 Turn，不存在回退到旧裁剪结果的第二条路径。
+本模块不做确定性硬裁剪。超预算请求统一进入请求级压缩；其中能精确映射到 Session
+连续前缀的摘要在 Turn 收口时持久化，其余摘要只服务当前 Turn。
 """
 
 from __future__ import annotations
@@ -67,16 +67,18 @@ __all__ = [
     "AssembledContext",
     "ContextProviderBinding",
     "DroppedFragment",
+    "ReplayedMessage",
     "RegisteredContextProvider",
     "assemble",
     "context_providers_from",
     "estimate_tokens",
-    "reassemble_history",
+    "replay_history",
     "replay_messages",
 ]
 
 #: 单个 Context Provider 的独立超时（§10.2 第 7 步 b）。
 DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS: Final = 3_000
+
 
 @dataclass(frozen=True, slots=True)
 class RegisteredContextProvider:
@@ -116,9 +118,19 @@ class AssembledContext:
     """一次组装的产物。"""
 
     messages: tuple[ModelMessage, ...]
+    session_history: tuple[ReplayedMessage, ...]
     fragments: tuple[ContextFragment, ...]
     dropped: tuple[DroppedFragment, ...]
     estimated_tokens: int
+
+
+@dataclass(frozen=True, slots=True)
+class ReplayedMessage:
+    """一条进入模型的 Session 消息及其在持久化记录中的结束水位。"""
+
+    message: ModelMessage
+    through: int
+
 
 def context_providers_from(registry: CapabilityRegistry) -> tuple[ContextProviderBinding, ...]:
     """从已冻结的 registry 取出全部生效的 Context Provider，按 `(priority, provider, name)` 排序。
@@ -146,7 +158,7 @@ def context_providers_from(registry: CapabilityRegistry) -> tuple[ContextProvide
     return tuple(sorted(bindings, key=lambda item: item.sort_key))
 
 
-def replay_messages(snapshot: SessionSnapshot) -> tuple[ModelMessage, ...]:
+def replay_history(snapshot: SessionSnapshot) -> tuple[ReplayedMessage, ...]:
     """把会话历史投影成模型消息（`EDG-305`：投影可以变，持久化格式不变）。
 
     **只取 user / assistant / system 且正文非空的记录**。`role=TOOL` 的记录被跳过：
@@ -154,17 +166,27 @@ def replay_messages(snapshot: SessionSnapshot) -> tuple[ModelMessage, ...]:
     会让下一次请求在 Provider 侧直接被拒。工具往返仍然留在会话文件里（`/session` 与诊断
     要看得到），只是不参与重放。
     """
-    messages: list[ModelMessage] = []
-    for record in snapshot.live_messages:
+    messages: list[ReplayedMessage] = []
+    for index, record in enumerate(
+        snapshot.messages[snapshot.compacted_through :], start=snapshot.compacted_through
+    ):
         if record.role is Role.TOOL or (not record.content and not record.attachments):
             continue
         messages.append(
-            ModelMessage(
-                role=record.role,
-                content=render_message_content(record.content, record.attachments),
+            ReplayedMessage(
+                message=ModelMessage(
+                    role=record.role,
+                    content=render_message_content(record.content, record.attachments),
+                ),
+                through=index + 1,
             )
         )
     return tuple(messages)
+
+
+def replay_messages(snapshot: SessionSnapshot) -> tuple[ModelMessage, ...]:
+    """返回 Session 的模型消息投影；水位映射由 `replay_history()` 保留。"""
+    return tuple(item.message for item in replay_history(snapshot))
 
 
 async def assemble(
@@ -215,31 +237,16 @@ async def assemble(
         else:
             kept.append(fragment)
 
-    messages = _render(kept, replay_messages(snapshot), user_input)
+    history = replay_history(snapshot)
+    messages = _render(kept, tuple(item.message for item in history), user_input)
     meter = accounting or TokenAccounting()
     return AssembledContext(
         messages=messages,
+        session_history=history,
         fragments=tuple(kept),
         dropped=tuple(dropped),
         estimated_tokens=meter.estimate_messages(messages),
     )
-
-
-def reassemble_history(
-    context: AssembledContext,
-    snapshot: SessionSnapshot,
-    user_input: str,
-    accounting: TokenAccounting,
-) -> AssembledContext:
-    """保留本轮已经取得的片段，只用压缩后的 Session 快照替换历史。"""
-    messages = _render(context.fragments, replay_messages(snapshot), user_input)
-    return AssembledContext(
-        messages=messages,
-        fragments=context.fragments,
-        dropped=context.dropped,
-        estimated_tokens=accounting.estimate_messages(messages),
-    )
-
 
 # --------------------------------------------------------------------------- a / b
 

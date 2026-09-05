@@ -41,7 +41,7 @@ MANIFEST = PluginManifest(
     version="0.1.0",
     # 你支持的 SDK 区间。宿主落在区间外时拒绝加载并报 PLUGIN_SDK_INCOMPATIBLE，
     # 不带病运行。
-    sdk_range=">=4.0.0,<5.0.0",
+    sdk_range=">=5.0.0,<6.0.0",
     setup="nucleamind_plugin_my_plugin:setup",
     # 有约束力的全集：setup 里注册的每一项都必须在这里声明，反之亦然。
     capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="my.tool"),),
@@ -89,21 +89,17 @@ def setup(api: NucleaAPI) -> None:
     )
 ```
 
-`NucleaAPI` 恰好有 11 个注册方法，与 11 类能力一一对应：`register_tool` /
+`NucleaAPI` 恰好有 10 个注册方法，与 10 类能力一一对应：`register_tool` /
 `register_command` / `register_context_provider` / `register_model_provider` /
 `register_channel` / `register_memory_provider` / `register_session_store` /
-`register_context_compactor` / `register_turn_compactor` / `register_cli_entry` / `on`（Hook）。
+`register_turn_compactor` / `register_cli_entry` / `on`（Hook）。
 
-`register_context_compactor(name, compactor)` 注册的是持久化上下文压缩策略。安装或注册不会
-自动生效，用户还必须在 `context.compactor` 显式选择同名能力。`ContextCompactor.compact()`
-只返回摘要正文与 `through` 水位；何时触发、结果校验、Session 写入、重载和故障回退都由
-Kernel 负责。
-
-`register_turn_compactor(name, compactor)` 注册的是模型—工具迭代期间的临时压缩策略。
+`register_turn_compactor(name, compactor)` 注册的是模型请求边界上的统一压缩策略。
 Runtime 总是选中一个 `TURN_COMPACTOR`，默认为内建 `basic`；用户可通过
 `context.turn_compactor` 选择第三方实现。`TurnContextCompactor.compact()` 收到不可拆分的
-`TurnContextUnit` 序列，返回要替换的连续前缀长度与非空摘要。它不得改写 Session、
-Transcript 或工具副作；非法结果和运行失败都会终止当前 Turn，不会静默改用内建策略。
+`TurnContextUnit` 序列，返回要替换的连续前缀长度与非空摘要。摘要立即服务当前请求；Kernel
+只在其精确覆盖初始 Session 连续前缀时，于 Turn 收口时持久化。插件不得改写 Session、
+Transcript 或工具副作用；非法结果和运行失败都会终止当前 Turn，不会静默改用内建策略。
 
 如果策略需要模型摘要，使用 `compact()` 当次收到的 `CompactionModel`，不要自行查找
 Provider。这个窄门面绑定当前实例已选模型、Turn correlation、取消和剩余时间，
@@ -303,7 +299,7 @@ class TestMyStore(SessionStoreContract):
 ```
 
 基类是 `ModelProviderContract` / `SessionStoreContract` / `ToolContract` /
-`ContextProviderContract` / `ContextCompactorContract` / `TurnContextCompactorContract` / `MemoryProviderContract` /
+`ContextProviderContract` / `TurnContextCompactorContract` / `MemoryProviderContract` /
 `ChannelContract`。它们**不 import pytest**，所以你用什么 runner 都行；子类名必须以
 `Test` 开头，否则 pytest 不收集。
 

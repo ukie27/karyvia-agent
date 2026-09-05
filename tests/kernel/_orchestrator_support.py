@@ -50,7 +50,6 @@ from nucleamind.kernel.routing import (
     SessionScheduler,
 )
 from nucleamind.kernel.turn import (
-    CompactionPolicy,
     ContextProviderBinding,
     OrchestratorDeps,
     RetryPolicy,
@@ -133,6 +132,7 @@ class FakeSessionStore:
         self.initial = list(initial)
         self.appends: list[tuple[SessionKey, tuple[SessionMessage, ...]]] = []
         self.compactions: list[tuple[SessionKey, int, SessionMessage]] = []
+        self.operations: list[str] = []
         self.compacted_through: dict[str, int] = {}
 
     async def load(self, key: SessionKey) -> SessionSnapshot:
@@ -144,11 +144,13 @@ class FakeSessionStore:
         )
 
     async def append(self, key: SessionKey, messages: Sequence[SessionMessage]) -> None:
+        self.operations.append("append")
         self.appends.append((key, tuple(messages)))
         bucket = self.data.setdefault(key.storage_id(), list(self.initial))
         bucket.extend(messages)
 
     async def compact(self, key: SessionKey, through: int, summary: SessionMessage) -> None:
+        self.operations.append("compact")
         self.compactions.append((key, through, summary))
         bucket = self.data.setdefault(key.storage_id(), list(self.initial))
         bucket.insert(through, summary)
@@ -334,7 +336,7 @@ def build(
     store: FakeSessionStore | None = None,
     commands: dict[str, RegisteredCommand] | None = None,
     context_providers: Sequence[ContextProviderBinding] = (),
-    compactor: CompactionPolicy | None = None,
+    turn_compactor: TurnCompactionPolicy | None = None,
     limits: TurnLimits | None = None,
     retry: RetryPolicy | None = None,
     stream: bool = False,
@@ -366,12 +368,10 @@ def build(
         # 它们变成 `模型脚本已耗尽`。要验重试的用例自己传一个策略（`D48`）。
         retry=retry or RetryPolicy(max_attempts=1),
         model_id="fake-model",
-        turn_compactor=TurnCompactionPolicy(
-            StaticTurnContextCompactor(), "basic", Builtin()
-        ),
+        turn_compactor=turn_compactor
+        or TurnCompactionPolicy(StaticTurnContextCompactor(), "basic", Builtin()),
         tool_specs=tuple(tool_specs),  # type: ignore[arg-type]
         context_providers=tuple(context_providers),
-        compactor=compactor,
         stream=stream,
         deliver=deliver,
         clock=clock or (lambda: datetime(2026, 8, 12, tzinfo=UTC)),
