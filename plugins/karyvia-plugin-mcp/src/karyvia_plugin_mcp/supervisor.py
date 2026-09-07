@@ -8,9 +8,8 @@
 
 - `mcp` 的三种传输都建在 anyio 的任务组上，而**任务组必须在进入它的那个任务里退出**。
   在 `setup()` 里 `enter_async_context`、再由停止路径去 `aclose()`，会在关闭时炸出
-  `RuntimeError: Attempted to exit cancel scope in a different task`。参考实现
-  （`references/nanobot/.../mcp.py`）为此写了一个 `_OwnedMCPConnection`，注释就一句：
-  「Close an MCP transport from the task that originally opened it」。
+  `RuntimeError: Attempted to exit cancel scope in a different task`。因此连接必须由
+  打开 transport 的同一个任务关闭。
 - 本插件没有第二条清理通道：manifest **没有** teardown 字段，`EDG-105` 的取消痕迹清理
   只作用在 `ctx.spawn_task()` 派生的任务上（`runtime/plugin_context.py::shutdown`）。
 

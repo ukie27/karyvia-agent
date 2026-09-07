@@ -5,7 +5,7 @@
 不负责：决定什么时候召回（`kernel/turn/`）、把片段拼进模型消息
 （`kernel/turn/context_builder.py`）、决定记什么（模型与用户）。
 
-**它取代的是 `references/nanobot/nanobot/agent/memory.py`**，但不是移植：
+**当前实现只管理结构化的单条记忆**：
 
 - 旧实现是 `MemoryStore` + `Consolidator` + `Dream` + `GitStore` 四层，1221 行缠在一个
   文件里，且直接读写 `SOUL.md` / `USER.md` / `memory/MEMORY.md` 三份固定的 Markdown。

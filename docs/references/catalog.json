@@ -1,31 +1,5 @@
 {
   "projects": {
-    "nanobot": {
-      "path": "references/nanobot",
-      "role": "原始 nanobot 行为基线和迁移参照",
-      "languages": ["python", "typescript"],
-      "topics": {
-        "agent_runtime": [
-          "nanobot/agent/loop.py",
-          "nanobot/agent/runner.py"
-        ],
-        "providers": [
-          "nanobot/providers/base.py",
-          "nanobot/providers/factory.py",
-          "nanobot/providers/registry.py"
-        ],
-        "channels": ["nanobot/channels/"],
-        "tools": ["nanobot/agent/tools/"],
-        "memory_and_session": [
-          "nanobot/agent/memory.py",
-          "nanobot/session/"
-        ],
-        "configuration": [
-          "nanobot/config/schema.py",
-          "nanobot/config/loader.py"
-        ]
-      }
-    },
     "openclaw": {
       "path": "references/openclaw",
       "role": "插件 SDK、宿主边界和外部插件生态兼容研究",

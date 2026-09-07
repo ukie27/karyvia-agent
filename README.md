@@ -1,11 +1,7 @@
 # Karyvia Agent
 
-Karyvia Agent is an independent Agent Kernel project derived from
-[HKUDS/nanobot](https://github.com/HKUDS/nanobot) under the MIT license.
-
-The goal is a small, stable kernel whose optional capabilities are supplied by
-plugins. `D35` removed the last of the inherited nanobot implementation, so the
-repository now contains only the new architecture.
+Karyvia Agent is a small, stable Agent Kernel whose optional capabilities are
+supplied by plugins.
 
 ## Current Status
 
@@ -15,14 +11,10 @@ CLI. Capability plugins are delivered too — seven official plugins ship in
 [`plugins/`](./plugins/README.md), covering an extra model provider, three
 channels, web/MCP tools, long-term memory, and cron automation.
 
-- The Python package is `karyvia`, the distribution is `karyvia`, and the
-  only CLI command is `karyvia`. No `nanobot` alias is kept.
+- The Python package, distribution, and CLI command are all named `karyvia`.
 - Named instance data lives in `~/.karyvia/instances/<instance>/`; configuration is
   snake_case and validated against a generated JSON Schema.
-- The project is developed independently and does not submit changes back to the
-  upstream nanobot repository.
-- Karyvia is not currently published to PyPI. Installing `nanobot-ai` from
-  PyPI installs the upstream project, not this repository.
+- Karyvia is not currently published to PyPI; install it from a local checkout.
 
 ## Architecture
 
@@ -109,7 +101,6 @@ Also:
 - [Documentation index](./docs/README.md)
 - [Current project status](./docs/project/README.md)
 - [Writing a plugin](./docs/plugin-development.md)
-- [Development background](./docs/project/开发背景.md)
 - [Architecture map](./docs/project/architecture-map.md)
 - [Evolution boundaries](./docs/project/evolution-boundaries.md)
 - [Common change guide](./docs/project/change-guide.md)
@@ -118,8 +109,6 @@ Also:
 - [Security boundaries](./.agent/security.md)
 - [Common implementation gotchas](./.agent/gotchas.md)
 
-## Attribution
+## License
 
-Karyvia is based on nanobot and retains the upstream MIT license and required
-third-party notices. See [LICENSE](./LICENSE) and
-[THIRD_PARTY_NOTICES.md](./THIRD_PARTY_NOTICES.md).
+Karyvia is distributed under the [MIT license](./LICENSE).

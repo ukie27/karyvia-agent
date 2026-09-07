@@ -139,7 +139,7 @@ karyvia plugins enable memory
 
 ## 刻意不做的事
 
-它取代的是 `references/nanobot/nanobot/agent/memory.py`，但**不是移植**：
+当前实现刻意保持以下范围：
 
 - **Dream（定时让 LLM 读历史、增量改写长期记忆）不做。** 它需要两样今天没有的东西：
   「插件能发起一次模型调用」——`PluginContext` 没有这条通道；以及定时触发——那是 `D40`。

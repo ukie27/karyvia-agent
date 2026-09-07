@@ -30,7 +30,7 @@ docker build -f deploy/Dockerfile \
 
 # 跑。实例目录挂进来，凭据走环境变量。
 docker run --rm -it \
-  -v ~/.karyvia:/home/nanobot/.karyvia \
+  -v ~/.karyvia:/home/karyvia/.karyvia \
   -e OPENAI_API_KEY \
   -p 127.0.0.1:8760:8760 \
   karyvia serve --host 0.0.0.0
@@ -46,7 +46,7 @@ docker run --rm -it \
   （见下面「监听端口」一节）。
 - **宿主侧只映射到 `127.0.0.1`**，除非你确实要把它暴露到网络上。
 - 入口脚本 `deploy/entrypoint.sh` 在以 root 启动时会 `chown` 数据目录并用 `setpriv`
-  降到非 root 用户 `nanobot`（UID 1000）；**降权失败就拒绝运行**，不会以 root 跑下去。
+  降到非 root 用户 `karyvia`（UID 1000）；**降权失败就拒绝运行**，不会以 root 跑下去。
   数据目录属主不对时它会打印三种修法（`chown` / `--user` / `--userns=keep-id`）并退出。
 
 ## docker compose

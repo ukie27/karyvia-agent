@@ -112,7 +112,7 @@ Windows 上用命名时区需要 `tzdata`（本包已按平台声明依赖）。
 
 - **heartbeat**（参考实现的 `HEARTBEAT.md`）：它是「定时 + 一段固定提示词 + 只在有结论时
   才说话」，用一条普通任务加一句「没有要紧的就回一个字：无」就能表达。
-- **local trigger**（`nanobot trigger <id> "..."`）：它要一个进程外的入队通道与至少一次
+- **local trigger**：它要一个进程外的入队通道与至少一次
   投递语义，那是另一件事，不该塞进本插件。
 - **第三方依赖**：不用 `croniter`（表达式自己解析）、不用 `filelock`
   （写盘走「临时文件 → `fsync` → `os.replace`」）。唯一的例外是 Windows 上的 `tzdata`。

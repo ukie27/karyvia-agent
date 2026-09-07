@@ -5,7 +5,7 @@
 不负责：MCP 的 resources / prompts / sampling（见下面「不做的事」）、
 执行 turn、决定什么时候调这些工具。
 
-**它取代的是 `references/nanobot/nanobot/agent/tools/mcp.py`**（1573 行），但不是移植：
+**当前范围只包含 MCP tools**：
 
 - 旧实现同时桥接 **tools / resources / prompts** 三种远端对象（三个 wrapper 类）。
   这里只做 tools：`resources` 与 `prompts` 在新层没有对应的能力种类，把它们也伪装成工具

@@ -1,16 +1,16 @@
 #!/bin/sh
-# `D31` 删掉了 `karyvia legacy`，容器改跑新 Kernel，实例目录随之换成 `~/.karyvia/`。
+# 容器数据目录与宿主机统一使用 `~/.karyvia/`。
 dir="$HOME/.karyvia"
 
 # Drop privileges whenever the container starts as root. Mounted data
 # directories may be root-owned, and a plain `docker run` defaults to root.
-# Chown the data dir so the non-root user can write it, then re-exec as nanobot.
+# Chown the data dir so the non-root user can write it, then re-exec as karyvia.
 # Fail closed if privilege dropping is unavailable.
 if [ "$(id -u)" = "0" ]; then
-    chown -R nanobot:nanobot "$dir" 2>/dev/null || echo "[entrypoint] warning: chown $dir failed"
-    if setpriv --reuid=nanobot --regid=nanobot --init-groups true 2>/dev/null; then
-        echo "[entrypoint] dropping privileges to nanobot via setpriv"
-        exec setpriv --reuid=nanobot --regid=nanobot --init-groups karyvia "$@"
+    chown -R karyvia:karyvia "$dir" 2>/dev/null || echo "[entrypoint] warning: chown $dir failed"
+    if setpriv --reuid=karyvia --regid=karyvia --init-groups true 2>/dev/null; then
+        echo "[entrypoint] dropping privileges to karyvia via setpriv"
+        exec setpriv --reuid=karyvia --regid=karyvia --init-groups karyvia "$@"
     fi
     echo "[entrypoint] error: started as root but setpriv privilege drop failed — refusing to run as root" >&2
     exit 1

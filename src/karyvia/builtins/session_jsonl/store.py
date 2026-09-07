@@ -81,7 +81,7 @@ def _fsync_dir(directory: Path) -> None:
     """让 `os.replace` 的结果落盘。
 
     Windows 上打开目录会抛 `PermissionError`（NTFS 同步写元数据，本就不需要这一步），
-    因此吞掉它而不是分平台写两条路径——这与 nanobot `agent/memory.py` 的做法一致。
+    因此吞掉它而不是分平台写两条路径。
     """
     with suppress(OSError):
         fd = os.open(str(directory), os.O_RDONLY)

@@ -9,8 +9,7 @@
 没有任何机制能让实例在没人说话的时候自己开一条 turn，提醒 / 每日汇总 / CI 跟进这类工作
 因此做不出来。
 
-**它取代的是 `references/nanobot/nanobot/cron/`**（830 行的 `service.py` + 294 行的
-`agent/tools/cron.py`），但不是移植：
+**调度器以 Channel 能力实现**：
 
 - 旧实现是 gateway 里的一个常驻服务，靠 `on_job` 回调回到 agent；这里**调度器就是一条
   `CHANNEL`**，`receive()` 本身是调度循环（理由见 `channel.py`）。因此**既不需要
@@ -23,7 +22,7 @@
   `origin_channel` / `origin_chat_id` 六个投递字段，外加一整套 legacy 兼容分支。
   这里只有 `Origin(channel_id, conversation_id)`：出站按 `message.channel_id` 路由是
   Kernel 既有的行为（`runtime/bootstrap.py` 的 `deliver`），插件不需要自己认路。
-- 旧实现的 heartbeat（`HEARTBEAT.md`）与 local trigger（`nanobot trigger <id>`）**没有做**。
+- heartbeat（`HEARTBEAT.md`）与 local trigger **没有做**。
   前者是「定时 + 一段固定提示词 + 只在有结论时才说话」，用一条普通任务就能表达；
   后者要一个进程外的入队通道与至少一次投递语义，那是另一件事，不该塞进本插件。
 

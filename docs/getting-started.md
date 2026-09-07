@@ -8,8 +8,7 @@
 
 ## 1. 安装
 
-需要 Python 3.11 或更新。**Karyvia 没有发布到 PyPI**——从 PyPI 装 `nanobot-ai` 装到的
-是上游项目，不是本仓库。从本地检出装：
+需要 Python 3.11 或更新。Karyvia 尚未发布到 PyPI，请从本地检出安装：
 
 ```bash
 git clone <本仓库地址> Karyvia

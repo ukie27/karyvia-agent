@@ -7,7 +7,7 @@ x-common-config: &common-config
       # 装进镜像还不等于启用——启用要写进 config.json 的 plugins.enabled。
       KARYVIA_PLUGINS: ${KARYVIA_PLUGINS:-openai-api}
   volumes:
-    - ~/.karyvia:/home/nanobot/.karyvia
+    - ~/.karyvia:/home/karyvia/.karyvia
   cap_drop:
     - ALL
 

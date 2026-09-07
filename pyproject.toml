@@ -18,7 +18,6 @@ classifiers = [
 ]
 license-files = [
     "LICENSE",
-    "THIRD_PARTY_NOTICES.md",
 ]
 
 dependencies = [
@@ -50,7 +49,7 @@ dev = [
 ]
 
 [project.scripts]
-# `karyvia` is the only command; no `nanobot` alias is kept (technical design 4.5).
+# Karyvia exposes one process entry point; subcommands are dispatched by runtime.cli.
 karyvia = "karyvia.runtime.cli.main:app"
 
 # Primary plugin discovery source (technical design 7.1). Official and
@@ -78,7 +77,6 @@ include = [
     "src/karyvia/",
     "README.md",
     "LICENSE",
-    "THIRD_PARTY_NOTICES.md",
     "pyproject.toml",
 ]
 

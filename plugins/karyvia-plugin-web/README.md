@@ -108,7 +108,7 @@ README 里当时如实这么写着。
 完整的流式接口（把响应生命周期交给调用方）今天没有消费者——两个模型 provider 消费 SSE
 但走 raw httpx，`openai-api` 产出 SSE 用的是 aiohttp——因此刻意没做。
 
-## 与 `references/nanobot` 那份实现的差异
+## 当前设计取舍
 
 - 13 个写死的后端 → 4 个 + `custom`（见上）。
 - **凭据缺失不静默回退到 DuckDuckGo**。旧实现会在没有 key 时换一个后端搜，结果看起来一切

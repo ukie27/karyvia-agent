@@ -53,7 +53,7 @@ INSTANCE_NAME_ENV = "KARYVIA_INSTANCE"
 #: Karyvia 的数据根。与 ``HOME`` 不同，它直接指向 ``.karyvia`` 这一层。
 KARYVIA_HOME_ENV = "KARYVIA_HOME"
 
-#: 家目录下的容器目录名（`legacy/` 用的是 `.nanobot`，新层不双读，见 AGENTS.md）。
+#: 家目录下的 Karyvia 数据目录名。
 HOME_DIRNAME = ".karyvia"
 
 #: 实例名长度上限。远小于 `contracts` 的通用标识上限：实例名会成为一段**路径分量**，

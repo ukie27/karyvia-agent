@@ -1,9 +1,7 @@
 # Karyvia Agent Technical Documentation
 
-本目录只放**当前实现**的文档。`D35` 删掉 `legacy/` 的同一个 PR 里，21 篇描述被继承的
-nanobot 实现的文档一并删除——它们教人跑的是 `nanobot onboard`、`nanobot webui` 这类
-已经不存在的命令，留着比没有更糟。需要确认旧行为时读 `references/nanobot/`
-（见 [`references/README.md`](./references/README.md)）。
+本目录只放**当前实现**的用户文档、持久化契约和开发规范。
+已经完成的阶段计划与迁移说明不再作为活跃文档；精确过程由 Git 保留。
 
 新层的**用户**文档（安装、配置字段、CLI 参考、部署）在 `D46` 补齐，见下表。它们与代码
 之间有守卫：`tests/e2e/test_user_docs.py` 把配置字段表与 `SECTION_SPECS`、CLI 子命令清单
@@ -17,7 +15,6 @@ nanobot 实现的文档一并删除——它们教人跑的是 `nanobot onboard`
 | 查配置字段与优先级 | [`configuration.md`](./configuration.md) |
 | 查 `karyvia` 的参数与退出码 | [`cli.md`](./cli.md) |
 | 部署成常驻服务 | [`deployment.md`](./deployment.md) |
-| 了解项目方向 | [`project/开发背景.md`](./project/开发背景.md) |
 | 遵循仓库开发规则 | [`../AGENTS.md`](../AGENTS.md) |
 | 接手当前开发工作 | [`project/README.md`](./project/README.md) |
 | 查层次、主链路与代码所有权 | [`project/architecture-map.md`](./project/architecture-map.md) |
@@ -45,10 +42,8 @@ nanobot 实现的文档一并删除——它们教人跑的是 `nanobot onboard`
 
 ## 文档规则
 
-- 不把 Karyvia 用户指向上游 nanobot 的安装器、PyPI 包、issue、PR、release
-  或社区渠道。
-- 上游归属记在 `LICENSE`、`THIRD_PARTY_NOTICES.md` 或明确的历史说明里，
-  不作为本项目的当前归属。
+- Karyvia 用户文档只指向本项目当前可用的安装、发布和支持渠道。
+- 法律归属只记在 `LICENSE` 或当前产物确实需要的第三方声明中。
 - 一条能力以插件形态落地时，在同一个 PR 里写它的文档；**不要**先留一篇描述
   「将来会怎样」的占位文档。
 - 所有权边界移进或移出 Kernel 时更新架构说明（当前在

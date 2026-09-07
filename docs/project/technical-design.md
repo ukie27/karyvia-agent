@@ -1,8 +1,8 @@
 # Karyvia 技术方案
 
-- 状态：评审后修订
-- 更新时间：2026-08-10
-- 文档阶段：整体技术方案（架构 + 模块划分 + 执行流程 + 工程规范）
+- 状态：当前有效
+- 更新时间：2026-09-07
+- 文档性质：架构、模块划分、执行流程与工程规范
 - 上游依据：[`requirements-analysis.md`](./requirements-analysis.md)
 - 适用范围：Kernel、Plugin Runtime、Plugin SDK、内建默认能力、生态兼容层
 
@@ -20,9 +20,8 @@
 
 不在本文档范围：具体插件的功能设计、WebUI 前端方案。
 
-**Karyvia 是对 nanobot 的改造，不是它的兼容发行版。** 新架构的命名、目录、
-配置格式、环境变量与 CLI 接口冲突时一律以 Karyvia 为准，不保留别名、不双读、
-不写长期迁移垫片；`legacy/` 已随 `D35` 删除（§4.3）。
+**Karyvia 的公开命名、目录、配置格式、环境变量与 CLI 接口只有一套。**
+不保留旧名别名、不双读、不写长期迁移垫片。
 
 ## 2. 设计目标与硬约束
 
@@ -45,7 +44,7 @@
 
 - **两层循环**：`packages/agent/src/agent-loop.ts` 是不认识具体工具、渠道和存储的最小循环，
   上层 harness 负责 session、context、压缩和事件。Karyvia 对应 `kernel/turn/engine.py`
-  与 `kernel/turn/orchestrator.py`。这是解决 nanobot `agent/loop.py` 2296 行的直接手段。
+  与 `kernel/turn/orchestrator.py`，使纯事件循环与 Session/Context 编排分层。
 - **回调参数化的循环**：`AgentLoopConfig` 把 context 转换、steering、工具前后拦截都做成
   显式回调，并在文档里写明「must not throw，返回安全兜底值」。Karyvia 把这条契约
   写进 Hook 定义和 Host API docstring。
@@ -71,20 +70,11 @@
 不采用：OpenClaw 的宿主体量（`src/plugin-sdk/` 数百个文件）。那是「SDK 即宿主内部」的
 反面教材，Karyvia 的 SDK 表面必须可枚举。
 
-**nanobot（迁移基线）**
-
-复用：`agent/tools/base.py` 的 Schema/Tool 校验、`agent/memory.py` 的原子写、
-路径守卫与 SSRF 防护、`bus/` 的消息与事件形态、`config/schema.py` 的 Pydantic 风格。
-这些是已验证的实现细节，重构时保留行为、更换归属。
-
 ### 2.3 不可违反的工程约束
 
 - Python 3.11+，全 asyncio，行宽 100，`ruff check`（不跑 `ruff format`）。
 - `basedpyright` 严格模式必须通过，动态数据在边界一次性解析成具体类型。
-- 仓库重构（`src/` 布局、包重命名 `nanobot` → `karyvia`、遗留代码隔离）
-  作为**第一个里程碑 M-A** 一次性完成。它允许且仅允许 §4.5 明列的包名、发行名和
-  CLI 名称变化；不得同时改变 Agent 业务逻辑、遗留配置格式、遗留环境变量或遗留状态目录。
-  验收标准是除明列命名变化外，现有行为基线保持一致。理由见 §13 M-A。
+- 仓库使用 `src/` 布局；只有 `karyvia` 包、发行名和 CLI 命名。
 - Windows 与 Linux 行为契约一致，路径与 shell 差异在能力实现内部消化。
 
 ## 3. 总体架构
@@ -143,8 +133,7 @@
 
 ### 4.1 仓库顶层
 
-现状是扁平布局：包目录 `nanobot/` 与 `docs/`、`tests/`、`scripts/`、`webui/` 平级，
-包内 23 个子目录一层排开，看不出哪些是核心、哪些是可选能力。目标布局：
+当前仓库按 Kernel 机制、能力实现、插件发行和工程资源分层：
 
 ```text
 Karyvia/
@@ -300,29 +289,16 @@ src/karyvia/
 | `runtime/cli/` | `karyvia` **可执行程序**：解析 argv、组装实例 | 不是会话内的斜杠命令 |
 
 `sdk/` 这个最醒目的名字给插件 SDK——它才是本项目对外的主要接口面。
-`embed/` 是重写的新门面，不是从旧 `nanobot/sdk/` 移植：旧实现随 `legacy/` 一起删除。
-它只包装 `runtime/instance.py`，在 `D23` runtime 组装完成后落地，在此之前只是空骨架。
+`embed/` 只包装 `runtime/instance.py`，保持为不复制 Runtime 机制的薄门面。
 
 `karyvia plugins enable` 与会话内 `/plugins` 是两个刻意分开的surface：前者是离线配置操作
 （改配置文件，下次启动生效），后者是运行期只读查询。两者共用
 `kernel/observability/diagnostics.py` 的同一份查询实现，不各写一套。
 
-### 4.3 遗留隔离区（`D35` 已清空并删除）
+### 4.3 单一实现原则
 
-`legacy/` 曾承接现有 nanobot 的约 13 万行 Python。它的四条规则（只出不进、依赖单向、
-进度可度量、迁移即删除）已经跑完全程：`D31` 删掉遗留 Agent 路径，`D32`–`D34` 各迁走一项
-能力，`D35` 删掉剩下的全部 218 文件 / 73773 行。
-
-**迁移期设施随之退休**：`R6` 守卫（新层禁止 import legacy/）、`scripts/legacy_debt.py`
-与债务基线、`tests/legacy/` 全部删除。守卫现在守的是 `R1`–`R5`。
-
-`D35` 之后的迁移参考是 `references/nanobot/`——本地只读的上游副本，被 Git 忽略，
-不在包里也 import 不到。它比原来的 `legacy/` 更全（`D31` 从 `legacy/` 删掉的
-`agent/tools/` 与 memory 在那里还在），代价是未改名、没有通过的测试。
-因此复用实现时**只能读不能搬**：把代码写到新家并补测试。
-
-**不要再开第二个隔离区。** 「先放着以后再清」这件事本项目已经做过一次，成本是
-四个模块的迁移周期加一套只为度量它而存在的 CI 设施。
+仓库不保留并行的旧实现区。能力应直接放在所属 Builtin 或独立插件中，
+共用机制放在 Kernel；不为阶段性搬运建立长期兼容路径。
 
 ### 4.4 测试目录镜像分层
 
@@ -346,25 +322,15 @@ tests/                 # 是一个包（__init__.py），否则 builtins/ 与标
 
 ### 4.5 命名与包标识
 
-Karyvia 是改造，不是 nanobot 的兼容发行版。新架构的命名冲突一律以 Karyvia
-为准，**不保留旧名、不做双读、不写长期迁移垫片**。
-
-| 项 | 现状 | 目标 | 旧名处置 |
-| --- | --- | --- | --- |
-| Python 包 | `nanobot` | `karyvia` | 删除 |
-| 发行名 | `nanobot-ai` | `karyvia` | 删除 |
-| CLI 命令 | `nanobot` | `karyvia` | 删除，不留别名 |
-| 环境变量前缀 | `NANOBOT_` | 只用 `KARYVIA_` | 删除（`D35`） |
-| 实例目录 | `~/.nanobot/` | `~/.karyvia/instances/<instance>/` | 删除（`D35`） |
-| 配置键风格 | camelCase 别名 | 只用 snake_case | 删除（`D35`） |
-| 插件 entry point 组 | 无 | `karyvia.plugins` | — |
+Karyvia 的命名表面是单一且规范的：Python 包、发行名和 CLI 都是 `karyvia`，
+环境变量使用 `KARYVIA_` 前缀，数据位于 `~/.karyvia/instances/<instance>/`，
+配置键使用 snake_case，插件 entry point 组是 `karyvia.plugins`。
 
 不写长期兼容垫片的理由：每个垫片都要长期维护、要双份测试，而它们保护的是一个
 **本项目不再承诺支持的产品**。旧实例目录里的数据仍在磁盘上，需要时手工拷贝配置即可；
 这是一次性的人工动作，不值得让新 Kernel 长期承担双读逻辑。
 
-`D35` 删掉 `legacy/` 之后仓库里已经没有第二套命名了——`NANOBOT_*` / `~/.nanobot/` /
-camelCase 只存在于 `references/nanobot/` 那份只读上游副本里。
+仓库不接受第二套别名或兼容性双读。
 
 ### 4.6 模块头部约定
 
@@ -627,8 +593,7 @@ bootstrap」的字面表述有出入，取其意不取其形）：`R2` 只允许
 
 ### 6.2 Turn 执行：两层拆分
 
-这是本方案对 nanobot `agent/loop.py`（2296 行）+ `agent/runner.py`（1670 行）的核心整改，
-直接借鉴 Pi 的 `agent-loop` / `harness` 分层。
+这里采用 Pi 的 `agent-loop` / `harness` 分层，把纯工具调用循环与上层编排分开。
 
 **第一层 `kernel/turn/engine.py`（目标 ≤ 400 行）**
 
@@ -725,9 +690,8 @@ engine 的不变量（写进 docstring 并由测试守护）：
 - **模型墙钟超时的终态是 `TurnCancelled(TIMEOUT)`**。旧实现把它**伪造**成
   `LLMResponse(finish_reason="error")` 并写一条占位 assistant 消息；新层的占位消息（若
   需要）由 `D14` 生成，engine 不替编排层编内容。
-- **超长工具结果不落盘、也没有豁免名单**。旧实现会把超长结果写进
-  `.nanobot/tool-results/` 并豁免 `read_file`；那既是迁移期运行契约（新层不保留），
-  又要求 engine 认识具体工具名。engine 只截断，「超长结果如何呈现」归 `D14` 的 invoker。
+- **超长工具结果不落盘、也没有豁免名单**。engine 不认识具体工具名，
+  只负责截断；「超长结果如何呈现」归 invoker。
 - **`partition_tool_batches` 是公开纯函数**，替代旧实现的私有方法
   `_partition_tool_batches`：调度口径是一条要被 `D14` 和插件作者读懂的规则，藏在私有方法
   里只能靠读 engine 源码反推。
@@ -869,8 +833,8 @@ class SessionSlot:
 去重（`EDG-201`）：Kernel 维护 `(channel_id, message_id)` 的有界 LRU（默认 4096 条 /
 10 分钟）。命中则跳过执行并返回上一次结果引用，避免重复触发有副作用的工具。
 
-持久化（`SES-002`、`SES-003`、`NFR-202`、`EDG-504`）：沿用 nanobot `agent/memory.py`
-已验证的原子写（临时文件 + `fsync` + `os.replace`）。写入失败一律向上传播为
+持久化（`SES-002`、`SES-003`、`NFR-202`、`EDG-504`）：使用原子写
+（临时文件 + `fsync` + `os.replace`）。写入失败一律向上传播为
 `PERSISTENCE` 类错误，turn 标记 `FAILED`，不允许伪装成功。
 
 ### 6.6 Hook 与事件模型
@@ -1044,8 +1008,7 @@ asyncio 抢占不了同步回调，因此「超时隔离」的形态是**测量 
   与卸载边界不清楚。
 - **不做目录自动加载**（Pi 的做法）：Pi 是单用户 coding agent，目录即意图；Karyvia 需要
   「安装 ≠ 启用」的解耦（`DST-002`）。
-- nanobot 现有的 `pkgutil` 扫描只保留在旧路径中，新体系内建能力用静态清单，
-  行为确定且可读（「显式优于魔法」）。
+- **内建能力使用静态清单**，不做 `pkgutil` 目录扫描，使行为确定且可读。
 - **不扫描 `InstanceLayout.plugins_dir`**：那是插件的**状态**目录
   （`<instance>/plugins/<id>/`），把它同时当成代码来源会让一个只写了状态的子目录看起来
   像一个装错了的插件。
@@ -1303,7 +1266,7 @@ Protocol）：`kernel/` 与 `runtime/` 都要调用 CLI 能力，而 `R2` 禁止
 | Session | `builtins/session_jsonl/` | 每 session 一个 JSONL + 一个 meta.json，追加写 + 原子替换 |
 | Context | `builtins/context_basic/` | 贡献系统指令与运行时事实；历史由 Kernel 投影，预算由完整请求统一计量 |
 | Turn Compactor | `builtins/context_compact_basic/` | 从最旧单元开始替换连续前缀，生成有界、确定性摘要 |
-| 基础工具 | `builtins/tools_fs/`、`tools_shell/` | 6 个工具，复用 nanobot 已验证的路径守卫与沙箱 |
+| 基础工具 | `builtins/tools_fs/`、`tools_shell/` | 6 个工具，统一经过路径守卫与沙箱 |
 | 命令 | `builtins/commands_core/` | `/help` `/config` `/session` `/plugins` `/capabilities` `/cancel` |
 
 `D22` 落地时对「命令」一行的细化（实现在 `builtins/commands_core/`）：
@@ -1368,7 +1331,7 @@ JSONL 每行一条记录，字段即 `contracts/session.py` 的序列化形式�
   代价是它落在历史之后的一条 user 消息里而不是 system 消息里，因此沿用内建基准
   `priority=0`；该值不参与 token 预算。把配置文本升为 `SYSTEM` 等于取消 `CMD-005` 的分级，
   那不是一个内建能力该自行决定的事。只有基线指令与运行时事实是 `trust=SYSTEM`。
-- **零 IO**（技术方案 §14 的「Provider 只读不写」）。模块连 `os` / `pathlib` 都不 import，由
+- **零 IO**（Provider 只读不写）。模块连 `os` / `pathlib` 都不 import，由
   `tests/architecture/test_builtin_no_privilege.py::test_read_only_builtins_have_no_syntactic_route_to_persistence`
   按「没有语法途径」而不是「看起来没写盘」来断言。因此它不可能因为缺少某个可选插件而
   失败，`CTX-006`/`EDG-307` 由此成立。
@@ -1437,7 +1400,7 @@ fs.read   fs.write   fs.edit   fs.list   fs.grep   shell.exec
 `karyvia.kernel.*`。
 
 - Workspace：路径解析后必须落在允许根内，`realpath` 后重新校验，覆盖符号链接、`..`、
-  Windows 大小写与重解析点（`EDG-405`）。复用 nanobot `agent/tools/path_utils.py` 的实现。
+  Windows 大小写与重解析点（`EDG-405`）。
 - SSRF：解析后的 IP 与每次重定向目标都要重新校验，禁止私有网段与元数据地址；
   DNS 解析结果与实际连接地址一致性检查（`EDG-406`）。
 - Shell：默认 cwd 限定在 workspace，默认不继承敏感环境变量，可选进程级沙箱后端。
@@ -1507,7 +1470,7 @@ lifecycle: start / stop / health
   `wire_capabilities(keep=...)` 与 `setup()`（`TOL-006` 成立的全部条件）。
 
 启动开销目标（`NFR-405`）：无插件默认安装的**冷启动到可接受输入 ≤ 300 ms**（不含
-Python 解释器启动）。以 nanobot 当前启动耗时为基线，在 CI 中作为回归指标记录，
+Python 解释器启动）。以仓库内稳定的冷启动样本为基线，在 CI 中作为回归指标记录，
 超出阈值 20% 触发告警而非直接失败（避免 CI 机器抖动造成噪声）。
 `D24` 把它落成 `scripts/check_startup_cost.py` 的 `startup_ms`（import 与 bootstrap 两段
 分别可归因），并如实记录：**当前它超出目标**，主要来自 `model-openai` 在 `setup()` 时
@@ -1781,200 +1744,12 @@ karyvia capabilities                                 # 报告中可见 provider 
 
 第 3 步单独成阶段且不允许 `skip`/`xfail`，因为架构边界一旦破口就会迅速扩散。
 
-## 13. 实施计划
-
-对应需求 §14 的四个阶段。每个里程碑给出交付物与可验证的完成判据。
-模块级拆分与逐项验收清单见 [`development-plan.md`](./development-plan.md)。
-
-### M-A 仓库重构（阶段一前置，P0）
-
-交付：§4.1 的顶层布局、§4.2 的包内空骨架、`legacy/` 隔离区、`pyproject.toml` 重写。
-
-做法是**受限的结构与命名迁移**，一个 PR 内完成，分四个可独立回退的 commit：
-
-```text
-A0  捕获行为基线（必须早于任何改动）：规范化的用例 ID 与结果集合落盘入库
-A1  git mv nanobot/ src/karyvia/legacy/    保留 git 历史
-A2  脚本机械重写导入前缀、字符串模块路径和构建资源路径；
-    遗留代码继续使用 `NANOBOT_*`、`~/.nanobot/` 和原配置格式
-A3  pyproject 重写：包名、发行名、入口、构建 include、basedpyright/pytest 路径
-```
-
-A0 是 M-A 全部完成判据的前提：「与重构前一致」这个标准依赖于「重构前」被记录下来，
-而那个状态只存在于动手之前。基线记录完整的用例 ID 与结果集合（约 5850 个用例），
-不假设全绿；采集错误非空时基线判为不可信。规范化规则与工具契约见
-[`development-plan.md`](./development-plan.md) 的 `D00`。
-
-按 §4.5，**不在新层写长期兼容垫片**。迁移期 `legacy/` 的入口曾收敛为 `karyvia legacy`
-单个子命令，`runtime/legacy_entry.py` 是唯一、限期存在的过渡例外；
-**两者都已在 `D31` 删除**。
-
-为什么放在最前面而不是「等 Kernel 稳定后再重命名」：
-
-1. 重命名成本随代码量单调上升。现在是 2979 个导入点，等新架构写完再动就是更多。
-2. 新代码从第一行起就写在最终位置，不存在「先放临时目录、以后再搬」的二次成本。
-3. 此时没有 Agent 业务逻辑变更；除包名、发行名和 CLI 名称外，遗留行为可直接用现有
-   测试基线对比，风险边界清楚。
-
-完成判据：
-
-- A0 基线与重构后重新采集的结果逐项一致：规范化后无丢失用例、无结果变化，
-  且两次采集的采集错误列表均为空。因导入路径变化而更新测试源码是允许的，
-  但不得改变断言语义。
-- `pip install -e .` 后 `karyvia --version` 与 `karyvia legacy --help` 均可用；不存在 `nanobot` 命令。
-- `karyvia legacy` 继续读取原有 `NANOBOT_*`、`~/.nanobot/` 和 camelCase 配置，证明 D00
-  没有把遗留配置迁移混入结构调整。
-- `import karyvia` 命中安装产物；仓库根目录下不存在可被误导入的同名目录。
-- wheel 构建产物包含 `templates/`、`skills/`、`web/dist/` 等非 Python 资源（与重构前一致）。
-- `scripts/legacy_debt.py` 输出基线数字，写入 CI 记录。
-- 新层无意外旧名：`rg -i nanobot src/karyvia --glob '!legacy/**'` 只允许命中
-  迁移说明与 `karyvia legacy`；`legacy/` 内保留旧配置键、环境变量和历史叙述是预期行为。
-
-**不在 M-A 范围**：Agent 业务逻辑变更、配置 schema 迁移、状态目录迁移、任何模块拆分、
-任何 `legacy/` 内部整理。Karyvia 新配置语义在 M3/D10 之后的新层实现中落地，
-不回写遗留实现。
-
-### M-B 架构守卫（阶段一前置，P0）
-
-交付：`tests/architecture/`、`scripts/legacy_debt.py`、CI 门禁。
-
-完成判据：
-
-- `R1`–`R5` 各有 AST 断言，且各有一个「注入违规样例必须失败」的反向测试。
-- 目标目录尚不存在时守卫返回通过而非报错（否则 M-B 自身无法验收）。
-- CI 中架构守卫是独立阶段，不允许 `skip`/`xfail`。
-- `legacy/` 债务指标接入 CI，数字只允许下降。
-
-守卫先于实现落地，因为边界破口是在写代码的过程中无声发生的，事后再补检查等于承认
-已有破口。
-
-### M1 契约与注册表（阶段一，P0）
-
-交付：`contracts/`、`sdk/` 骨架、`kernel/registry/`。
-
-完成判据：
-
-- registry 覆盖解析的单测覆盖全部冲突分支（重复、缺失目标、双重覆盖、arity 违规）。
-- `sdk.__all__` 快照建立。
-- `sdk/manifest.py` 导入无副作用（无网络、无文件写入、耗时低于阈值）。
-
-风险控制：此阶段**不动 `legacy/` 内部代码**，新层与隔离区并存，随时可回退。
-
-### M2 Turn 引擎拆分（阶段一，P0）
-
-交付：`kernel/turn/`（engine + orchestrator + cancel + limits）、`kernel/routing/`。
-
-做法（这是全项目最高风险的一步，`13.1`）：
-
-1. 先为 `legacy/agent/loop.py` + `runner.py` 的现有行为补齐行为基线测试：
-   迭代上限、工具错误处理、流式聚合、并发调度。**基线测试针对旧实现编写并通过。**
-2. 新写 `engine.py`，用 Fake provider 让基线测试的**行为断言部分**在新实现上同样通过。
-3. 新写 `orchestrator.py`，接管 session/context/事件。
-4. 内建能力与插件体系齐备后（M4 之后），**直接删除 `legacy/agent/`**，
-   其剩余调用方改调新 Kernel。见 [`development-plan.md`](./development-plan.md) 的 `D31`。
-   **`D31` 已完成**，两处与本节字面表述的偏差如实记在开发方案 §12：WebUI 与 gateway
-   随 `legacy/agent/` 一并删除（新 Kernel 没有它们要的 MCP / skills / tool-registry），
-   OpenAI 兼容接口在新层重写为官方插件而不是改造 `legacy/api/server.py`。
-   不搭薄适配层、不设 `legacy | kernel` 双路径开关——本项目是改造而非兼容发行版，
-   双路径要求两套实现长期共存与双份测试，成本高于收益，回退用 git 即可。
-   M1–M4 期间 `legacy/` 内部代码完全不动，新 Kernel 以独立入口 `karyvia` 并行生长，
-   任何阶段中止都不影响现有可用功能。
-
-完成判据：`engine.py ≤ 400` 行且不 import 任何具体能力；基线测试的行为断言在新实现上
-通过；6 个取消检查点各有独立测试。
-
-### M3 内建能力基线（阶段一，P0）
-
-交付：`builtins/` 当前 9 项、`BUILTIN_MANIFESTS`、契约测试套件、首次运行体验。
-
-完成判据（对应 §16.1）：
-
-- 全新环境只配模型凭据 → 完成一次带工具调用的 turn（`e2e` 用例）。
-- `karyvia capabilities` 列出全部内建能力及提供方。
-- 缺凭据时的错误指向文件与字段名，且哨兵扫描确认无凭据值泄漏。
-- CLI 可中断，中断后会话可继续。
-- 尝试禁用全部可禁用内建能力的配置下，CLI 仍可用；禁用 CLI 的配置被显式拒绝。
-
-### M4 Plugin Runtime 最小闭环（阶段二，P0）
-
-交付：`kernel/plugins/` 的外部发现、校验与生命周期、资源门面、示例插件和
-`karyvia plugins` 命令；复用 M3/D16 已建立的 Host `KaryviaAPI` 与事务性注册通道。
-
-示例插件选择：**`karyvia-plugin-echo-tool`（新增一个工具）+
-`karyvia-plugin-session-memory`（覆盖内建 session store 为内存实现）**。
-后者专门用于验证覆盖路径与 disable 优先语义，风险低且能覆盖 SINGLETON arity。
-
-完成判据（对应 §16.2）：
-
-- 不修改 engine/orchestrator 即可加载外部插件。
-- 插件注册的工具参与真实 turn。
-- 覆盖内建 session store，`karyvia capabilities` 显示 shadowed 关系。
-- 禁用后能力消失，恢复行为由配置决定。
-- 配置错误、SDK 不兼容、运行时失败三类场景各有稳定错误码与诊断输出。
-- 示例插件不 import `karyvia.kernel.*`（架构测试断言）。
-- 内建 session store 与插件 session store 通过同一契约测试。
-
-### M5 官方能力插件化（阶段三，P1）
-
-**范围已于 `D35` 收窄**（原为六项全做）：
-
-```text
-1  额外 Model Provider   —— 止步：内建 model-openai + anthropic 插件已够（D32 交付）
-2  Memory                —— 仍要做，需 MemoryProvider 接口 + MEM-005 管理命令
-3  扩展 Tool（web、search、mcp）—— 仍要做，可复用 net/shell 资源服务
-4  Channel               —— 当前只保留 feishu；其他平台以后按独立插件重新设计
-5  Cron / Automation     —— 仍要做，依赖后台任务与 Hook
-6  WebUI + Gateway       —— 不做，前端源码已随 D35 删除
-```
-
-收窄的理由是这是个人项目：十几个聊天平台与七八个 Model Provider 的适配面，维护成本
-远超它们创造的价值，而每一个都要长期跟着上游 API 变。**放弃的不是能力而是承诺**——
-第三方随时可以照 `plugins/` 里现有官方插件的形状再写一个。
-
-每个模块的迁移遵循同一套五步，避免 `13.9` 的双重机制问题：
-
-```text
-a  读 references/nanobot/ 里的旧实现与它自己的测试当行为说明书
-b  实现插件版本，通过同一套契约测试
-c  切换：调用方改指插件版本，切换点唯一
-d  同 PR 内删除对应的遗留代码
-e  同 PR 内删除该模块的遗留测试
-```
-
-`D35` 删掉 `legacy/` 之后，d/e 两步已经没有对象——它们退化成「更新文档」。
-a 步同样不再是「补基线测试」：`D32` 起就改成直接读旧实现，不为一个要删掉的实现
-再写一遍测试。
-
-**不设新旧双路径开关。** 切换在一个 PR 内完成，回退手段是 git，不是运行期配置项。
-
-`legacy/` 已于 `D35` 清空并删除，`R6` 守卫与 `scripts/legacy_debt.py` 一并退休——
-迁移期专用设施不留在最终仓库里，这一条已经兑现。
-
-### M6 生态兼容（阶段四，P2）
-
-回答 §17.2 第 12 项。首批兼容范围：
-
-| OpenClaw 扩展类型 | 首批支持 | 说明 |
-| --- | --- | --- |
-| Tool / 命令类插件 | 支持 | 映射到 TOOL / COMMAND 能力 |
-| Model Provider | 部分支持 | 支持 API-Key 形式；OAuth 登录流首版不支持 |
-| Memory 插件 | 部分支持 | 映射 MemoryProvider，不保证宿主专有检索语义 |
-| Channel 插件 | 不支持 | 依赖 OpenClaw gateway 协议与账户模型，成本过高 |
-| WebUI / 渲染扩展 | 不支持 | Karyvia 首版无对应扩展面 |
-| 依赖隐式全局状态的插件 | 不支持 | 加载期拒绝并给出具体原因（`CMP-003`） |
-
-兼容层作为**独立包** `karyvia-compat-openclaw`，本身就是一个 Karyvia 插件，
-因此 `CMP-004`（不成为 Kernel 依赖）由包边界天然保证。
-
 ## 14. 风险与应对
 
 | 风险 | 来源 | 应对 |
 | --- | --- | --- |
-| 只搬文件不解耦 | `13.1` | 架构测试 `R1`–`R5` 先于实现落地；engine 行数上限 |
-| 重构中混入业务或配置变更 | M-A | M-A 只允许明列的命名变化；遗留配置、环境变量和状态目录保持不变；分三个可独立回退 commit |
-| 遗留隔离区长期不清 | §4.3 | **已闭环**：债务棘轮压到 `D35` 清空，隔离区与棘轮一并删除 |
-| 重命名遗漏 | §4.5 | M-A 验收双防线：归一化后的测试结果逐项一致 + 新层旧名扫描无意外命中 |
-| 一次性重写失控 | `13.1` | M2 采用「基线测试 → 新实现 → 单点切换并删除旧实现」，每步有独立验收，回退使用 git |
+| 依赖边界被侵蚀 | `13.1` | 架构测试强制 `R1`–`R5`；engine 与其他层分别有文件行数上限 |
+| 同一能力出现双重机制 | `13.9`、§4.3 | 只保留一条规范实现路径；覆盖与冲突由 Registry 统一判定 |
 | SDK 表面膨胀 | `13.2` | `KaryviaAPI` 冻结 10 个注册方法、Hook 冻结 9 个、`__all__` 快照测试 |
 | 内建能力获得特权 | `13.10` | `builtins/` 禁止 import `kernel/`，架构测试断言 |
 | 内建工具集扩张 | `13.10`、`BAS-008` | 6 工具冻结清单 + 三条准入判定 + 评审门槛 |
@@ -2011,9 +1786,8 @@ a 步同样不再是「补基线测试」：`D32` 起就改成直接读旧实现
 2. §5 的每个契约字段都能追溯到需求 §10 的逻辑字段。
 3. §10 的四条流程覆盖需求 §8 的全部步骤，且每个异常分支指向 §11 的编号场景。
 4. §15 的 12 项结论均有依据与验证方式，无「后续再定」。
-5. 需求 §15 的 P0 清单每一项都能在 §13 的 M1–M4 中找到对应交付物。
-6. §4.2 的每个目录都能归属到 `R1`–`R5` 中的确定层级，无歧义地带。
-7. 没有引入需求分析未涉及的新范围。
+5. §4.2 的每个目录都能归属到 `R1`–`R5` 中的确定层级，无歧义地带。
+6. 没有引入需求分析未涉及的新范围。
 
 实现过程中若发现某条结论不成立，先更新本文档再改代码，避免文档与实现脱节。
 
@@ -2021,7 +1795,7 @@ a 步同样不再是「补基线测试」：`D32` 起就改成直接读旧实现
 
 | 需求域 | 本文档位置 |
 | --- | --- |
-| `BAS-001`–`BAS-010` | §8、§10.1、§10.2、§13 M3 |
+| `BAS-001`–`BAS-010` | §8、§10.1、§10.2 |
 | `KER-001`–`KER-010` | §6.2、§6.3、§6.4、§6.5 |
 | `PLG-001`–`PLG-007` | §7.1–§7.4 |
 | `SDK-001`–`SDK-007` | §6.1、§7.5、§7.6 |
@@ -2029,11 +1803,11 @@ a 步同样不再是「补基线测试」：`D32` 起就改成直接读旧实现
 | `MOD-001`–`MOD-005` | §5.2、§8.1 |
 | `CTX-001`–`CTX-006` | §5.2、§10.2 第 7 步 |
 | `SES-001`–`SES-006` | §5.2、§6.5、§8.1 |
-| `MEM-001`–`MEM-005` | §7.5、§13 M5 |
+| `MEM-001`–`MEM-005` | §7.5、§8.1 |
 | `TOL-001`–`TOL-007` | §5.2、§6.4、§8.2、§8.3 |
 | `CFG-001`–`CFG-005` | §6.7 |
 | `OBS-001`–`OBS-005` | §6.8 |
-| `CMP-001`–`CMP-004` | §13 M6 |
+| `CMP-001`–`CMP-004` | §2.2、§7.6 |
 | `CMD-001`–`CMD-005` | §5.2、§6.3、§7.5 |
 | `DST-001`–`DST-005` | §8、§10.4、§10.5、§11 |
 | `EDG-1xx`–`EDG-5xx` | §6–§11 各流程的异常分支 |

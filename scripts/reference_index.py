@@ -38,7 +38,7 @@ TEXT_EXTENSIONS = {
     ".ts",
     ".tsx",
 }
-PROJECT_NAMES = ("nanobot", "openclaw", "pi")
+PROJECT_NAMES = ("openclaw", "pi")
 SYMBOL_PATTERN = re.compile(
     r"^\s*(?:export\s+(?:default\s+)?|declare\s+)?"
     r"(?:async\s+)?(?:function|class|interface|type|const|let|var)\s+"

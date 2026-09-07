@@ -1,6 +1,6 @@
 # Karyvia 当前状态与接手入口
 
-> 更新基线：D53。这里描述当前事实，不记录逐 PR 流水账；历史摘要见
+> 这里描述当前事实，不记录逐 PR 流水账；历史摘要见
 > [`history.md`](./history.md)，精确变化以 Git 为准。
 
 ## 结论
@@ -11,7 +11,7 @@ Karyvia 已经具备一套可运行、受架构守卫约束的 Agent Kernel 骨�
 
 当前骨架基本符合最初的极简方向：Kernel 负责机制，具体能力由 Builtin 或插件负责；内建
 能力没有私有注册通道，官方插件与第三方插件走同一套 SDK、Manifest、Host、Registry 和
-生命周期。原 nanobot 的 `legacy/`、WebUI 和旧命名兼容层已经删除。
+生命周期。仓库不包含第二套旧实现、WebUI 或旧命名兼容层。
 
 现在最重要的工作不是继续补齐所有可能的能力，而是维护这些清晰的边界，在真正出现需求时
 沿现有接缝演进。三个可能需要未来专项设计的方向已经明确记录，但当前不应为它们放入半成品
@@ -161,12 +161,11 @@ mkdir -p .pytest-tmp
 
 新接手项目建议按以下顺序：
 
-1. [`开发背景.md`](./开发背景.md)：为什么做这个项目。
-2. [`architecture-map.md`](./architecture-map.md)：代码在哪里、主链路怎么走。
-3. [`evolution-boundaries.md`](./evolution-boundaries.md)：哪些能加、哪些必须迁移。
-4. [`change-guide.md`](./change-guide.md)：动手时的检查清单。
-5. [`../../AGENTS.md`](../../AGENTS.md)：仓库执行规则。
-6. 目标模块的 docstring、相邻测试和正式技术方案对应章节。
+1. [`architecture-map.md`](./architecture-map.md)：代码在哪里、主链路怎么走。
+2. [`evolution-boundaries.md`](./evolution-boundaries.md)：哪些能加、哪些必须迁移。
+3. [`change-guide.md`](./change-guide.md)：动手时的检查清单。
+4. [`../../AGENTS.md`](../../AGENTS.md)：仓库执行规则。
+5. 目标模块的 docstring、相邻测试和正式技术方案对应章节。
 
 详细阶段历史不再作为理解当前架构的前置条件，需要追溯时再读
 [`history.md`](./history.md) 或 Git。

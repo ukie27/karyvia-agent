@@ -7,7 +7,7 @@
 - [`docs/project/architecture-map.md`](./docs/project/architecture-map.md)：层次、运行链路与所有权
 - [`docs/project/change-guide.md`](./docs/project/change-guide.md)：常见改动需要触碰哪些位置
 - [`docs/project/evolution-boundaries.md`](./docs/project/evolution-boundaries.md)：哪些已冻结、哪些可扩展、哪些以后才设计
-- [`docs/project/history.md`](./docs/project/history.md)：D00–D53 里程碑摘要
+- [`docs/project/history.md`](./docs/project/history.md)：历史里程碑摘要
 
 更细的正式约束仍以 [`docs/project/technical-design.md`](./docs/project/technical-design.md)、
 [`docs/project/requirements-analysis.md`](./docs/project/requirements-analysis.md) 和测试守卫为准。
@@ -27,7 +27,7 @@ Karyvia 是一个轻量、模块化、可扩展的 Agent Kernel。核心只保�
 只有第一个答案为“不能”且第二个答案为“机制”时，才应进入 Kernel。不要为了尚未实现的
 功能预埋空接口；先确认现有接缝无法表达，再按演进流程修改公开表面。
 
-当前产品范围刻意收窄：不恢复旧 `legacy/`、WebUI 或 nanobot 兼容层；不在 Kernel 内堆新的
+当前产品范围刻意收窄：不恢复已移除的 `legacy/` 或 WebUI，不增加旧名兼容层；不在 Kernel 内堆新的
 供应商、Channel 和工具；OpenClaw 等更高层产品属于独立包，不反向污染 Kernel。
 
 ## 2. 仓库层次与依赖方向
@@ -280,7 +280,7 @@ Dispatcher、SessionScheduler、DedupCache、EventBus 和 TurnOrchestrator 应�
 - 活跃规则只放在本文件和 `docs/project/` 的四个入口文档，避免把阶段流水账复制到每个文件。
 - 用户文档描述实际可用行为；能力未实现前不写占位使用说明。
 - 配置、CLI、插件安装列表和插件代码示例已有防漂移测试，改代码时必须同步更新。
-- 上游 nanobot 只保留在 `references/nanobot/` 作为只读参考；不要从那里 import 或复制旧命名。
+- 本地 `references/` 只用于设计研究，不得从其中 import 或直接复制外部实现。
 - 历史决策通过 Git 和 [`history.md`](./docs/project/history.md) 查询；不要把 D 编号历史重新塞回
   活跃开发规则。
 - 安全边界详见 [`.agent/security.md`](./.agent/security.md)，常见陷阱见

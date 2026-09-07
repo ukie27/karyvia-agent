@@ -4,7 +4,7 @@
 | --- | --- |
 | 实例目录解析优先级 | `TestResolution` |
 | 目录名与文件名固定 | `test_layout_names_are_frozen` |
-| 只读 `KARYVIA_*` | `test_legacy_nanobot_env_is_ignored` |
+| 只读 `KARYVIA_*` | `test_unrecognized_env_is_ignored` |
 | `ensure()` 建目录且幂等 | `TestEnsure` |
 | 派生路径都落在实例目录内 | `test_all_derived_paths_stay_inside_root` |
 
@@ -107,10 +107,10 @@ class TestResolution:
         layout = InstanceLayout.resolve(instance_dir="rel-instance", env={}, home=tmp_path)
         assert layout.root.is_absolute()
 
-    def test_legacy_nanobot_env_is_ignored(self, tmp_path: Path) -> None:
-        """新层只读 `KARYVIA_*`（AGENTS.md）：旧名字不得有任何效果。"""
+    def test_unrecognized_env_is_ignored(self, tmp_path: Path) -> None:
+        """布局只读公开的 `KARYVIA_*` 环境变量。"""
         layout = InstanceLayout.resolve(
-            env={"NANOBOT_INSTANCE_DIR": str(tmp_path / "legacy"), "NANOBOT_INSTANCE": "legacy"},
+            env={"UNRELATED_INSTANCE_DIR": str(tmp_path / "other"), "UNRELATED_INSTANCE": "other"},
             home=tmp_path,
         )
         assert layout.root == (

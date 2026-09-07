@@ -2,8 +2,8 @@
 
 ## 项目定位
 
-Karyvia 基于 HKUDS/nanobot（MIT 协议）独立开发。本项目目前处于重构阶段，
-不作为公共基础设施运营；安全修复按本仓库的常规 git 提交进行。
+Karyvia 是一个独立的 Agent Kernel 项目，不作为公共基础设施运营；
+安全修复按本仓库的常规 git 提交进行。
 
 ## 安全最佳实践（开发与部署均适用）
 
@@ -13,12 +13,12 @@ Karyvia 基于 HKUDS/nanobot（MIT 协议）独立开发。本项目目前处于
 
 ```bash
 # ✅ 最佳：配置中使用环境变量引用（密钥不落盘）
-# ~/.nanobot/config.json:
-#   "apiKey": "${ANTHROPIC_API_KEY}"
+# ~/.karyvia/instances/default/config.json:
+#   "api_key": "${ANTHROPIC_API_KEY}"
 # 运行时通过环境变量或 Docker secret 提供。
 
 # ✅ 良好：配置文件限制权限
-chmod 600 ~/.nanobot/config.json
+chmod 600 ~/.karyvia/instances/default/config.json
 
 # ❌ 禁止：在代码或配置文件里硬编码明文 key
 ```
@@ -27,7 +27,7 @@ chmod 600 ~/.nanobot/config.json
 
 ### 2. 凭据管理建议
 
-- 优先环境变量引用；明文 key 存入 `~/.nanobot/config.json` 时设置 `0600` 权限。
+- 优先环境变量引用；明文 key 存入实例 `config.json` 时设置 `0600` 权限。
 - 生产部署考虑 OS keyring / 凭据管理器。
 - 定期轮换 API key；开发与生产环境使用不同 key。
 

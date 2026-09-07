@@ -5,7 +5,7 @@
 不负责：决定什么时候调它们（模型与 `kernel/turn/`）、校验参数（kernel 的
 `ToolInvoker` 按 `ToolSpec.parameters` 校验）、把结果放进上下文（`kernel/turn/context_builder.py`）。
 
-**它取代的是 `references/nanobot/nanobot/agent/tools/web.py`**，但不是移植：
+**当前实现保持有界的后端集合**：
 
 - 旧实现有 **13 个写死的搜索后端**（duckduckgo / brave / tavily / searxng / jina / kagi /
   exa / bocha / serper / olostep / volcengine / keenable …）。这里只写死四个形状差异大的，
