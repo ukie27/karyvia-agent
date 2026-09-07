@@ -1,17 +1,17 @@
-"""cwd 边界守卫：把 `cwd` 参数判成 workspace 内的一个目录（`EDG-405`、`NFR-302`）。
+"""cwd 边界守卫：把 `cwd` 参数判成 workspace 内的一个目录。
 
 职责：`CwdGuard`——解析、双重校验（逻辑 + realpath）、渲染回相对显示路径。
 不负责：执行命令（`process.py`）、
 决定 workspace 根在哪（配置交下来，见 `settings.py`）。
 
-**判据与 `tools_fs.WorkspaceGuard` 逐条相同**（`EDG-405`、`NFR-302`）：
+**判据与 `tools_fs.WorkspaceGuard` 逐条相同**：
 
 1. **逻辑校验**：`os.path.normpath` 之后（不跟随符号链接）必须落在根内——挡住 `..`。
 2. **realpath 校验**：`Path.resolve()` 之后必须**再**落在根内——挡住符号链接与 Windows
    的重解析点。
 
 两次比较都先过 `os.path.normcase`，因此 Windows 的大小写差异不构成绕过面，而 Linux 上
-`normcase` 是恒等函数——同一段代码在两个平台给出同一套判定（`NFR-605`）。
+`normcase` 是恒等函数——同一段代码在两个平台给出同一套判定。
 
 **为什么不 import `tools_fs.WorkspaceGuard` 而是各写一份**（`AGENTS.md` 原则 5「优先重复
 而非过早抽象」）：`R4` 确实允许 `builtins/` 之间互相 import，但 `tools-fs` 与 `tools-shell`
@@ -106,7 +106,7 @@ class CwdGuard:
     def relative(self, path: Path) -> str:
         """渲染成根内的 posix 相对路径，供模型消费。
 
-        工具产出里一律用它而不是绝对路径：两个平台给出同一个串（`NFR-605`），顺带也不把
+        工具产出里一律用它而不是绝对路径：两个平台给出同一个串，顺带也不把
         宿主机目录结构送进上下文。根自身渲染成 `"."`。
         """
         try:

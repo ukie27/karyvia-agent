@@ -1,4 +1,4 @@
-"""组装根：把 manifest 清单经唯一 Host 注册进能力表（技术方案 §10.1 步骤 3、7）。
+"""组装根：把 manifest 清单经唯一 Host 注册进能力表。
 
 职责：把 `PluginManifest` 翻译成 kernel 认识的 `LoadRequest`，驱动
 `kernel.plugins.load_into`，再解析覆盖并冻结 registry；产出 `Wiring`。
@@ -17,7 +17,7 @@ basedpyright 配置是 `include = ["src/karyvia"]` + `exclude = ["**/tests"]`，
 
 **内建与外部插件走同一个函数**：`wire_capabilities()` 只是默认 `manifests=BUILTIN_MANIFESTS`
 且默认“一切都是 `Builtin()`”。外部 Manifest 与 `Plugin(PluginId(...))` 也传入同一函数，
-不需要第二条注册路径（`SDK-007`）。
+不需要第二条注册路径。
 """
 
 from __future__ import annotations
@@ -54,7 +54,7 @@ __all__ = [
 ]
 
 #: 「这条能力声明这次还算数吗」。装配根按配置回答，`to_load_request()` 据此裁剪声明
-#: （`TOL-006`，见那里的 docstring）。拿到整份 manifest 而不只是 `CapabilityDecl`，
+#: （见那里的 docstring）。拿到整份 manifest 而不只是 `CapabilityDecl`，
 #: 是因为回答这个问题需要知道是谁的配置块。
 CapabilityFilter = Callable[[PluginManifest, CapabilityDecl], bool]
 
@@ -82,7 +82,7 @@ def to_declaration(decl: CapabilityDecl) -> CapabilityDeclaration:
     """把一条 manifest 能力声明翻成 kernel 投影。
 
     **`priority` 只在作者显式写过时才传下去**。`CapabilityDecl.priority` 的默认值是 100
-    （技术方案 §7.2），照搬会让每一项内建能力都拿到 100，而 §6.1 规则 1 定的内建基准是
+    ，照搬会让每一项内建能力都拿到 100，而 §6.1 规则 1 定的内建基准是
     **0**。pydantic 的 `model_fields_set` 恰好能回答「作者到底写没写」，因此留 `None`
     让 `base_priority_for()` 决定——内建 0、插件 100，规则仍只有一处实现。
     """
@@ -104,7 +104,7 @@ def to_load_request(
 ) -> LoadRequest:
     """把一份 manifest 投影成 kernel 认识的加载请求。
 
-    **`keep` 是 `TOL-006` 的落点**。`CapabilityHost` 要求 manifest 声明的每一项
+    **`keep` 是的落点**。`CapabilityHost` 要求 manifest 声明的每一项
     都真的被注册，而「按名字单独禁用一个工具」要求被禁用的那项从 registry 里消失——静态
     manifest 无法按配置少声明一项，于是由这里裁掉。裁剪与 `setup()` 的注册决定必须**同源
     于同一份配置**（`builtins/tools_fs` 导出 `enabled_tool_names()` 正是为此），否则
@@ -143,7 +143,7 @@ async def wire_capabilities(
     一个 `Builtin()`，按提供方索引会让九份内建拿到同一个配置块与同一个状态目录——
     `session-jsonl` 会读到 `model-openai` 的配置。manifest 才是「这是谁」的唯一答案。
 
-    `keep` 按配置裁掉本次不生效的能力声明（`TOL-006`，见 `to_load_request()`）。它对
+    `keep` 按配置裁掉本次不生效的能力声明（见 `to_load_request`）。它对
     每一份 Manifest 一视同仁，不存在某个内建工具专用的裁剪路径。
 
     **异常约定**：提供方加载失败记进 `Wiring.outcomes`；覆盖冲突不抛，进

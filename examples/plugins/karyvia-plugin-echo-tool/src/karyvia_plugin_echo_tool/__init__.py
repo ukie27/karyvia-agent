@@ -1,4 +1,4 @@
-"""示例插件 `echo-tool`：一个插件最少要写的东西（开发方案 `D30`）。
+"""示例插件 `echo-tool`：一个插件最少要写的东西。
 
 职责：声明一份 `PluginManifest`，在 `setup(api)` 里注册一个工具能力 `echo.say`。
 不负责：任何持久化、出网与子进程——本插件只使用 `ctx.config`，不调用其他宿主资源服务。
@@ -6,9 +6,9 @@
 **只 import `karyvia.contracts` 与 `karyvia.sdk`**（依赖规则 `R4`）。插件够不着
 `karyvia.kernel.*`，`tests/architecture/test_import_boundaries.py` 会拦下任何尝试。
 
-**MANIFEST 在模块顶层、导入无副作用**（技术方案 §7.2 的硬约束）：发现阶段只 import 本模块
+**MANIFEST 在模块顶层、导入无副作用**：发现阶段只 import 本模块
 取那个对象，此时不该发生任何 IO。真正的工作全在 `setup()` 里，而 `setup()` 只有在插件被
-`plugins.enabled` 列出、且过了阶段 A 之后才会被调用。
+`plugins.enabled` 列出、且过了加载前校验 之后才会被调用。
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ CONFIG_PREFIX_KEY: Final = "prefix"
 MANIFEST: Final = PluginManifest(
     id="echo-tool",
     version="0.1.0",
-    # SDK 兼容区间由**插件**声明，宿主据此判断要不要加载（`SDK-005`）。落在区间外时
+    # SDK 兼容区间由**插件**声明，宿主据此判断要不要加载。落在区间外时
     # 拒绝加载并报 `PLUGIN_SDK_INCOMPATIBLE`，不带病运行。
     sdk_range=">=5.0.0,<6.0.0",
     setup="karyvia_plugin_echo_tool:setup",
@@ -94,9 +94,9 @@ class EchoTool:
 
 
 def resolve_prefix(ctx: PluginContext) -> str:
-    """从 `ctx.config` 取前缀。**只看得见自己那一块**配置（`CFG-002`）。
+    """从 `ctx.config` 取前缀。**只看得见自己那一块**配置。
 
-    形状已经由 manifest 的 `config_schema` 在阶段 A 校验过，因此这里不重复判类型；
+    形状已经由 manifest 的 `config_schema` 在加载前校验 校验过，因此这里不重复判类型；
     非字符串的值根本走不到这里（那次校验的失败是 `CONFIG_INVALID`，插件不会被加载）。
     """
     value: JsonValue | None = ctx.config.get(CONFIG_PREFIX_KEY)
@@ -107,7 +107,7 @@ def setup(api: KaryviaAPI) -> None:
     """注册入口。manifest 的 `setup` 字段指向它。
 
     **在同步返回前完成全部注册**：注册先进暂存批次，`setup` 正常返回才一次性并入
-    registry；中途抛异常则整批丢弃（`EDG-103`）。因此这里不该派生后台任务去「稍后注册」。
+    registry；中途抛异常则整批丢弃。因此这里不该派生后台任务去「稍后注册」。
     """
     api.register_tool(
         ToolSpec(

@@ -1,4 +1,4 @@
-"""`fs.grep`：在 workspace 内按正则搜索文本（技术方案 §8.2）。
+"""`fs.grep`：在 workspace 内按正则搜索文本。
 
 职责：`fs.grep` 的 `ToolSpec` 与 `ToolHandler` 实现。
 不负责：路径判定（`paths.py`）、解码（`content.py`）、注册（`registration.py`）。
@@ -6,7 +6,7 @@
 **正则由模型给，因此 ReDoS 有面**。三道约束合起来把它压成有界代价：pattern 长度封顶、
 每处理一个文件检查一次取消、匹配数封顶。这不是「挡住了 ReDoS」——一个足够病态的
 pattern 配一个足够长的行仍然能卡住一次调用，但那次调用会被 Kernel 的
-`tool_timeout_ms` 收走（`EDG-407`），而不是拖垮整个实例。
+`tool_timeout_ms` 收走，而不是拖垮整个实例。
 
 **二进制文件跳过而不是报错**：一次 grep 扫过几百个文件，其中有 PNG 是常态。让整次搜索
 因此失败，模型只能改成一个个文件读——那比返回一份「跳过了 N 个二进制文件」的结果差得多。
@@ -108,7 +108,7 @@ class GrepTool(FsTool):
         more = False
         for candidate in sorted(self._candidates(target, name_filter)):
             # 取消检查在**每个文件之前**：一次 grep 可能扫几百个文件，只在入口检查一次
-            # 等于取消要等到整次搜索结束（`EDG-407` 的宽限期就白给了）。
+            # 等于取消要等到整次搜索结束（宽限期就白给了）。
             cancel.raise_if_requested()
             found, readable = await asyncio.to_thread(self._search, candidate, pattern)
             if not readable:
@@ -138,7 +138,7 @@ class GrepTool(FsTool):
         """产出待搜索的文件。目标是文件时就搜它自己。
 
         与 `fs.list` 一样，每个条目重新过一次 `guard.resolve()`：指向根外的符号链接直接
-        跳过，一条越界链接不该让整次搜索失败，也不该被搜进结果（`EDG-405`）。
+        跳过，一条越界链接不该让整次搜索失败，也不该被搜进结果。
         """
         if target.is_file():
             yield target

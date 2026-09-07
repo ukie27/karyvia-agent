@@ -1,8 +1,8 @@
-"""插件配置块的形状校验：`plugins.<plugin_id>.{config,secrets}`（技术方案 §6.7）。
+"""插件配置块的形状校验：`plugins.<plugin_id>.{config,secrets}`。
 
 职责：把 `plugins` 小节里那些**不是保留键**的条目解析成 `PluginEntry`，并在形状不对时
 给出带 JSON Pointer 的问题；顺带回答「哪些插件 id 在配置里出现过」。
-不负责：逐字段校验插件配置（那要用 manifest 自带的 `config_schema`，属阶段 A）、
+不负责：逐字段校验插件配置（那要用 manifest 自带的 `config_schema`，属加载前校验）、
 解析 `${VAR}`（`secrets.py`，且解析发生在 `ctx.secret()` 调用时而不是加载时）、
 决定谁被加载。
 
@@ -10,12 +10,12 @@
 本模块一个字段名都不认识——它认识的是「插件条目长什么样」这个**形状**。独立模块也避免
 让具体字段表和插件条目解析共同挤压 Kernel 的 500 行上限。
 
-**为什么是 `plugins.<id>` 而不是 `plugins.config.<id>`**：技术方案 §6.7 写死的形状是
-`plugins.<plugin_id>.config`，`schema.py` 的模块 docstring 举的例子（`/plugins/acme/config/
-api_key`）也是它。代价是保留键与插件 id 共用一个命名空间，因此一个叫 `disable` 的插件
+**为什么是 `plugins.<id>` 而不是 `plugins.config.<id>`**：配置契约直接把
+`config` 和 `secrets` 放在每个插件 id 下。代价是保留键与插件 id 共用一个命名空间，
+因此一个叫 `disable` 的插件
 无法配置——那被显式拒绝（`CONFIG_INVALID`）而不是静默当成保留键。
 
-**`secrets` 与 `config` 分开是 `CFG-003` 的结构性保证**：凭据不在插件
+**`secrets` 与 `config` 分开是的结构性保证**：凭据不在插件
 自己的配置块里，`model-openai` 的 `config_schema` 因此根本没有 `api_key` 这个键，
 `ctx.config` 交给插件的那份东西里也就没有可泄漏的东西。`secrets` 的值只能是 `${VAR}`
 形态的字符串字面量，明文由 `ctx.secret()` 在调用时从环境变量取。
@@ -74,9 +74,9 @@ _EMPTY_SECRETS: Final[Mapping[str, str]] = MappingProxyType({})
 class PluginEntry:
     """一个插件在配置里的那一条。
 
-    `config` 原样交给 `ctx.config`（`CFG-002`：插件只看得见自己那一块）。
+    `config` 原样交给 `ctx.config`（插件只看得见自己那一块）。
     `secrets` 是名字到 `${VAR}` **字面量**的映射，`ctx.secret()` 调用时才解析——
-    加载期解析等于把明文提前搬进进程里一份，而 `EDG-502` 要的是「缺哪个变量」这条诊断
+    加载期解析等于把明文提前搬进进程里一份，而  要的是「缺哪个变量」这条诊断
     在真正取用时给出。
 
     """

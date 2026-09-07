@@ -1,4 +1,4 @@
-"""嵌入式 Python SDK：把 Karyvia 当库用的薄门面（技术方案 §4.2）。
+"""嵌入式 Python SDK：把 Karyvia 当库用的薄门面。
 
 职责：暴露 `open_instance()`（异步上下文管理器）与 `run()`（一次性问答），两者都只是
 `runtime.bootstrap()` + `AgentInstance` 的包装。
@@ -43,7 +43,7 @@ class EmbeddedAgent:
         """问一句，拿正文。
 
         **走的是 `orchestrator.handle()`**，与 CLI 与任何 Channel 完全同一个入口
-        （`MSG-007`）。被去重或被队列拒时返回空串，诊断在
+        。被去重或被队列拒时返回空串，诊断在
         `TurnReceipt`（用 `send()` 拿它）。
         """
         receipt = await self.send(content, conversation_id=conversation_id)
@@ -79,7 +79,7 @@ async def open_instance(
     """装配、启动、用完即停。
 
     **默认取实例锁**：嵌入式调用与 `karyvia run` 会写同一份会话历史，同时跑两个写者正是
-    `DST-005` 要挡的。明知在做只读实验时可以传 `acquire_lock=False`。
+     要挡的。明知在做只读实验时可以传 `acquire_lock=False`。
 
     `manifests` 让嵌入方换掉能力清单（默认就是内建那一份）。它**不是**第二套注册路径——
     交出去的仍然是同一个 `bootstrap()`，只是清单换了。测试用它把模型换成 Fake。

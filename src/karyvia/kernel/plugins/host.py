@@ -1,4 +1,4 @@
-"""唯一的 Host `KaryviaAPI` 实现：把 10 个注册方法分派进 `RegistrationBatch`（技术方案 §7.5）。
+"""唯一的 Host `KaryviaAPI` 实现：把 10 个注册方法分派进 `RegistrationBatch`。
 
 职责：接住插件 `setup(api)` 里的 10 类注册调用，回查声明表取 `overrides` 与 `priority`，
 包成对应 kind 的注册载荷，逐条放进批次；并在 `finish()` 时核对声明与实际注册一一对应。
@@ -6,7 +6,7 @@
 Host）、构造 `PluginContext`、发现插件、判定谁最终生效
 （`kernel/registry/resolution.py`）。本模块不做 IO。
 
-**内建与插件共用这一个实现**（`SDK-007`、`BAS-005`）：不存在内建专用注册 API。两者的差别
+**内建与插件共用这一个实现**：不存在内建专用注册 API。两者的差别
 全部在 `LoadRequest` 的产出方式上（内建来自静态可信清单，插件还要过发现与依赖校验），
 差异不延伸到能力注册接口。
 
@@ -19,9 +19,9 @@ Host）、构造 `PluginContext`、发现插件、判定谁最终生效
 `pyproject.toml` 的 `exclude = ["**/tests"]` 让测试无法承担这个角色）。
 
 **未声明的注册是错误**（`PLUGIN_LOAD_FAILED`）。放行它等于让 manifest 的 `capabilities`
-变成一份没有约束力的文档，而 `overrides` 只能从那里来（`EDG-102`：覆盖永不由加载顺序
+变成一份没有约束力的文档，而 `overrides` 只能从那里来（覆盖永不由加载顺序
 决定），`karyvia capabilities` 也建立在「声明即全集」上。反过来，声明了
-却没注册同样是错误——那说明 manifest 骗过了阶段 A，用户会看到一项查得到却不存在的能力。
+却没注册同样是错误——那说明 manifest 骗过了加载前校验，用户会看到一项查得到却不存在的能力。
 两者共用一个码，靠 `detail` 区分：诊断要回答的是「manifest 和实现对不上」这件事本身。
 """
 
@@ -72,7 +72,7 @@ class CapabilityHost(Generic[_ContextT]):
 
     生命周期：由 loader 建好、交给 `setup(api)`、`setup` 返回后 loader 调 `finish()` 再
     `commit()`。Host 自己**从不提交**——`setup` 的返回时刻在 loader 的作用域里，而
-    `EDG-103`「中途抛异常整批丢弃」要求提交发生在那之后。
+    「中途抛异常整批丢弃」要求提交发生在那之后。
     """
 
     __slots__ = ("_batch", "_ctx", "_declared", "_hook_counts", "_namespaces", "_used")
@@ -112,7 +112,7 @@ class CapabilityHost(Generic[_ContextT]):
         self._register(CapabilityKind.TOOL, spec.name, RegisteredTool(spec=spec, handler=handler))
 
     def register_command(self, spec: CommandSpec, handler: CommandHandler) -> None:
-        """注册一个斜杠命令。别名冲突由 `build_command_index()` 在启动期查（`CMD-002`）。"""
+        """注册一个斜杠命令。别名冲突由 `build_command_index` 在启动期查。"""
         self._register(
             CapabilityKind.COMMAND, spec.name, RegisteredCommand(spec=spec, handler=handler)
         )
@@ -138,7 +138,7 @@ class CapabilityHost(Generic[_ContextT]):
         self._register(CapabilityKind.MODEL, name, RegisteredModelProvider(provider=provider))
 
     def register_channel(self, name: str, channel: Channel) -> None:
-        """注册一个外部平台接入。注册只是登记，`start()` 由 Runtime 在阶段 D 调用。"""
+        """注册一个外部平台接入。注册只是登记，`start()` 由 Runtime 在激活阶段 调用。"""
         self._register(CapabilityKind.CHANNEL, name, RegisteredChannel(channel=channel))
 
     def register_memory_provider(self, name: str, provider: MemoryProvider) -> None:
@@ -150,7 +150,7 @@ class CapabilityHost(Generic[_ContextT]):
         self._register(CapabilityKind.SESSION_STORE, name, RegisteredSessionStore(store=store))
 
     def register_cli_entry(self, name: str, entry: CliEntry) -> None:
-        """注册本地命令行入口（SINGLETON，不可禁用，见 `BAS-009`/`EDG-108`）。"""
+        """注册本地命令行入口（SINGLETON，不可禁用，见 /）。"""
         self._register(CapabilityKind.CLI_ENTRY, name, RegisteredCliEntry(entry=entry))
 
     def on(
@@ -228,7 +228,7 @@ class CapabilityHost(Generic[_ContextT]):
 
         **两条同时匹配是错误而不是择一**：`mcp` 与 `mcp.remote` 两个前缀都能放行
         `mcp.remote.read`，选哪一条会决定它拿到哪个 `priority`。静默择一正是
-        `EDG-102`「覆盖永不由加载顺序决定」在这一层的对应物。
+        「覆盖永不由加载顺序决定」在这一层的对应物。
         """
         matches = [decl for decl in self._namespaces if decl.covers(kind, name)]
         if not matches:

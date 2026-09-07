@@ -1,7 +1,7 @@
-"""实例排他锁（技术方案 §10.1 步骤 1、`EDG-507`、`DST-005`）。
+"""实例排他锁。
 
 职责：用 `O_EXCL` 获取 `instance.lock`，判定并回收陈旧锁，释放时不误删别人的锁。
-不负责：判定 PID 是否存活（`process.py`）、发布事件或写日志（`D12`）、注册退出钩子
+不负责：判定 PID 是否存活（`process.py`）、发布事件或写日志、注册退出钩子
 （生命周期归 `runtime/bootstrap.py`——`kernel/` 不留全局副作用）。
 
 互斥机制只有两样：`O_EXCL` 创建 + 对占用者的存活探测。**不引入** `fcntl.flock` /
@@ -12,10 +12,10 @@
 安全网：CPython 的 `os.open` 用 `_wopen`，共享模式 `_SH_DENYNO` 共享读写但**不共享删除**，
 所以别的进程即使把陈旧性算错了也 `unlink` 不掉一把活锁，只会拿到 `PermissionError`。
 回收路径因此必须把那个错误降级成「持有者存活 → 拒绝」，而不是让它冒出去。
-反过来，第二个进程必须仍能**读**被持有的锁文件，否则 `EDG-507` 报不出 PID——
+反过来，第二个进程必须仍能**读**被持有的锁文件，否则  报不出 PID——
 `_SH_DENYNO` 允许这件事，而这正是有人「用 `msvcrt.locking` 改进一下」就会破坏的不变量。
 
-`O_EXCL` 在 NFS 上不可靠。`DST-005` 把范围限定在同一主机，锁里记的 `hostname` 让共享
+`O_EXCL` 在 NFS 上不可靠。 把范围限定在同一主机，锁里记的 `hostname` 让共享
 文件系统的情形失败关闭：主机名不同就一律当成占用中，绝不去探测另一台机器上的 PID。
 """
 
@@ -97,7 +97,7 @@ class LockInfo:
         }
 
     def describe(self) -> str:
-        """给人看的一句话。PID 必须出现在里面（`EDG-507` 要求能指出是谁）。"""
+        """给人看的一句话。PID 必须出现在里面。"""
         when = (
             time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.created_at))
             if self.created_at
@@ -115,7 +115,7 @@ def _as_float(value: object) -> float:
 
 @dataclass(frozen=True, slots=True)
 class StaleLockReclaimed:
-    """回收一把陈旧锁的记录。调用方（`D23`）应当把它大声报出来。"""
+    """回收一把陈旧锁的记录。调用方应当把它大声报出来。"""
 
     #: `dead_pid` / `pid_reused` / `unreadable`。
     reason: str

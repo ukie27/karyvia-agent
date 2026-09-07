@@ -1,18 +1,18 @@
-"""唯一 Host 的注册分派测试（`D16` 验收；`SDK-007`、`BAS-005`、`EDG-102`、`EDG-103`）。
+"""唯一 Host 的注册分派测试。
 
 四条主线：
 
-- **一个 Host 服务两种身份**。开发方案点名的验收是「用同一个 Host API 分别注册一个 Fake
+- **一个 Host 服务两种身份**。用同一个 Host API 分别注册一个 Fake
   builtin 和一个 Fake plugin，断言 registry 结果结构一致，只允许 `ProviderId` 不同」。
-  这条测试是「不存在内建专用注册 API」（`SDK-007`）唯一可断言的形态。
-- **声明表是全集**。`overrides` 只能来自 manifest（`EDG-102`：覆盖永不由加载顺序决定），
+  这条测试是「不存在内建专用注册 API」唯一可断言的形态。
+- **声明表是全集**。`overrides` 只能来自 manifest（覆盖永不由加载顺序决定），
   因此未声明的注册与已声明却没注册都是错误，两者靠 `detail` 区分。
 - **HOOK 的命名与优先级**。`on()` 既没有 name 也分不清「作者写了 100」和「什么都没写」，
   两件事各有一条测试钉住结论。
-- **Host 不提交批次**。`setup` 的返回时刻在 loader 的作用域里，`EDG-103` 要求提交发生在
+- **Host 不提交批次**。`setup` 的返回时刻在 loader 的作用域里， 要求提交发生在
   那之后。
 
-`ctx` 一律用 `FakePluginContext`：`D16` 的 Host 只持有并转交它、一个成员都不碰，
+`ctx` 一律用 `FakePluginContext`： 的 Host 只持有并转交它、一个成员都不碰，
 因此这些用例不该也不需要构造生产资源服务（那是 `tests/runtime/` 的事）。
 """
 
@@ -150,9 +150,9 @@ def test_ctx_is_handed_back_untouched() -> None:
 
 
 def test_the_same_host_gives_builtin_and_plugin_identical_structure() -> None:
-    """开发方案点名的验收：结构一致，只允许 `ProviderId` 与由它派生的 priority 不同。
+    """内建与外部插件的登记结构一致，只允许 `ProviderId` 与由它派生的 priority 不同。
 
-    「不存在内建专用注册 API」（`SDK-007`）没有别的可断言形态——两条路径产出的登记必须
+    「不存在内建专用注册 API」没有别的可断言形态——两条路径产出的登记必须
     逐字段相同，否则「同一条注册契约」就只是一句话。
     """
     plugin: ProviderId = Plugin(PluginId("acme"))
@@ -214,7 +214,7 @@ def test_registering_an_undeclared_capability_is_rejected() -> None:
 
 
 def test_a_declared_capability_that_is_never_registered_fails_at_finish() -> None:
-    """声明了却没注册说明 manifest 骗过了阶段 A——用户会看到一项查得到却不存在的能力。"""
+    """声明了却没注册说明 manifest 骗过了加载前校验——用户会看到一项查得到却不存在的能力。"""
     _, _, host = make_host(
         declare(CapabilityKind.TOOL, ECHO_SPEC.name),
         declare(CapabilityKind.MODEL, "model"),
@@ -233,7 +233,7 @@ def test_finish_passes_when_every_declaration_is_fulfilled() -> None:
 
 
 def test_overrides_come_from_the_declaration_not_from_the_call() -> None:
-    """`EDG-102`：覆盖只能显式声明。注册调用本身没有表达覆盖的参数，这是刻意的。"""
+    """覆盖只能显式声明。注册调用本身没有表达覆盖的参数，这是刻意的。"""
     registry, batch, host = make_host(
         declare(CapabilityKind.TOOL, ECHO_SPEC.name, overrides="builtin:fs.read"),
         provider=Plugin(PluginId("acme")),
@@ -305,7 +305,7 @@ def test_two_handlers_on_one_hook_get_distinct_registry_names() -> None:
 
 
 def test_the_host_does_not_commit_the_batch() -> None:
-    """提交归 loader：`setup` 的返回时刻在它的作用域里，`EDG-103` 要求提交发生在那之后。"""
+    """提交归 loader：`setup` 的返回时刻在它的作用域里， 要求提交发生在那之后。"""
     registry, _, host = make_host(declare(CapabilityKind.TOOL, ECHO_SPEC.name))
     host.register_tool(ECHO_SPEC, EchoTool())
     host.finish()
@@ -324,10 +324,10 @@ def test_registering_after_commit_raises() -> None:
     assert excinfo.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
-# --------------------------------------------------------------- 命名空间声明（`D38-A`）
+# --------------------------------------------------------------- 命名空间声明
 #
 # 这套机制是为「能力名要连上外部服务才知道」开的（MCP 的远端工具名只有 `list_tools`
-# 之后才可知，而 manifest 是静态的）。形状照 `on()` 那条已有的先例：一条声明、N 次注册。
+# 之后才可知，而 manifest 是静态的）。形状照 `on()` 那条已有的既有实现：一条声明、N 次注册。
 
 
 def namespace(kind: CapabilityKind, prefix: str, **kwargs: object) -> CapabilityDeclaration:

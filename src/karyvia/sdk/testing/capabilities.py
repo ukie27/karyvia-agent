@@ -8,7 +8,7 @@
 再塞进去会逼近上限；更要紧的是两者的定位不同——`fakes.py` 里的
 `FakeModelProvider` / `InMemorySessionStore` 是**可编脚本的**测试替身（有状态、可断言
 调用序列），这里的几个是**参考实现**：它们存在的意义是「契约基类有一个跑得通的样例」，
-`ToolContract` 与 `ChannelContract` 自 `D05` 发布至今都没有这样的东西，`D15` 与
+`ToolContract` 与 `ChannelContract` 自  发布至今都没有这样的东西， 与
 `tests/sdk/` 因此各自私下写了一份。两个入口都由 `sdk.testing` 统一导出。
 
 `FakePluginContext` 只提供不涉及外部资源的参考实现。文件、网络与进程访问仍需插件测试
@@ -279,10 +279,10 @@ class RecordingEventSubscriber:
 
 
 class FakeInstanceView:
-    """最小合规 `InstanceView`（`D22`）：五份数据都由构造参数直接给出。
+    """最小合规 `InstanceView`：五份数据都由构造参数直接给出。
 
     刻意**不**内建任何默认内容：一个自带三条假命令的视图会让 `/help` 的测试在什么都没
-    注册时也「看起来对」。空实例的正确形态就是空——`EDG-101` 要求那也是可用的。
+    注册时也「看起来对」。空实例的正确形态就是空—— 要求那也是可用的。
     """
 
     def __init__(
@@ -330,7 +330,7 @@ class FakeInstanceView:
 
 
 class FakeTurnControl:
-    """最小合规 `TurnControl`（`D22`）：记下每次取消请求，供断言。
+    """最小合规 `TurnControl`：记下每次取消请求，供断言。
 
     `cancel_turn()` 对未知 `turn_id` 返回 `False` 而**不抛**——「已经结束了」与「失败了」
     对用户是同一个好结果，对诊断不是。请求仍然记进 `requested`：`/cancel` 是否真的把
@@ -371,7 +371,7 @@ class FakePluginContext:
         self._state_dir = state_dir or Path(".")
         self._secrets = dict(secrets or {})
         self._events = RecordingEventSubscriber()
-        #: `D22`：诊断视图与 turn 控制面默认给空实现，而不是留 `None` 让属性访问炸掉。
+        #: ：诊断视图与 turn 控制面默认给空实现，而不是留 `None` 让属性访问炸掉。
         self._instance = instance if instance is not None else FakeInstanceView()
         self._turns = turns if turns is not None else FakeTurnControl()
         #: 经 `spawn_task()` 登记过的任务名，按顺序。不真的起协程——「谁的任务」可判定

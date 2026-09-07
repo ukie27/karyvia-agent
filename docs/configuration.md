@@ -45,7 +45,7 @@
 default  <  config.json  <  env  <  cli
 ```
 
-这个顺序只在 `kernel/config/sources.py::collect_layers()` 的返回顺序里定义一次。
+这个顺序只在 `kernel/config/sources.py::collect_layers` 的返回顺序里定义一次。
 **内置默认值是完整的一层**，不是 dataclass 兜底——所以「这个值取自默认值」是一个查得到
 的答案，而不是「查不到来源」：
 
@@ -197,7 +197,7 @@ Session 的等待上限。保留旧字段会按未知配置拒绝启动，避免
 空间、5% 安全余量，并把压缩目标设为触发线的 80%。超限时，策略只能用
 摘要替换可压缩单元的连续前缀，工具调用与它的全部结果永远是同一单元。摘要立即用于当前
 Turn；若它只覆盖初始 Session 的连续前缀，Kernel 会先追加本 Turn 的 Transcript，再调用
-`SessionStore.compact()` 持久化摘要和水位。混入 Context、Memory 或本 Turn 工具往返的摘要
+`SessionStore.compact` 持久化摘要和水位。混入 Context、Memory 或本 Turn 工具往返的摘要
 不会写入 Session。内建 `basic` 默认启用；策略运行失败、返回非法结果或压缩后仍超限时，
 当前 Turn 明确失败，Kernel 不再执行隐式裁剪或回落到另一策略。Provider 返回实际输入
 usage 时，Kernel 会把实际请求保存为相同 Session 的计量锚点；模型、工具、采样参数和消息
@@ -288,7 +288,7 @@ usage 时，Kernel 会把实际请求保存为相同 Session 的计量锚点；�
 | 键 | 作用 |
 | --- | --- |
 | `config` | 交给插件的配置。逐字段的校验用插件 manifest 自带的 `config_schema` |
-| `secrets` | 凭据。值**只能是 `${VAR}` 形态的字符串**，明文由 `ctx.secret()` 在调用时从环境变量取 |
+| `secrets` | 凭据。值**只能是 `${VAR}` 形态的字符串**，明文由 `ctx.secret` 在调用时从环境变量取 |
 
 **`secrets` 与 `config` 分开是结构性保证**：凭据不在插件自己的配置块里，因此
 `ctx.config` 交给插件的那份东西里根本没有可泄漏的内容。`model-openai` 的 `config_schema`

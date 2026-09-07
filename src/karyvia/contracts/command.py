@@ -1,14 +1,14 @@
-"""命令契约：声明、调用与结果（需求 §9.13 `CMD-001`–`CMD-005`、技术方案 §6.3）。
+"""命令契约：声明、调用与结果。
 
 职责：定义命令声明 `CommandSpec`、一次命令调用 `CommandInvocation`、输入分流的四态
 `Disposition` 与命令处理结果 `CommandResult`。
 不负责：解析命令前缀与参数、匹配命令名、执行 handler、捕获异常——那些在
-`kernel/routing/`（`D13`）与 `builtins/commands_core/`（`D22`）；本模块不含任何 IO。
+`kernel/routing/`与 `builtins/commands_core/`；本模块不含任何 IO。
 
 命令与 Tool 是并列的一等能力，因此它的三件套单独成模块（对标 `tool.py`），
 而不是塞进 `capability.py`——后者管的是「能力如何被标识」，不是某一类能力的载荷。
 
-`Disposition` 的四个取值照抄技术方案 §6.3，`kernel/routing/dispatcher.py` 直接复用
+`Disposition` 的四个取值是命令分流的完整状态集，`kernel/routing/dispatcher.py` 直接复用
 这一个枚举。分流决策与命令结果共用一套取值，是为了避免出现「dispatcher 认为继续、
 handler 认为已处理」这种只能靠映射表调和的分裂。
 """
@@ -48,7 +48,7 @@ _PARAM_NAME_PATTERN: Final = re.compile(r"^[a-z][a-z0-9_-]*$")
 
 @dataclass(frozen=True, slots=True)
 class CommandParam:
-    """一个命令参数的声明（`CMD-001`「参数形式」）。
+    """一个命令参数的声明（「参数形式」）。
 
     只描述位置参数：命令是给人敲的，不是给模型调的（那是 Tool 的活），
     引入具名选项与类型系统只会让 `/help` 的输出比命令本身还长。
@@ -77,7 +77,7 @@ class CommandParam:
 
 @dataclass(frozen=True, slots=True)
 class CommandSpec:
-    """命令声明（`CMD-001`）：名称、参数形式、说明和操作者要求。"""
+    """命令声明：名称、参数形式、说明和操作者要求。"""
 
     name: str
     description: str
@@ -138,17 +138,17 @@ class CommandSpec:
 
     @property
     def all_names(self) -> tuple[str, ...]:
-        """命令名与全部别名。`CMD-002` 的启动期冲突检查按这个集合比对。"""
+        """命令名与全部别名。 的启动期冲突检查按这个集合比对。"""
         return (self.name, *self.aliases)
 
 
 @dataclass(frozen=True, slots=True)
 class CommandInvocation:
-    """一次命令调用（技术方案 §6.3）。
+    """一次命令调用。
 
     `message` 原样带上，handler 因此能拿到 `sender.is_operator`、附件与平台元数据，
     不需要 Kernel 预先把这些字段一个个转抄进来。`correlation` 是必填的：命令即使不进
-    模型也分配 `turn_id` 并发布 turn 事件，可观测性才统一（`KER-010`）。
+    模型也分配 `turn_id` 并发布 turn 事件，可观测性才统一。
     """
 
     name: str
@@ -168,7 +168,7 @@ class CommandInvocation:
 
 
 class Disposition(StrEnum):
-    """输入分流的四态（技术方案 §6.3）。"""
+    """输入分流的四态。"""
 
     COMMAND_HANDLED = "command_handled"
     """命令已产生输出，本次输入不进模型。"""
@@ -180,7 +180,7 @@ class Disposition(StrEnum):
     """未命中任何命令。这是 dispatcher 的结论，handler 永远不会返回它。"""
 
     REJECTED = "rejected"
-    """校验失败或命令执行失败。会话保持可用，进程不退出（`CMD-003`）。"""
+    """校验失败或命令执行失败。会话保持可用，进程不退出。"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -189,7 +189,7 @@ class CommandResult:
 
     `fragments` 让命令可以向本次 turn 注入上下文（Skill、Prompt 片段的落点）。它是
     `ContextFragment` 而不是裸文本，因此自动受 `trust`、`priority`、预算与敏感级别约束
-    ——`CMD-004`、`CMD-005` 要的「不得凭借文本形式绕过限制」在类型上就已经成立。
+    ——、 要的「不得凭借文本形式绕过限制」在类型上就已经成立。
     """
 
     disposition: Disposition

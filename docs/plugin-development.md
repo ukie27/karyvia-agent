@@ -44,7 +44,7 @@ MANIFEST = PluginManifest(
     sdk_range=">=5.0.0,<6.0.0",
     setup="karyvia_plugin_my_plugin:setup",
     # 有约束力的全集：setup 里注册的每一项都必须在这里声明，反之亦然。
-    capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="my.tool"),),
+    capabilities=(CapabilityDecl(kind=CapabilityKind.TOOL, name="my.tool")),
     # 用户能在 plugins.my-plugin.config 里写什么。宿主在加载前按它校验。
     config_schema={
         "type": "object",
@@ -96,12 +96,12 @@ def setup(api: KaryviaAPI) -> None:
 
 `register_turn_compactor(name, compactor)` 注册的是模型请求边界上的统一压缩策略。
 Runtime 总是选中一个 `TURN_COMPACTOR`，默认为内建 `basic`；用户可通过
-`context.turn_compactor` 选择第三方实现。`TurnContextCompactor.compact()` 收到不可拆分的
+`context.turn_compactor` 选择第三方实现。`TurnContextCompactor.compact` 收到不可拆分的
 `TurnContextUnit` 序列，返回要替换的连续前缀长度与非空摘要。摘要立即服务当前请求；Kernel
 只在其精确覆盖初始 Session 连续前缀时，于 Turn 收口时持久化。插件不得改写 Session、
 Transcript 或工具副作用；非法结果和运行失败都会终止当前 Turn，不会静默改用内建策略。
 
-如果策略需要模型摘要，使用 `compact()` 当次收到的 `CompactionModel`，不要自行查找
+如果策略需要模型摘要，使用 `compact` 当次收到的 `CompactionModel`，不要自行查找
 Provider。这个窄门面绑定当前实例已选模型、Turn correlation、取消和剩余时间，
 只允许无工具、非流式的 `complete(messages, cancel, max_output_tokens=...)`，且不会再进入
 Turn 压缩层。内建 `basic` 当前不调用它，第三方和后续内建策略可直接使用。
@@ -111,7 +111,7 @@ Turn 压缩层。内建 `basic` 当前不调用它，第三方和后续内建策
 
 ### 长生命周期资源
 
-`setup()` 只登记，不应在这里建立长连接或让后台任务抢跑。使用 `PluginContext` 的三个入口：
+`setup` 只登记，不应在这里建立长连接或让后台任务抢跑。使用 `PluginContext` 的三个入口：
 
 ```python
 from karyvia.sdk import KaryviaAPI
@@ -126,23 +126,23 @@ class Service:
 
 
 def setup(api: KaryviaAPI) -> None:
-    service = Service()
+    service = Service
 
-    async def connect() -> None:
-        await service.connect()
+    async def connect -> None:
+        await service.connect
 
-    async def close() -> None:
-        await service.close()
+    async def close -> None:
+        await service.close
 
     api.ctx.on_start(connect)
     api.ctx.add_cleanup(close)
-    api.ctx.spawn_task(service.run(), name="service-loop")
+    api.ctx.spawn_task(service.run, name="service-loop")
 ```
 
-- `on_start()` 按插件依赖顺序执行，此时 Registry 已冻结，`ctx.instance` 与 `ctx.turns` 已可用。
-- `spawn_task()` 在 `setup()` 中只登记，完成 `on_start()` 后才真正启动；插件激活后调用则立即
+- `on_start` 按插件依赖顺序执行，此时 Registry 已冻结，`ctx.instance` 与 `ctx.turns` 已可用。
+- `spawn_task` 在 `setup` 中只登记，完成 `on_start` 后才真正启动；插件激活后调用则立即
   启动。
-- `add_cleanup()` 释放连接池、数据库连接等非 Task 资源，同一插件内按登记逆序执行。
+- `add_cleanup` 释放连接池、数据库连接等非 Task 资源，同一插件内按登记逆序执行。
 - 停止时先取消后台任务，再执行清理；一个清理失败不会跳过其余清理。
 
 不要用 `instance_shutdown` Observer 释放关键资源：Observer 的失败按设计被隔离，而且它不是
@@ -229,7 +229,7 @@ DECL = CapabilityDecl(
 
 ### 被禁用之后
 
-插件被写进 `plugins.disable` 后，Runtime 不读取其 manifest、不执行 `setup()`，也不注册
+插件被写进 `plugins.disable` 后，Runtime 不读取其 manifest、不执行 `setup`，也不注册
 它的任何能力：
 
 ```json
@@ -246,7 +246,7 @@ DECL = CapabilityDecl(
 
 ## 7.5 能力名要连上外部服务才知道：命名空间声明
 
-manifest 是**静态**的，而 `CapabilityHost.finish()` 要求声明的 `(kind, name)` 与实际注册的
+manifest 是**静态**的，而 `CapabilityHost.finish` 要求声明的 `(kind, name)` 与实际注册的
 **逐条相等**。桥接类插件（MCP、远端工具网关）撞得上这条：远端工具名要连上 server、
 `list_tools` 之后才可知。
 
@@ -295,7 +295,7 @@ from karyvia.sdk.testing import InMemorySessionStore, SessionStoreContract
 
 class TestMyStore(SessionStoreContract):
     def make_store(self) -> SessionStore:
-        return InMemorySessionStore()
+        return InMemorySessionStore
 ```
 
 基类是 `ModelProviderContract` / `SessionStoreContract` / `ToolContract` /

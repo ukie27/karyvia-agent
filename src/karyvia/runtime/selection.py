@@ -128,7 +128,7 @@ def select_turn_compactor(
 def require_sessions(registry: CapabilityRegistry) -> SessionStore:
     binding = session_store_from(registry)
     if binding is None:
-        raise missing_capability("SESSION_STORE", "没有会话存储，历史无处可写（SES-003）。")
+        raise missing_capability("SESSION_STORE", "没有会话存储，历史无处可写。")
     return binding.value
 
 

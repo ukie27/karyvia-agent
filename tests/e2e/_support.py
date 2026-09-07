@@ -6,7 +6,7 @@
 
 **为什么是 SSE 而不是一次性 JSON**：装配根默认 `stream=True`（`OrchestratorDeps.stream`），
 因此真实路径走的是流式分片与 `StreamFolder` 的增量拼装。用非流式响应录制会让这套用例绕开
-`D19` 最容易出错的那一段，而那正是「开箱可用」最先撞上的地方。
+ 最容易出错的那一段，而那正是「开箱可用」最先撞上的地方。
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def use_tool(
     """模型这一轮要调一个工具。
 
     参数**故意切成两片**发：`arguments` 在线格式里是被切碎的字符串，只能 `+=`，
-    流结束才 `json.loads`（`D19` 记下的四个坑之一）。一次发完的录制验不到那条路。
+    流结束才 `json.loads`。一次发完的录制验不到那条路。
     """
     encoded = json.dumps(dict(arguments))
     half = max(1, len(encoded) // 2)

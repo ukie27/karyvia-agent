@@ -1,18 +1,17 @@
-"""启动序列：从「实例在哪」到一个可以接受输入的 `AgentInstance`（技术方案 §10.1）。
+"""启动序列：从「实例在哪」到一个可以接受输入的 `AgentInstance`。
 
 职责：按 §10.1 的十步装配一个实例——取锁、加载配置、挑选内建清单、发现并规划外部插件、
 注册能力、解析覆盖、校验必需能力、装出 `OrchestratorDeps` 与两个门面。
-不负责：跑它（`instance.py`）、解析 argv（`runtime/cli/`）、阶段 A 的三项判定
+不负责：跑它（`instance.py`）、解析 argv（`runtime/cli/`）、加载前校验 的三项判定
 （`plugin_plan.py` + `kernel/plugins/loader.py`）、插件装配策略（`plugin_bootstrap.py`）、
 生成首次运行的配置。
 
-**插件装配策略已收口在 `plugin_bootstrap.py`**：内建配置块派生、阶段 A 桥接、
+**插件装配策略已收口在 `plugin_bootstrap.py`**：内建配置块派生、加载前校验 桥接、
 能力筛选与 `setup()` 配置同源都在那里。本模块只按顺序调用它们，并用 `StartupResources`
 保证任何一步失败时，已经产生的任务、订阅和 sink 都会在实例锁释放前回滚。
 
-**`EDG-108` 在这里落地两次**：配置试图禁用 CLI 入口时直接拒绝启动；覆盖 CLI 的提供方
-没能交出实现时，用同一批 manifest 再装一次、但只让内建提供 CLI 入口（`BAS-010` 的
-「强制回落」，且它不允许被配置成 `fail_start`）。
+** 在这里落地两次**：配置试图禁用 CLI 入口时直接拒绝启动；覆盖 CLI 的提供方
+没能交出实现时，用同一批 manifest 再装一次、但只让内建提供 CLI 入口。
 """
 
 from __future__ import annotations
@@ -118,7 +117,7 @@ def load_config_or_report(
     overrides: Sequence[str] | None,
     home: Path | None,
 ) -> LoadedConfig:
-    """§10.1 步骤 2。解析失败时把错误写进 `logs/`（`EDG-501` 的后半句）。
+    """§10.1 步骤 2。解析失败时把错误写进 `logs/`（后半句）。
 
     **这是 `write_config_error()` 唯一的调用点**：配置解析失败发生在事件总线建起来之前，
     做成 sink 就等于把这条需求推回它无法成立的时序里。写盘失败不掩盖
@@ -231,17 +230,17 @@ async def _build_instance(
         bus,
         entry_points=GlobalPluginHome.resolve(env=env, home=home).entry_points,
     )
-    # 阶段 A 校验与拓扑排序。产出接到诊断上，`/plugins` 因此列得出
+    # 加载前校验 校验与拓扑排序。产出接到诊断上，`/plugins` 因此列得出
     # 候选、跳过原因与两个阶段的失败。
     plan, inventory = plan_external(
         inventory, config, layout, loaded.workspace_root, bus, selected
     )
     external_ids = [manifest.id for manifest in plan.manifests]
     # 内建在前、外部插件按拓扑序在后。顺序只保证「被依赖者先 setup」，覆盖由 manifest 的
-    # `overrides` 决定（`EDG-102`）。
+    # `overrides` 决定。
     all_manifests = (*selected, *plan.manifests)
 
-    # 内建与外部插件共用注册、覆盖解析和 Registry 冻结路径（`SDK-007`）。
+    # 内建与外部插件共用注册、覆盖解析和 Registry 冻结路径。
     runtime = PluginRuntime()
     attempt = resources.plugin_checkpoint()
     wiring = await wire_all(
@@ -260,7 +259,7 @@ async def _build_instance(
         for manifest in all_manifests
         for decl in manifest.capabilities
     ):
-        # `EDG-108`/`BAS-010`：覆盖 CLI 的提供方没交出实现，强制回落到内建实现。
+        # /：覆盖 CLI 的提供方没交出实现，强制回落到内建实现。
         # 重装一次而不是打补丁——半装好的 registry 已经冻结，改它比重来更容易出错。
         outcomes = await resources.rollback_plugins(
             attempt, timeout_ms=config.plugins.stop_timeout_ms
@@ -292,7 +291,7 @@ async def _build_instance(
     model, model_id, model_info = select_model(registry, config)
     cli = cli_entry_from(registry)
     if cli is None:
-        raise missing_capability("CLI_ENTRY", "没有本地交互入口（BAS-009）。")
+        raise missing_capability("CLI_ENTRY", "没有本地交互入口。")
 
     instance = _assemble(
         layout=layout,
@@ -337,7 +336,7 @@ def _plugin_status_source(
         for status in inventory.statuses():
             lifecycle = by_id.get(str(status.plugin_id))
             if lifecycle is None or status.state is PluginState.FAILED:
-                # 阶段 A 落榜的插件根本没有生命周期，而已经记下的失败不该被一个
+                # 加载前校验 落榜的插件根本没有生命周期，而已经记下的失败不该被一个
                 # 后续生命周期状态盖掉。
                 rows.append(status)
                 continue

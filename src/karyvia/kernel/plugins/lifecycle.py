@@ -1,4 +1,4 @@
-"""插件生命周期：状态机、停止顺序与停止超时（技术方案 §7.4；`NFR-201`、`PLG-005`、`EDG-104`）。
+"""插件生命周期：状态机、停止顺序与停止超时。
 
 职责：定义插件的六个生命周期阶段与**唯一**一张合法转换表、把阶段投影成诊断用的
 `PluginState`、把一批停止动作按给定顺序逐个跑完并为每个动作施加独立超时。
@@ -7,11 +7,11 @@
 `runtime/plugin_context.py`）、发布事件（bus 在装配根手里）、决定谁被禁用（配置，
 且首版不热更新）。
 
-**停止顺序不在这里算**（`PLG-005`）：`stop_order()` 只是把 `LoadPlan.order` 翻过来。
+**停止顺序不在这里算**：`stop_order` 只是把 `LoadPlan.order` 翻过来。
 再写一遍拓扑排序会让「被依赖者后停」与「被依赖者先起」各有一份实现，而它们必须是同一
 个序的两面——一份坏了，另一份的测试不会响。
 
-**超时后是放弃等待而不是等到它结束**（`EDG-104`）：一个吞掉 `CancelledError` 的插件任务
+**超时后是放弃等待而不是等到它结束**：一个吞掉 `CancelledError` 的插件任务
 可以永远不返回，而实例退出不能被它扣住。放弃意味着那个协程可能仍在跑——`StopOutcome`
 如实标着 `timed_out`，`TIMEOUT_PLUGIN_STOP` 因此是一条独立的错误码而不是复用加载失败。
 
@@ -45,16 +45,16 @@ __all__ = [
     "units_for",
 ]
 
-#: 单个插件的停止预算（技术方案 §7.4 的 `plugin_stop_timeout_ms`）。
+#: 单个插件的停止预算。
 #: **与 `kernel/config/schema.py` 的 `DEFAULT_PLUGIN_STOP_TIMEOUT_MS` 必须相等**，
 #: 由 `test_plugin_stop_timeout_default_matches_the_config_schema` 盯着。两处各写一份的
 #: 理由与 turn 的六项预算相同：`kernel.config` 不能 import 本包（会把 registry、routing、
-#: turn 与 asyncio 一起拖上 `karyvia config show` 的路径，`NFR-405` 的冷启动预算）。
+#: turn 与 asyncio 一起拖上 `karyvia config show` 的路径，既定冷启动预算）。
 DEFAULT_STOP_TIMEOUT_MS: Final = 5_000
 
 
 class PluginPhase(StrEnum):
-    """插件生命周期的阶段（技术方案 §7.4 的状态机）。
+    """插件生命周期的阶段。
 
     与 `PluginState` 的分工见模块 docstring：这里是判定口径，那里是显示口径。
     `DISABLED` 不在这里——它是配置结论而不是阶段，一个被禁用的插件根本不会进入生命周期。
@@ -62,7 +62,7 @@ class PluginPhase(StrEnum):
 
     #: 候选被发现、manifest 已读。
     DISCOVERED = "discovered"
-    #: 阶段 A 全部通过：SDK 兼容、依赖可解、配置合 schema、状态版本一致。
+    #: 加载前校验 全部通过：SDK 兼容、依赖可解、配置合 schema、状态版本一致。
     VALIDATED = "validated"
     #: `setup()` 跑完且整批注册已提交。
     LOADED = "loaded"
@@ -84,11 +84,11 @@ class PluginPhase(StrEnum):
 #: 三条不那么显然的边：
 #:
 #: - `LOADED -> STOPPING`：装配失败时已经 `setup()` 过的插件仍然要被清理，它没经过
-#:   `STARTED`（实例从未就绪）。
+#: `STARTED`（实例从未就绪）。
 #: - `FAILED -> STOPPING`：`setup()` 中途失败的插件**注册被回滚了、副作用没有**——它可能
-#:   已经 `spawn_task()` 或订阅过事件（`setup` 跑在事件循环里）。不给它一条清理路径，
-#:   那些任务就会活过实例本身。
-#: - `STOPPING -> FAILED`：停止超时（`EDG-104`）。它不是 `STOPPED`——那会声称清理干净了。
+#: 已经 `spawn_task()` 或订阅过事件（`setup` 跑在事件循环里）。不给它一条清理路径，
+#: 那些任务就会活过实例本身。
+#: - `STOPPING -> FAILED`：停止超时。它不是 `STOPPED`——那会声称清理干净了。
 PHASE_TRANSITIONS: Final[Mapping[PluginPhase, frozenset[PluginPhase]]] = {
     PluginPhase.DISCOVERED: frozenset({PluginPhase.VALIDATED, PluginPhase.FAILED}),
     PluginPhase.VALIDATED: frozenset({PluginPhase.LOADED, PluginPhase.FAILED}),
@@ -210,7 +210,7 @@ class StopOutcome:
 
 
 def stop_order(order: Sequence[str]) -> tuple[str, ...]:
-    """停止顺序 = 启动拓扑序的逆序（`PLG-005`）。
+    """停止顺序 = 启动拓扑序的逆序。
 
     参数就是 `LoadPlan.order`。这个函数只把“逆序”写在一处；`plan_load_order()` 是加载
     顺序的唯一来源，停止侧不重算拓扑（见模块 docstring）。
@@ -223,7 +223,7 @@ async def stop_plugins(
     *,
     timeout_ms: int = DEFAULT_STOP_TIMEOUT_MS,
 ) -> tuple[StopOutcome, ...]:
-    """**按给定顺序**逐个停止，每个各有独立超时（`EDG-104`）。
+    """**按给定顺序**逐个停止，每个各有独立超时。
 
     调用方交进来的顺序就是执行顺序——用 `stop_order(plan.order)` 得到它。逐个而不是并发：
     依赖方必须先于被依赖方停下，而并发停止会让「B 还在用 A 的能力时 A 已经停了」重新
@@ -235,7 +235,7 @@ async def stop_plugins(
     把真正的诊断淹掉。
 
     **异常约定**：不抛。停止是收尾路径，一个插件的失败不该盖住其余插件的清理
-    （`NFR-204`）；一切都折进 `StopOutcome`。`BaseException` 除外——取消整个停止流程
+    ；一切都折进 `StopOutcome`。`BaseException` 除外——取消整个停止流程
     是调用方的权利。
     """
     outcomes: list[StopOutcome] = []
@@ -257,7 +257,7 @@ async def _stop_one(unit: StopUnit, *, timeout_ms: int) -> StopOutcome:
     done, _ = await asyncio.wait({task}, timeout=timeout_ms / 1000)
     if not done:
         task.cancel()
-        # 不 await：等下去正是 `EDG-104` 要避免的那件事。
+        # 不 await：等下去正是  要避免的那件事。
         task.add_done_callback(_swallow)
         return _failed(unit, _timeout_error(unit.plugin_id, timeout_ms), timed_out=True)
 

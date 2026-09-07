@@ -156,7 +156,7 @@ Lifecycle activate → ready → reverse-order stop
 ```
 
 加载顺序只保证依赖先 setup，不决定覆盖胜负。覆盖语义只在 Registry resolution 中解释。
-`RegistrationBatch` 回滚能力表；`StartupResources` 同时接管 `setup()` 已产生的任务与订阅。
+`RegistrationBatch` 回滚能力表；`StartupResources` 同时接管 `setup` 已产生的任务与订阅。
 某个插件在 setup 阶段失败时，其传递依赖者不再执行 setup；无关插件仍继续加载。
 任一步失败时先逆序清理这些运行资源，再释放实例锁；成功后所有权一次性交给
 `AgentInstance`。CLI 回落等二次装配也必须先撤销前一次尝试。
@@ -169,25 +169,25 @@ Python 安装还会拒绝同名发行包的多版本集合。卸载不允许破�
 ## 5. 配置与 Secret 链路
 
 ```text
-schema.defaults()
+schema.defaults
       + config.json
       + KARYVIA_* env
       + CLI overrides
               │
               ▼
-       collect_layers()  （唯一优先级来源）
+       collect_layers  （唯一优先级来源）
               ▼
-       validate_config() （SECTION_SPECS 唯一字段表）
+       validate_config （SECTION_SPECS 唯一字段表）
               │
               ├─ Config 文档始终保留 ${VAR} 字面量
-              └─ resolve_secrets() → 单独的 SecretMap
+              └─ resolve_secrets → 单独的 SecretMap
                                       │
                                       ▼
                               runtime 组装具体能力
 ```
 
 Kernel Config 不写磁盘。`karyvia init` 和配置编辑只在 Runtime 中落盘，并在写回前经过
-`prepare_for_write()`。
+`prepare_for_write`。
 
 ## 6. 事件与诊断链路
 
@@ -203,7 +203,7 @@ producer ── bus.publish(name, correlation, payload, error)
 ```
 
 调用点不自行构造 `RuntimeEvent`，sink 不自行补脱敏。配置解析失败发生在 Bus 创建之前，只有
-`write_config_error()` 是独立例外。
+`write_config_error` 是独立例外。
 
 ## 7. 后续变化从哪里接入
 

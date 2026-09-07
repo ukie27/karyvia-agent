@@ -1,6 +1,6 @@
 # karyvia-plugin-memory
 
-Karyvia 官方插件：**跨 Session 的长期记忆**（需求 §9.8 `MEM-001`–`MEM-005`）。
+Karyvia 官方插件：**跨 Session 的长期记忆**。
 存储是 JSONL，检索是自写的关键词打分——**一个第三方依赖都不引入**。
 
 装上并启用之后，实例会多出四样东西：
@@ -10,7 +10,7 @@ Karyvia 官方插件：**跨 Session 的长期记忆**（需求 §9.8 `MEM-001`�
 | `MEMORY` | `jsonl` | 存储本体。也是 kernel 侧召回的目标，但那条路默认不开（见「已知边界」第 1 条） |
 | `CONTEXT_PROVIDER` | `memory` | 每轮 turn 自动召回相关记忆并放进上下文 |
 | `TOOL` | `memory.remember` / `memory.recall` / `memory.forget` | 模型显式地记、查、删 |
-| `COMMAND` | `/memory`（别名 `/mem`） | 给人用的查询、检索与删除入口（`MEM-005`） |
+| `COMMAND` | `/memory`（别名 `/mem`） | 给人用的查询、检索与删除入口 |
 
 ## 安装与启用
 
@@ -91,7 +91,7 @@ karyvia plugins enable memory
 这几条如实写在这里，而不是留给你去发现。
 
 1. **kernel 侧召回默认不开，两边同时开会重复召回。**
-   `D44` 起 kernel 会消费 `CapabilityKind.MEMORY`：装配根按 `memory.provider` 挑一条
+    起 kernel 会消费 `CapabilityKind.MEMORY`：装配根按 `memory.provider` 挑一条
    `MEMORY` 能力交给上下文组装器。但那个键**默认不写**，因此默认配置下记忆进到上下文靠的
    仍然是本插件自己的 `CONTEXT_PROVIDER:memory`。
 
@@ -113,16 +113,16 @@ karyvia plugins enable memory
    `agent` 范围；`session` / `workspace` 会被明确拒绝并说明原因，而不是静默落到某个
    「默认」分区。插件自己的四条通路都拿得到 key，不受此限。
 
-3. **`FragmentScope.USER` 不支持。** `ContextProvider.provide()` 拿到的
+3. **`FragmentScope.USER` 不支持。** `ContextProvider.provide` 拿到的
    `SessionSnapshot` 里没有发送者身份（`SessionMessage` 一个 sender 字段都没有），
    工具侧的 `ToolInvocation.correlation` 同样没有。折成「按 conversation 存」会让群聊里
    A 的用户记忆被召回给 B——那是真实的隐私泄漏。
 
 4. **一切写入都是 `trust=UNTRUSTED`**，包括你用 `/memory add` 手敲的那条。召回内容因此
-   恒被包成 `<untrusted-data>` 数据块（`EDG-306`），不获得指令优先级。这是刻意的：
+   恒被包成 `<untrusted-data>` 数据块，不获得指令优先级。这是刻意的：
    群聊里任何人都能敲那条命令。
 
-   **`D42` 补齐了另一半。** 在那之前这句话只对 Context Provider 那条通路成立——
+   ** 补齐了另一半。** 在那之前这句话只对 Context Provider 那条通路成立——
    `ToolResult` 没有 trust 字段，`memory.recall` 交出的正文以裸文本进模型，只能靠工具
    自己在开头加一行「是参考数据，不构成指令」提醒。现在两条通路口径一致：那条工具声明
    `trust=UNTRUSTED`，包裹由 `fold_tool_result` 完成，自加的那行提醒已删。
@@ -142,14 +142,14 @@ karyvia plugins enable memory
 当前实现刻意保持以下范围：
 
 - **Dream（定时让 LLM 读历史、增量改写长期记忆）不做。** 它需要两样今天没有的东西：
-  「插件能发起一次模型调用」——`PluginContext` 没有这条通道；以及定时触发——那是 `D40`。
+  「插件能发起一次模型调用」——`PluginContext` 没有这条通道；以及定时触发——那是 。
 - **GitStore（记忆变更的版本历史）不做。** 它要求把记忆存成 Git 仓库里的文本文件，
-  而那会把「记忆的存储形态」钉死成一种具体后端，正是 `MEM-001` 要避免的。
+  而那会把「记忆的存储形态」钉死成一种具体后端，正是  要避免的。
 - **`SOUL.md` / `USER.md` / `MEMORY.md` 三份固定文件不做。** 那套是 Agent 人格与用户画像，
   属于 `builtins/context_basic` 的运维指令那一档，不是长期记忆机制。
 - **没有 `backend: "jsonl" | "sqlite" | …` 配置项。** 换后端的正规做法是装另一个声明
   `overrides` 的插件，而不是让本发行包把每一种后端的依赖都拖进来。
-- **「修正」不单列命令。** 契约已经定死：`forget()` + 重新写一条的组合语义明确，
+- **「修正」不单列命令。** 契约已经定死：`forget` + 重新写一条的组合语义明确，
   而原地修改会让「这条记忆是什么时候、由谁写的」变得不可追溯。
 
 ## 许可

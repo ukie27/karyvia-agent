@@ -1,4 +1,4 @@
-"""折叠：分片折成响应、结果折成消息（技术方案 §6.2、§10.6，需求 `EDG-303`、`EDG-403`）。
+"""折叠：分片折成响应、结果折成消息。
 
 职责：把 `ModelChunk` 序列折叠成一个 `ModelResponse`（`StreamFolder`）；把 `ModelResponse` 与
 `ToolResult` 折叠成下一轮请求要用的 `ModelMessage`（空结果占位、按 `tool_result_max_bytes`
@@ -8,7 +8,7 @@
 由 `engine.py` 把本函数产出的 assistant 消息回放进同一请求序列；本模块是纯函数与纯状态机，
 不含 IO、不认识取消。
 
-**本模块抛出的两处 `retryable=True` 有一个真正的消费者了**（`D48`）：它们发生在
+**本模块抛出的两处 `retryable=True` 有一个真正的消费者了**：它们发生在
 `finish()` 里，也就是**流已经被 engine 消费完之后**——`retry.py` 的闸门只在首个实质分片
 放行之前才敢重来，因此这两处仍然会打掉整个 turn。真正被重试接住的是「出任何输出之前就
 失败了」的那一类，判定在 `_StreamGate.failed_early()`。
@@ -61,7 +61,7 @@ __all__ = [
 
 #: 空结果占位。`ModelMessage` 拒绝「既无 content 又无 tool_calls」的消息，而工具**确实**可能
 #: 什么都不返回（`rm` 成功、`grep` 无匹配）。给一句明确的说明，比让模型面对一条空消息去猜
-#: 「是没执行还是没输出」要好——旧实现的 `empty_tool_result_message` 是同一个结论。
+#: 「是没执行还是没输出」更明确。
 EMPTY_TOOL_RESULT_TEXT = "（{tool} 执行完成，没有输出。）"
 
 
@@ -72,7 +72,7 @@ class StreamFolder:
     事件流出，不进入答案也不进入下一轮请求。这是契约层的决定（推理属于过程不属于资产），
     这里只是不去违背它。
 
-    **`OPAQUE` 分片是那条决定的受控例外**（`D45`）：它累积的不是推理**文本**，而是
+    **`OPAQUE` 分片是那条决定的受控例外**：它累积的不是推理**文本**，而是
     产出它的 Provider 要求原样回传的私有块。两者的差别是「谁需要它」——推理文本是给人
     看的，opaque 块是那家供应商继续跑下去的前提条件。
     """
@@ -115,7 +115,7 @@ class StreamFolder:
         elif chunk.kind is ChunkKind.TOOL_CALL and chunk.tool_call is not None:
             self._push_call(chunk.tool_call)
         elif chunk.kind is ChunkKind.OPAQUE and chunk.block is not None:
-            # **按到达顺序累积，不去重、不解释**（`D45`）：Provider 私有块的语义只有
+            # **按到达顺序累积，不去重、不解释**：Provider 私有块的语义只有
             # 产出它的那一家知道，顺序往往就是它要求的回传顺序。上界由
             # `ModelMessage` 的 `MAX_OPAQUE_BLOCKS` 兜住。
             self._blocks.append(chunk.block)
@@ -129,7 +129,7 @@ class StreamFolder:
     def _push_call(self, call: ToolCall) -> None:
         """同 `call_id` 后到覆盖先到，保持首次出现的顺序。
 
-        `ModelResponse` 构造时拒绝重复 `call_id`（`EDG-303`），所以必须去重。选覆盖而不是
+        `ModelResponse` 构造时拒绝重复 `call_id`，所以必须去重。选覆盖而不是
         合并：`ModelChunk.tool_call` 携带的是**已解析**的 `ToolCall`（`arguments` 是映射不是
         JSON 片段），合并两个已解析的映射是猜测——增量拼装 JSON 是 Provider 边界的职责
         （§10.6「归一化在边界完成」）。覆盖次数记进 `provider_metadata`，让这件事仍然可观测。
@@ -143,7 +143,7 @@ class StreamFolder:
 
         **异常约定**：供应商声明本次流是错误或已取消时抛 `KaryviaError`，**不**折成一个
         看起来正常的响应——那会让主循环因为「没有 tool_calls」把它判成 `TurnCompleted`，
-        把一次失败渲染成完整答案（`EDG-304`）。折叠只能做一次，重复调用抛
+        把一次失败渲染成完整答案。折叠只能做一次，重复调用抛
         `KERNEL_INVARIANT_VIOLATED`：状态机复用会让上一轮的文本混进下一轮。
         """
         self._require_open()
@@ -173,7 +173,7 @@ class StreamFolder:
         stop = self._stop
         if stop is None:
             # 全案唯一一处推断：流结束了但没有 DONE 分片。抛出会把一份**已完整收到**的答案
-            # 变成 `TurnFailed`，对用户是净损失；但 `MOD-005` 要求不静默降级，因此把推断
+            # 变成 `TurnFailed`，对用户是净损失；但  要求不静默降级，因此把推断
             # 记进 `provider_metadata`，让它在事件与日志里可见，并有测试盯着这个标记。
             stop = StopReason.TOOL_CALLS if self._calls else StopReason.END_TURN
             metadata["missing_done_chunk"] = True
@@ -206,7 +206,7 @@ def assistant_message(response: ModelResponse) -> ModelMessage:
     `ModelMessage` 的「content 与 tool_calls 不得同时为空」必然满足——这条约束不是靠校验
     绕过的，是靠调用点结构消除的。
 
-    **`provider_blocks` 原样搬过去**（`D45`）：Anthropic 的 thinking 块必须连着
+    **`provider_blocks` 原样搬过去**：Anthropic 的 thinking 块必须连着
     `signature` 回传才肯继续跑工具循环，而这里正是「上一轮的话变成下一轮的输入」那一刻。
     Kernel 不读它们、不筛它们——按 `provider` 过滤是消费方（Provider 的编码器）的事。
     """
@@ -230,7 +230,7 @@ def fold_tool_result(
     占位只作用于**消息**：工具确实返回了空，`ToolResult.content` 保持空才是真话；而模型那边
     必须收到一条非空消息。
 
-    **不可信包裹在截断之后**（`D42`，`ToolResult.as_model_text`）：先包再截会把闭合标记
+    **不可信包裹在截断之后**（`ToolResult.as_model_text`）：先包再截会把闭合标记
     截掉，而一个没有闭合的数据块正是它要防的东西。代价是最终消息比
     `tool_result_max_bytes` 长出包装那几行——这个量是常数，而截掉闭合标记的后果不是。
 
@@ -248,10 +248,10 @@ def fold_tool_result(
 
 
 def unknown_tool_result(call: ToolCall, available: tuple[str, ...] = ()) -> ToolResult:
-    """模型报了一个本次请求里没有的工具名（`EDG-303`）。
+    """模型报了一个本次请求里没有的工具名。
 
     对话式回复而不是终止 turn：模型完全可能在下一轮改用正确的名字，而这条错误对它是可读、
-    可纠正的。旧实现也是这个结论，`D09` 保留。
+    可纠正的，因此保留在结果中。
     """
     names = "、".join(available) if available else "（本轮没有可用工具）"
     return ToolResult(
@@ -287,7 +287,7 @@ def blocked_result(call: ToolCall, reason: str) -> ToolResult:
 
 
 def skipped_result(call: ToolCall, reason: CancelReason) -> ToolResult:
-    """取消发生时尚未轮到执行的调用（技术方案 §6.4 检查点 5）。
+    """取消发生时尚未轮到执行的调用。
 
     `side_effect=NONE` 是这里的全部意义：turn 被中断后，用户必须能判定哪些副作用**没有**
     发生。合成一条结果而不是干脆不给，是因为 `tool_calls` 悬空会让这段历史无法重放。
@@ -311,10 +311,10 @@ def escaped_result(call: ToolCall, error: Exception) -> ToolResult:
     """`ToolInvoker.invoke` 逸出了异常——契约说它不该抛（`protocols.py` 的异常约定）。
 
     `side_effect=UNKNOWN` 而不是 `NONE`：异常从执行器里逃出来，说明它已经开始做事了，
-    做到哪一步没人知道（`EDG-401`）。假设「什么都没发生」是这里最危险的选项。
+    做到哪一步没人知道。假设「什么都没发生」是这里最危险的选项。
 
     **工具失败不升级为 `TurnFailed`**：这条错误以一条 tool 消息回给模型，本轮继续——
-    模型完全可能换个参数重试，或者绕开这个工具。旧实现同一结论。
+    模型完全可能换个参数重试，或者绕开这个工具。
     """
     # 抛出的已经是 `KaryviaError` 时原样保留：执行器给出的码（超时、权限）比这里能猜的准。
     wrapped = (

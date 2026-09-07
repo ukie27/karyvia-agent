@@ -1,16 +1,16 @@
 """`tools_shell` 的配置：workspace 根、超时、输出上限、环境变量与单工具禁用
-（`TOL-006`、`CFG-002`、`NFR-307`）。
+。
 
 职责：把 `ctx.config` 校验成一份不可变的 `ShellToolSettings`，并回答「这次该注册
 `shell.exec` 吗」。
 不负责：读实例布局（`R4` 禁止内建 import `kernel/`，根由装配根经 `ctx.config["workspace"]`
 交下来）、执行命令（`process.py`）、构造环境变量（`environ.py`）、构造 argv（`command.py`）。
 
-**工具名是单个常量**（技术方案 §8.2「内建工具恰好 6 个，清单本身是接口」）：本包只交付
-`shell.exec`。`enabled_tool_names()` 仍然存在——与 `tools_fs` 是同一条机制（`TOL-006`），
+**工具名是单个常量**：本包只交付
+`shell.exec`。`enabled_tool_names` 仍然存在——与 `tools_fs` 是同一条机制，
 装配根用它过滤 manifest 声明，`setup()` 用同一份设置决定注册谁，两处同源于同一份配置。
 
-**环境变量默认全部不继承**（`NFR-307`「默认执行环境必须保守；扩大范围必须显式配置」）：
+**环境变量默认全部不继承**（「默认执行环境必须保守；扩大范围必须显式配置」）：
 子进程只拿到 `environ.py` 里那份平台基线，父进程里的 `OPENAI_API_KEY` 之类根本没有到达
 子进程的路径。要多给什么，运维得在 `pass_env` 里逐个写出名字——那正是「显式操作」。
 """
@@ -42,7 +42,7 @@ __all__ = [
     "resolve_settings",
 ]
 
-#: 本包交付的唯一工具名（技术方案 §8.2 的冻结清单第 6 项）。
+#: 本包交付的唯一工具名。
 TOOL_NAME: Final = "shell.exec"
 
 #: 七个配置键。manifest 的 `config_schema` 与这里必须一致，由测试对照。
@@ -144,10 +144,10 @@ def _read_disabled(config: Mapping[str, JsonValue]) -> bool:
 def _read_workspace(config: Mapping[str, JsonValue], ctx: PluginContext) -> Path:
     """决定 workspace 根：配置里的 `workspace`，否则退回插件私有状态目录。
 
-    **本内建不知道实例布局**（`R4`），根只能由装配根交下来：`D23` 会把
+    **本内建不知道实例布局**（`R4`），根只能由装配根交下来： 会把
     `ConfigDocument.workspace.root` 放进本插件的配置块。没配时退回 `ctx.state_dir`——那是
     每个插件都必然拥有的私有目录，比抛错更符合「插件在没有配置时也该能工作」，也比默默
-    用进程 cwd 安全得多（与 `tools_fs.resolve_settings` 同一条先例）。
+    用进程 cwd 安全得多（与 `tools_fs.resolve_settings` 相同原则）。
     """
     configured = config.get(CONFIG_WORKSPACE_KEY)
     if configured is None:
@@ -252,7 +252,7 @@ class ShellToolSettings:
 
 
 def resolve_settings(ctx: PluginContext) -> ShellToolSettings:
-    """把 `ctx.config` 校验成一份设置（`CFG-002`：只看得到自己那一块）。
+    """把 `ctx.config` 校验成一份设置（只看得到自己那一块）。
 
     **异常约定**：类型不对、上限非正、`disable` 里有表外名字，一律抛 `CONFIG_INVALID`。
     `max_output_chars` 超过契约的 `MAX_TOOL_RESULT_LENGTH` 同样拒绝——放行它只会让每次
@@ -281,7 +281,7 @@ def resolve_settings(ctx: PluginContext) -> ShellToolSettings:
 
 
 def enabled_tool_names(config: Mapping[str, JsonValue]) -> tuple[str, ...]:
-    """本次配置下该生效的工具名。装配根用它过滤 manifest 声明（`TOL-006`）。
+    """本次配置下该生效的工具名。装配根用它过滤 manifest 声明。
 
     只看配置、不碰 `ctx`：装配根在构造 `PluginContext` **之前**就要知道该声明哪几个能力，
     而这个问题只依赖 `disable` 一个键。`resolve_settings()` 与它读的是同一个函数

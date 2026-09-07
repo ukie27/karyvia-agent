@@ -1,11 +1,11 @@
-"""会话契约：持久化单元、快照与 turn 终态（需求 §9.7 `SES-001`–`SES-006`、技术方案 §6.4）。
+"""会话契约：持久化单元、快照与 turn 终态。
 
 职责：定义会话历史的最小持久化单元 `SessionMessage`、带版本号的 `SessionSnapshot`，
 以及一次 turn 的四个终态 `TurnStatus`、取消原因与 `TurnOutcome`。
 不负责：读写存储、加锁与排队、压缩策略、保留期判定——那些在 `kernel/session/`
-（`D07`）与 `kernel/routing/`（`D10`）；本模块不含任何 IO。
+与 `kernel/routing/`；本模块不含任何 IO。
 
-`SessionSnapshot` 带 `schema_version` 是 `SES-006` 的落点：外部实现可以明确判断自己读到
+`SessionSnapshot` 带 `schema_version` 是的落点：外部实现可以明确判断自己读到
 的格式，而不是靠字段形状猜测。
 """
 
@@ -35,7 +35,7 @@ __all__ = [
     "TurnStatus",
 ]
 
-#: 会话存储格式的版本号。字段语义变化必须递增（`SES-006`）。
+#: 会话存储格式的版本号。字段语义变化必须递增。
 SESSION_SCHEMA_VERSION: Final = 2
 
 
@@ -43,7 +43,7 @@ class Role(StrEnum):
     """会话与模型消息共用的角色。
 
     定义在会话模块而不是模型模块：历史是会话的资产，模型只是它的消费者之一，
-    换 Provider 不应该牵动历史格式（`MOD-004`、`EDG-305`）。
+    换 Provider 不应该牵动历史格式。
     """
 
     SYSTEM = "system"
@@ -53,7 +53,7 @@ class Role(StrEnum):
 
 
 class TurnStatus(StrEnum):
-    """turn 的终态，恰好四个（技术方案 §6.4、`KER-003`、`KER-005`）。
+    """turn 的终态，恰好四个。
 
     没有「部分成功」这种中间态：一次 turn 要么完成，要么被取消、失败或撞上预算上限，
     调用方据此决定是否可以把结果当完整答案呈现。
@@ -66,7 +66,7 @@ class TurnStatus(StrEnum):
 
 
 class CancelReason(StrEnum):
-    """取消原因（`KER-007`、`EDG-206`）。用户重复中断时行为幂等，原因保持第一次的值。"""
+    """取消原因。用户重复中断时行为幂等，原因保持第一次的值。"""
 
     USER = "user"
     TIMEOUT = "timeout"
@@ -76,11 +76,10 @@ class CancelReason(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class SessionMessage:
-    """会话历史的最小持久化单元（`SES-002`、`SES-004`）。
+    """会话历史的最小持久化单元。
 
-    `turn_id` 让每条记录可以回溯到产生它的 turn；`interrupted` 对应技术方案 §6.4 的
-    检查点 3——流式中途被打断时，已产生的文本要持久化并标记，不能当作完整回答
-    （`EDG-304`）。
+    `turn_id` 让每条记录可以回溯到产生它的 turn；流式中途被打断时，
+    已产生的文本仍要持久化，并用 `interrupted` 标明它不是完整回答。
 
     `tool_call_id` 只在 `role=TOOL` 时有值，把工具结果与它对应的调用绑起来；
     `attachments` 保存随消息流转的文件引用，不复制文件字节。
@@ -125,7 +124,7 @@ class SessionMessage:
 
 @dataclass(frozen=True, slots=True)
 class SessionSnapshot:
-    """某一时刻的会话全量视图（`SES-004`、`SES-006`）。
+    """某一时刻的会话全量视图。
 
     `compacted_through` 是已被压缩摘要覆盖的记录数：`messages[:compacted_through]` 的
     内容已由摘要代表，重放时不再逐条送入模型。用计数而不是标记位，是为了让「压缩到
@@ -167,7 +166,7 @@ class SessionSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class TurnOutcome:
-    """一次 turn 的终态记录（`KER-003`、`KER-005`、`OBS-002`）。
+    """一次 turn 的终态记录。
 
     `error` 只在 `FAILED` 时有值，`cancel_reason` 只在 `CANCELLED` 时有值——两者与
     `status` 的一致性在构造时校验，避免出现「状态说成功但带着错误」这种事后没人敢信的
@@ -211,5 +210,5 @@ class TurnOutcome:
 
     @property
     def is_complete_answer(self) -> bool:
-        """只有 `COMPLETED` 才能作为完整答案呈现（`EDG-304`）。"""
+        """只有 `COMPLETED` 才能作为完整答案呈现。"""
         return self.status is TurnStatus.COMPLETED

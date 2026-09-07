@@ -1,16 +1,16 @@
-"""消息契约：统一的入站与出站消息（需求 §10.2、§10.3、`MSG-001`–`MSG-007`）。
+"""消息契约：统一的入站与出站消息。
 
 职责：定义发送者、附件引用、流式状态，以及 Kernel 唯一认可的 `InboundMessage` 与
-`OutboundMessage`，并在构造时完成需求 §10.2 的三条校验。
+`OutboundMessage`，并在构造时完成字段形状、标识和元数据校验。
 不负责：与任何平台 SDK 打交道、决定分段与格式降级策略、投递——归一化与投递都在
-Channel 一侧（`MSG-004`、技术方案 §9.1）。
+Channel 一侧。
 
 两条设计约束值得单独说明：
 
-- `OutboundMessage` 自带 `channel_id + conversation_id + turn_id`（`MSG-006`），
+- `OutboundMessage` 自带 `channel_id + conversation_id + turn_id`，
   Channel 不必维护自己的 Session 映射即可投递；构造时还会断言这些寻址字段与
   `session_key` 一致，否则「自带寻址」反而会静默投错地方。
-- CLI 与其他 Channel 共用这一套契约，没有专用旁路（`MSG-007`）。
+- CLI 与其他 Channel 共用这一套契约，没有专用旁路。
 """
 
 from __future__ import annotations
@@ -41,7 +41,7 @@ __all__ = [
     "StreamState",
 ]
 
-#: 单条消息的文本上限（字符）。`EDG-205` 要求大文本产生可预期结果而不是拖垮进程。
+#: 单条消息的文本上限（字符）。 要求大文本产生可预期结果而不是拖垮进程。
 MAX_CONTENT_LENGTH: Final = 256 * 1024
 
 #: 单条消息的附件数量上限。
@@ -70,7 +70,7 @@ class AttachmentSource(StrEnum):
     """可由 Channel 或工具按 SSRF 策略拉取的 http(s) 地址。"""
 
     WORKSPACE = "workspace"
-    """相对 Workspace 根的受控路径，实际解析仍要过 `EDG-405` 的路径守卫。"""
+    """相对 Workspace 根的受控路径，实际解析仍要过的路径守卫。"""
 
     OPAQUE = "opaque"
     """平台侧不透明标识（如 Telegram `file_id`），需 Channel 用自己的凭据换取。"""
@@ -83,7 +83,7 @@ class StreamState(StrEnum):
     """出站消息的流式状态（§10.3 `stream_state`）。
 
     `CANCELLED` 与 `FAILED` 必须与 `FINAL` 可区分，Channel 不得渲染为完整答案
-    （§10.3 末段、`EDG-304`）。判定用 `OutboundMessage.is_complete_answer`。
+    （§10.3 末段）。判定用 `OutboundMessage.is_complete_answer`。
     """
 
     STARTED = "started"
@@ -189,10 +189,10 @@ def _validate_content(content: str, attachments: Sequence[AttachmentRef], *, req
 
 @dataclass(frozen=True, slots=True)
 class InboundMessage:
-    """Kernel 唯一认可的入站消息（§10.2、`MSG-001`）。
+    """Kernel 唯一认可的入站消息（§10.2）。
 
-    平台私有字段只能落在 `metadata` 的命名空间键下（`MSG-002`），Kernel 不解读其结构；
-    原始 SDK 对象在 Channel 边界就必须归一化掉（`MSG-004`），`normalize_metadata()`
+    平台私有字段只能落在 `metadata` 的命名空间键下，Kernel 不解读其结构；
+    原始 SDK 对象在 Channel 边界就必须归一化掉，`normalize_metadata`
     会对残留的非 JSON 值直接报错而不是放行。
     """
 
@@ -239,7 +239,7 @@ class InboundMessage:
 
 @dataclass(frozen=True, slots=True)
 class OutboundMessage:
-    """Kernel 交给 Channel 投递的出站消息（§10.3、`MSG-006`）。
+    """Kernel 交给 Channel 投递的出站消息（§10.3）。
 
     `session_key` 对应 §10.3 的 `session_id`；`channel_id` 与 `conversation_id` 冗余
     保留，是为了让 Channel 不查任何缓存即可投递。冗余就必须校验一致，否则两份寻址
@@ -264,7 +264,7 @@ class OutboundMessage:
             validate_identifier("reply_to", self.reply_to)
         self._validate_addressing()
         # 只有「声称是完整答案」的状态才要求有内容；取消与失败允许空正文，
-        # 由 Channel 按 `EDG-304` 附加标记后呈现。
+        # 由 Channel 按  附加标记后呈现。
         _validate_content(
             self.content,
             self.attachments,
@@ -294,7 +294,7 @@ class OutboundMessage:
     def is_complete_answer(self) -> bool:
         """是否可作为完整答案呈现。
 
-        `CANCELLED` / `FAILED` 一律为 False（`EDG-304`）：Channel 必须附加明确标记，
+        `CANCELLED` / `FAILED` 一律为 False：Channel 必须附加明确标记，
         不得让用户误以为这是模型给出的完整回答。
         """
         return self.stream_state is StreamState.FINAL

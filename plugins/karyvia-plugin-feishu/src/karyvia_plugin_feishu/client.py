@@ -1,4 +1,4 @@
-"""**SDK 出口①**：飞书的 HTTP API（开发方案 `D34`）。
+"""**SDK 出口①**：飞书的 HTTP API。
 
 职责：`Messenger` / `Cards` / `Reactions` / `Resources` 四个 Protocol 的生产实现——
 发消息、回复、CardKit 四调用、反应增删、取 bot open_id、取父消息正文。
@@ -112,7 +112,7 @@ class FeishuClient:
 
     def _fail(self, where: str, exc: Exception) -> None:
         """记一次失败。**只放类型名不放异常消息**——SDK 的异常文本可能带凭据
-        （`D13` 的先例）。"""
+        。"""
         if self.on_failure is not None:
             self.on_failure(where, type(exc).__name__)
 

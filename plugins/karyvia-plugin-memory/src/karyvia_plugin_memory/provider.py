@@ -4,7 +4,7 @@
 不负责：读写文件（`store.py`）、打分（`scoring.py`）、决定片段怎么进模型消息
 （`kernel/turn/context_builder.py`）。
 
-**这是记忆进到模型上下文的默认路径。** `D44` 给了 kernel 第二条：装配根按 `memory.provider`
+**这是记忆进到模型上下文的默认路径。**  给了 kernel 第二条：装配根按 `memory.provider`
 挑一条 `MEMORY` 能力交给组装器（`kernel/turn/memory.py`），但那个键**默认不写**，因此默认
 配置下这条 Context Provider 仍是唯一的入口。**两边同时开会让 `agent` 范围的记忆在一轮里
 出现两次**——处置写在本包 `__init__.py` 的边界一节里。
@@ -75,9 +75,9 @@ class MemoryContextProvider:
     ) -> tuple[ContextFragment, ...]:
         """贡献片段。
 
-        **异常约定**：可以抛 `KaryviaError`。读盘故障只会让这一次贡献被跳过并记录
-        （`CTX-005`），不会让 turn 失败——那正是 `MEM-003`
-        「Memory 不可用时降级为无长期记忆模式」的落地形态，**不需要**在这里 try/except
+        **异常约定**：可以抛 `KaryviaError`。读盘故障只会让这一次贡献被跳过并记录，
+        不会让 turn 失败。这是「Memory 不可用时降级为无长期记忆模式」的实现，
+        **不需要**在这里 try/except
         把故障吞成空结果。吞掉它会让「记忆一直召不回来」查不出原因。
         **取消语义**：检索前检查一次（`store.search` 内部做），被取消时抛 `CANCELLED` 类。
         """

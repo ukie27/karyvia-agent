@@ -1,6 +1,6 @@
-"""`D23` 内建 CLI 入口：控制台渲染、Channel 契约与两种执行模式。
+""" 内建 CLI 入口：控制台渲染、Channel 契约与两种执行模式。
 
-职责：验 `CliConsole` 的渲染规则（流式不重复打、`EDG-304` 的标记）、`CliChannel` 满足
+职责：验 `CliConsole` 的渲染规则（流式不重复打、 的标记）、`CliChannel` 满足
 `ChannelContract`、`StdioCliEntry` 的参数解析与单次/交互两种模式。
 不负责：验它接到实例上之后的行为（`tests/runtime/test_bootstrap.py`）。
 
@@ -80,7 +80,7 @@ def outbound(
 
 
 def test_a_line_becomes_a_contract_shaped_inbound_message() -> None:
-    """`MSG-007`：CLI 没有绕过 `InboundMessage` 的专用路径。"""
+    """CLI 没有绕过 `InboundMessage` 的专用路径。"""
     console = make_console()
     message = console.submit("你好")
     assert message.content == "你好"
@@ -131,7 +131,7 @@ async def test_a_non_streaming_final_is_printed_once() -> None:
     [(StreamState.CANCELLED, "已中断"), (StreamState.FAILED, "本轮失败")],
 )
 async def test_incomplete_answers_carry_a_marker(state: StreamState, marker: str) -> None:
-    """`EDG-304`：`is_complete_answer` 为假时必须附加标记，不得呈现成完整回答。"""
+    """`is_complete_answer` 为假时必须附加标记，不得呈现成完整回答。"""
     out = io.StringIO()
     console = make_console(out)
     console.submit("问")
@@ -140,7 +140,7 @@ async def test_incomplete_answers_carry_a_marker(state: StreamState, marker: str
 
 
 async def test_attachments_are_listed_after_the_answer() -> None:
-    """`D47`：终帧带的附件在正文之后逐行印出来。
+    """终帧带的附件在正文之后逐行印出来。
 
     **印路径而不是字节**：终端里字节没有呈现形态，而 workspace 相对路径可以直接喂给
     `fs.read`、也可以在文件管理器里打开。
@@ -214,7 +214,7 @@ def test_a_rejected_turn_also_releases_the_reader() -> None:
 
 
 class TestCliChannelContract(ChannelContract):
-    """内建 Channel 必须先过契约基类（`D05` 起的规矩）。"""
+    """内建 Channel 必须通过统一的 Channel 契约测试。"""
 
     def make_channel(self) -> Channel:
         return CliChannel(make_console())

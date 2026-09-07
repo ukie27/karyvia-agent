@@ -1,4 +1,4 @@
-"""Session 并发三策略的测试（`D13` 验收表第 1、4 行；`KER-008`、`EDG-202`）。
+"""Session 并发三策略的测试。
 
 两条主线：
 
@@ -7,7 +7,7 @@
 - **不静默丢弃**：队列满时必须给出明确的 `INPUT_SESSION_BUSY`，提交数恒等于
   「执行 + 合并 + 拒绝」之和。
 
-**全程不用 `sleep` 制造时序**（开发方案对本模块的明确要求）：用 `asyncio.Event` 卡住第一个
+**全程不用 `sleep` 制造时序**：用 `asyncio.Event` 卡住第一个
 `run`，制造出确定的重叠窗口；用 `await asyncio.sleep(0)` 只是让已创建的任务跑到第一个
 挂起点，不依赖任何时长。
 """
@@ -104,7 +104,7 @@ async def submit_all(
 
 
 async def test_queue_preserves_strict_fifo_under_concurrency() -> None:
-    """20 条并发消息，执行顺序必须严格等于提交顺序（`EDG-202`「不得无序修改历史」）。"""
+    """20 条并发消息，执行顺序必须严格等于提交顺序（「不得无序修改历史」）。"""
     scheduler: SessionScheduler[tuple[str, ...]] = SessionScheduler(
         policy=ConcurrencyPolicy.QUEUE, queue_max_size=64
     )

@@ -110,7 +110,7 @@ def plan_external(
     *,
     strict: bool = True,
 ) -> tuple[ExternalPlan, PluginInventory]:
-    """把装配根拥有的最终配置块与状态目录交给阶段 A。"""
+    """把装配根拥有的最终配置块与状态目录交给加载前校验。"""
     derived = builtin_config_blocks(config, layout, workspace)
 
     def config_for(manifest: PluginManifest) -> Mapping[str, JsonValue]:

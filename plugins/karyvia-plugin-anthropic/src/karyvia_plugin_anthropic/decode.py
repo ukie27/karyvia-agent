@@ -1,4 +1,4 @@
-"""Anthropic Messages API 的**响应侧**线格式翻译（开发方案 `D32`）。
+"""Anthropic Messages API 的**响应侧**线格式翻译。
 
 职责：响应体 JSON → `ModelResponse`；SSE 事件 → `ModelChunk`；`stop_reason` 与 usage 映射；
 流式 `tool_use` 增量按 `index` 的拼装。
@@ -18,7 +18,7 @@
 - **只解析 `data:` 行、按载荷自带的 `type` 分派。** SSE 帧同时有 `event:` 与 `data:`，两个
   真相来源会在中转改写 `event:` 时静默分叉。也没有 `[DONE]` 哨兵——流结束就是迭代结束。
 
-**`thinking` 块经 `OpaqueBlock` 带出来**（`D45`）。`D32`–`D44` 期间它们被丢掉：契约里没有
+**`thinking` 块经 `OpaqueBlock` 带出来**。– 期间它们被丢掉：契约里没有
 放 `signature` 的地方，而没有签名的思考块回放过去会被 Anthropic 拒绝，留一半比不留更糟——
 代价是 thinking 与工具调用**不能同时用**。`contracts.OpaqueBlock` 补上了那个槽位，因此这里
 改为把 `thinking` / `redacted_thinking` 原样带出（连着 `signature`），由
@@ -75,7 +75,7 @@ SSE_DATA_PREFIX: Final = "data:"
 #: 分得开，因此契约里那个枚举值在这里终于有了产出点。
 #:
 #: **`refusal` 是 HTTP 200 上的正常响应**，走 `CONTENT_FILTER` 而不是异常
-#: （`is_complete_answer` 因此为假，Channel 侧的呈现规则据此区分——`EDG-304`）。
+#: （`is_complete_answer` 因此为假，Channel 侧的呈现规则据此区分）。
 _STOP_REASONS: Final[Mapping[str, StopReason]] = {
     "end_turn": StopReason.END_TURN,
     "tool_use": StopReason.TOOL_CALLS,
@@ -160,7 +160,7 @@ def _tool_call(*, call_id: str, name: str, arguments: Mapping[str, JsonValue]) -
     """构造一个 `ToolCall`，把契约的拒绝翻成「外部服务给了坏数据」。
 
     `detail` 里**只放名字，不回显参数**——参数是模型生成的自由文本，可能带着它从上下文里
-    抄来的凭据（`D13` 的先例）。
+    抄来的凭据。
     """
     try:
         return ToolCall(call_id=call_id, name=name, arguments=arguments)
@@ -177,7 +177,7 @@ class _Decoded:
 
     text: str = ""
     calls: tuple[ToolCall, ...] = ()
-    #: 要原样回传的思考块（`D45`）。**按到达顺序**——Anthropic 要求续写时 thinking 块排在
+    #: 要原样回传的思考块。**按到达顺序**——Anthropic 要求续写时 thinking 块排在
     #: 同一条 assistant 轮的最前面且保持原序。
     blocks: tuple[OpaqueBlock, ...] = ()
     unknown: int = 0
@@ -261,7 +261,7 @@ def _metadata(
         # 不认识的终止原因照实记下来：推断出来的那个终态是我们的结论，不是它说的。
         meta["raw_stop_reason"] = raw_stop
     if decoded.blocks:
-        # 「思考发生过、而且带出来了」的观测信号。`D45` 之前这里记的是
+        # 「思考发生过、而且带出来了」的观测信号。 之前这里记的是
         # `dropped_thinking_blocks`——现在没有东西被丢掉了，留着那个名字会说反话。
         meta["thinking_blocks"] = len(decoded.blocks)
     if decoded.unknown:
@@ -302,7 +302,7 @@ def parse_sse_data(line: str) -> str | None:
 
 @dataclass(slots=True)
 class _PendingThinking:
-    """一个尚未定案的思考块（`D45`）。
+    """一个尚未定案的思考块。
 
     流式下它分三处到达：`content_block_start` 给出块类型（`thinking` / `redacted_thinking`
     与 `redacted_thinking` 的 `data`），`thinking_delta` 给正文，`signature_delta` 给签名。
@@ -420,7 +420,7 @@ class StreamDecoder:
             self._thinking_at(event)
             return ()
         if kind == "signature_delta":
-            # `D45` 之前它在这里被吞掉，于是 thinking 与工具调用不能同时用。
+            #此前它在这里被吞掉，于是 thinking 与工具调用不能同时用。
             signature = delta.get("signature")
             if isinstance(signature, str) and signature:
                 self._thinking_at(event).signature += signature

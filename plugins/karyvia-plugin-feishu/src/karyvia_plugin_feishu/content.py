@@ -1,4 +1,4 @@
-"""入站正文抽取：飞书的各种消息体 → 一段模型看得懂的文本（`MSG-004`，开发方案 `D34`）。
+"""入站正文抽取：飞书的各种消息体 → 一段模型看得懂的文本。
 
 职责：`text` / `post` / `interactive` / `share_*` / `system` / `merge_forward` 六类消息体的
 文本抽取；从 post 里捞出内嵌的 `image_key`。**纯函数，零 IO，不认识 SDK 也不认识配置。**
@@ -73,11 +73,11 @@ def parse_content(raw: str) -> Mapping[str, JsonValue]:
     """飞书事件里的 `message.content` 是一段 **JSON 字符串**。解析失败返回空表。
 
     解析失败不抛：一条看不懂的消息体应当被降级成「没有正文」，而不是让整条 Channel 因为
-    平台加了个新字段就报错（`MSG-004`：畸形消息丢弃并记录，不得终止 Channel）。
+    平台加了个新字段就报错（畸形消息丢弃并记录，不得终止 Channel）。
     """
     try:
         # `json.loads` 交回 `Any`。**在这里就收成 `object`**，否则它会顺着返回值一路漏
-        # 进调用方（`plugins/…-cron/store.py` 的同一条判定）。
+        # 进调用方（`plugins/…-cron/store.py` 采用的相同规则判定）。
         parsed: object = json.loads(raw)
     except (TypeError, ValueError):
         return {}

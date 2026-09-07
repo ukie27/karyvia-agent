@@ -1,4 +1,4 @@
-"""会话契约测试（`D03`，需求 §9.7、技术方案 §6.4）。
+"""会话契约测试。
 
 重点在两处一致性：`role=TOOL` 与 `tool_call_id` 必须同进同出，`TurnStatus` 与
 `error` / `cancel_reason` 必须匹配——「状态说成功却带着错误」这种记录事后没人敢信。
@@ -79,7 +79,7 @@ def test_tool_role_requires_tool_call_id() -> None:
 
 
 def test_interrupted_defaults_to_false_and_is_recordable() -> None:
-    """技术方案 §6.4 检查点 3：中断时已产生的文本要持久化并标记。"""
+    """中断时已产生的文本要持久化并标记。"""
     assert message().interrupted is False
     assert message(interrupted=True).interrupted is True
 
@@ -133,7 +133,7 @@ def test_snapshot_only_accepts_the_current_schema_version(schema_version: int) -
 
 
 def test_turn_status_has_exactly_four_terminal_states() -> None:
-    """技术方案 §6.4：终态只有四个，新增视为公开表面变化。"""
+    """终态只有四个，新增视为公开表面变化。"""
     assert {status.value for status in TurnStatus} == {
         "completed",
         "cancelled",

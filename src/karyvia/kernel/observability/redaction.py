@@ -1,4 +1,4 @@
-"""事件载荷的脱敏、有界化与 JSON 序列化（技术方案 §6.8；`OBS-003`、`NFR-305`、`NFR-404`）。
+"""事件载荷的脱敏、有界化与 JSON 序列化。
 
 职责：把任意载荷在**事件构造之前**收敛成既已脱敏又有界的 `JsonValue`；把
 `RuntimeEvent` 与 `KaryviaError` 序列化成可直接写盘的 JSON 字典。
@@ -50,7 +50,7 @@ def _cap(value: JsonValue) -> JsonValue:
     """按条数上界收敛一棵已脱敏的 JSON 树。
 
     `redact()` 已经管了单串长度（512）与深度（6），唯独没有条数上界——一条带十万元素
-    列表的事件在契约层是合法 JSON，却足以撑爆内存环与日志盘（`NFR-404`）。
+    列表的事件在契约层是合法 JSON，却足以撑爆内存环与日志盘。
     """
     if isinstance(value, Mapping):
         return _cap_mapping(value)

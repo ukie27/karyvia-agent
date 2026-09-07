@@ -1,4 +1,4 @@
-"""注册意图投影的校验测试（`D16`；`EDG-102`）。
+"""注册意图投影的校验测试。
 
 `CapabilityDeclaration` 与 `LoadRequest` 是纯数据，但它们的校验有实际作用：声明表是
 Host 判定「这个注册合法吗」的唯一依据，一条形状非法的声明会让 `overrides` 的解码推迟到
@@ -43,7 +43,7 @@ def test_a_malformed_override_target_is_rejected() -> None:
 
 
 def test_a_well_formed_override_target_survives_as_a_raw_string() -> None:
-    """`D06` 的约定：跨层只传原始串，两侧共用一份解码实现。"""
+    """当前约定：跨层只传原始串，两侧共用一份解码实现。"""
     declaration = CapabilityDeclaration(
         kind=CapabilityKind.TOOL, name="fs.read", overrides="builtin:fs.read"
     )
@@ -92,7 +92,7 @@ def test_the_same_name_under_two_kinds_is_not_a_duplicate() -> None:
     assert len(request.declarations) == 2
 
 
-# --------------------------------------------------------------- 命名空间声明（`D38-A`）
+# --------------------------------------------------------------- 命名空间声明
 
 
 def test_a_namespace_declaration_covers_names_under_its_prefix() -> None:

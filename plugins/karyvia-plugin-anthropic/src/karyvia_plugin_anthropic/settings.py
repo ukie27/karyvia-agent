@@ -1,4 +1,4 @@
-"""`anthropic` 插件的配置读取与校验（`CFG-002`：插件只看得见自己那一块）。
+"""`anthropic` 插件的配置读取与校验（插件只看得见自己那一块）。
 
 职责：把 `ctx.config` 校验成一份不可变的 `AnthropicSettings`，并由它派生每个模型的
 `ModelInfo`。全部校验在 `setup()` 时发生一次。
@@ -9,12 +9,12 @@
 
 - **一张按模型名版本号 gating 的表都不留。** legacy 的 `anthropic_provider.py` 有四张
   （`_ADAPTIVE_ONLY_MIN_VERSIONS` / `_THINKING_DISABLE_MIN_VERSIONS` /
-  `_SAMPLING_DEPRECATED_MODELS` 与那个解析模型名版本号的正则），`D19` 已经拒过同类的
+  `_SAMPLING_DEPRECATED_MODELS` 与那个解析模型名版本号的正则）， 已经拒过同类的
   `max_tokens_field` slug 表，理由不变：表只会越滚越大，而用户换一个新模型要等我们发版。
   这里改成 `thinking.mode` / `supports_temperature` / `effort` 三个配置项，运维改一行即可。
 - **能力声明与开关同源。** `describe()` 交出的能力集是「配置里列的基线 ∪ thinking 开着时的
   `reasoning` ∪ 缓存开着时的 `prompt_caching`」；反过来，**声明了 `reasoning` 却没开
-  thinking 是 `CONFIG_INVALID`**。两个方向都判死，`MOD-005` 的「缺席即报缺失、绝不静默
+  thinking 是 `CONFIG_INVALID`**。两个方向都判死， 的「缺席即报缺失、绝不静默
   降级」才真的成立——否则一份声明得漂亮的配置会让组装器以为拿得到思考内容。
 - **`describe()` 不得发网络请求**（契约写死：它在预算推导路径上）。因此模型窗口只能来自
   配置，`models` / `default_*` 因此存在。`models` 非空即视为**白名单**。
@@ -79,7 +79,7 @@ __all__ = [
 #: 本插件的能力名。MODEL 是 MULTI_UNIQUE，因此它在 kind 内唯一——内建占的是 `openai`。
 CAPABILITY_NAME: Final = "anthropic"
 
-#: `PROVIDER_NAME` 在 `wire.py` 里定义（`D45` 起 `OpaqueBlock.provider` 也用它），
+#: `PROVIDER_NAME` 在 `wire.py` 里定义，
 #: 从这里原样再导出——本模块 import `wire`，反过来会成环。
 
 #: 凭据名，**固定不可配置**。配置块和 `ctx.secret()` 必须使用同一个稳定名字。
@@ -132,13 +132,13 @@ CACHING_KEYS: Final[frozenset[str]] = frozenset({"enabled", "ttl", "breakpoints"
 _BREAKPOINT_KEYS: Final[frozenset[str]] = frozenset({"system", "tools", "history"})
 _DISPLAY_MODES: Final[frozenset[str]] = frozenset({"omitted", "summarized"})
 
-#: 默认窗口取 200k 而不是 1M：多数在用的 Claude 是 200k，猜大会让 `CTX-003` 生成超窗请求。
+#: 默认窗口取 200k 而不是 1M：多数在用的 Claude 是 200k，猜大会让  生成超窗请求。
 _DEFAULT_CONTEXT_WINDOW: Final = 200_000
 _DEFAULT_MAX_OUTPUT: Final = 8_192
 _DEFAULT_REQUEST_TIMEOUT_MS: Final = 120_000
 _DEFAULT_STREAM_IDLE_TIMEOUT_MS: Final = 60_000
 
-#: 默认声明的能力。**只列真正做到的两项**（`MOD-005`）：`reasoning` 与 `prompt_caching`
+#: 默认声明的能力。**只列真正做到的两项**：`reasoning` 与 `prompt_caching`
 #: 由对应开关派生，图像输入与结构化输出这个实现根本没有。
 _DEFAULT_CAPABILITIES: Final[frozenset[ModelCapability]] = frozenset(
     {ModelCapability.TOOL_CALLS, ModelCapability.STREAMING}

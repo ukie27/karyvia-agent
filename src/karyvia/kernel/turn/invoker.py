@@ -1,8 +1,8 @@
-"""工具执行器：schema 校验、超时、取消宽限期与孤儿任务表（技术方案 §10.2 第 10 步）。
+"""工具执行器：schema 校验、超时、取消宽限期与孤儿任务表。
 
 职责：实现 `deps.ToolInvoker`——把一次 `ToolCall` 补齐成带幂等键的 `ToolInvocation`，
 校验参数，在 `timeout_ms + grace` 内交回一个 `ToolResult`，并把宽限期
-用尽仍未返回的协程登记为孤儿任务（`EDG-407`、`EDG-104`）。
+用尽仍未返回的协程登记为孤儿任务。
 不负责：决定调度顺序与批次（engine 的 `scheduling.py`）、截断结果（engine 的
 `folding.py`，且必须在 `after_tool_call` **之后**）、判定「这个工具存不存在」
 （engine 按 `ModelRequest.tools` 先拦）。
@@ -15,14 +15,14 @@
    判断就丢了。
 2. **`side_effect` 如实标注**。执行**之前**失败（schema）一律 `NONE`——工具还没被
    碰过；宽限期用尽一律 `UNKNOWN`——Kernel 不知道那个还在跑的协程做了什么。谎报 `NONE`
-   会让用户据此重试并造成重复副作用（`EDG-401`、`EDG-407`）。
+   会让用户据此重试并造成重复副作用。
 3. **必须在 `timeout_ms + grace` 内返回**。engine 不加第二层超时，因此这里是唯一的时间
    闸门：先 `wait_for(timeout_ms)`，超时后请求子令牌取消并再等 `grace`，仍不回来就把
    task 丢进孤儿表、自己造一份结果返回。
 
 **为什么 `jsonschema` 在函数内 import**：与 `config/schema.py::to_limits` 同一条理由——
 `import kernel.turn` 出现在诊断与配置以外的很多路径上，而 `jsonschema` 的导入是几十毫秒
-（`NFR-405` 给整个冷启动 300 ms）。真的要执行工具的调用方才付这笔钱，编译好的 validator
+。真的要执行工具的调用方才付这笔钱，编译好的 validator
 按 `ToolSpec` 缓存，一个工具只编译一次。
 """
 
@@ -61,7 +61,7 @@ __all__ = [
 ]
 
 #: 孤儿任务表的上限。它只用于诊断（「这个实例留下了几个还在跑的工具」），无界会让一个
-#: 反复超时的工具把内存吃光（`NFR-404` 同一条理由）。满了丢最旧并计数。
+#: 反复超时的工具把内存吃光。满了丢最旧并计数。
 DEFAULT_MAX_ORPHANS: Final = 64
 
 #: 单次校验最多报几条问题。全报会让一个字段名写错的大对象刷出上百行 detail，而用户
@@ -160,7 +160,7 @@ class ToolExecutor:
 
     @property
     def orphans(self) -> tuple[OrphanTask, ...]:
-        """当前登记的孤儿任务（`EDG-104` 的实例停止报告用）。"""
+        """当前登记的孤儿任务（实例停止报告用）。"""
         return tuple(self._orphans)
 
     @property
@@ -185,7 +185,7 @@ class ToolExecutor:
             correlation=correlation,
             timeout_ms=timeout_ms,
             # 只有只读工具默认带幂等键：重放一次只读调用永远安全，而写类工具的「重试是否
-            # 安全」只有工具自己知道（`EDG-402` 因此默认禁止自动重试）。
+            # 安全」只有工具自己知道。
             idempotency_key=f"{call.name}:{call.call_id}" if read_only else None,
         )
 
@@ -229,7 +229,7 @@ class ToolExecutor:
         except TimeoutError:
             return await self._after_timeout(task, invocation, cancel, started)
         # handler 约定不抛；逸出的异常折成结果，但 `side_effect` 只能是 UNKNOWN——
-        # 一个抛到一半的 handler 有没有改外部世界，Kernel 无从判断（`EDG-401`）。
+        # 一个抛到一半的 handler 有没有改外部世界，Kernel 无从判断。
         except Exception as error:
             return self._failed(
                 call,
@@ -361,13 +361,13 @@ def _compile(schema: dict[str, JsonValue]) -> _Validator | KaryviaError:
     """把一份 JSON Schema 编译成校验器。这是 `jsonschema` 唯一的接触点。
 
     **惰性 import**：与 `config/schema.py::to_limits` 同一条理由——`import kernel.turn`
-    出现在诊断与配置以外的很多路径上，而 `jsonschema` 的导入是几十毫秒（`NFR-405` 给整个
+    出现在诊断与配置以外的很多路径上，而 `jsonschema` 的导入是几十毫秒（ 给整个
     冷启动 300 ms）。真的要执行工具的调用方才付这笔钱。
 
     **schema 写错了返回错误而不是抛**：那是工具作者的 bug，不该打掉整个 turn。
 
     `cast` 有运行时检查支撑（`isinstance` 对 `runtime_checkable` Protocol 查属性存在性），
-    这是 `AGENTS.md` 原则 6 对 `cast` 的要求：`jsonschema` 没有 `py.typed`，它交出来的
+    这是 `AGENTS.md` 原则 6 对 `cast`当前约束：`jsonschema` 没有 `py.typed`，它交出来的
     一切在类型层都是未知，收口必须在这一处完成。
     """
     import jsonschema.validators as js  # boundary: 无类型标注的第三方库，形状在本函数内收口

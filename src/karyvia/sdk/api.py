@@ -1,4 +1,4 @@
-"""Host API：插件与 Kernel 之间的注册面与受限运行时（技术方案 §7.5）。
+"""Host API：插件与 Kernel 之间的注册面与受限运行时。
 
 职责：声明 `KaryviaAPI`（恰好 10 个能力注册方法 + `ctx`）、`PluginContext` 及其生命周期和
 四个资源访问器 Protocol（`fs` / `net` / `shell` / `secret`），以及配套的 `HttpResponse`、
@@ -14,12 +14,12 @@
 
 - **10 个注册方法与 `CapabilityKind` 的 10 个取值一一对应**，不多不少。多出一个方法就等于
   多出一类没有冲突语义的能力（`CAPABILITY_ARITY` 会 KeyError），少一个就等于某类能力
-  只能靠 Kernel 内部特权注册——那正是 `BAS-005`「内建能力不享受特权」要堵的路。
+  只能靠 Kernel 内部特权注册——那正是 「内建能力不享受特权」要堵的路。
 - **安装并启用插件即表示完全信任它**。资源访问器提供一致的路径、超时、SSRF 防护和密钥
   封装，但不是权限或进程隔离；插件也可以直接使用 Python/OS API。需要隔离时应使用独立
   进程、容器或部署边界，而不是扩张同进程 Host API。
 - **后台任务只能经 `ctx.spawn_task()` 创建**。Host API 不暴露裸 `asyncio.create_task`，
-  否则「这个任务是谁的」在禁用插件时就无从判定，`EDG-105` 的痕迹清理也就无从谈起。
+  否则「这个任务是谁的」在禁用插件时就无从判定， 的痕迹清理也就无从谈起。
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ class ShellResult:
 
 @runtime_checkable
 class FileAccess(Protocol):
-    """受工作区边界约束的文件访问服务（`EDG-405`）。
+    """受工作区边界约束的文件访问服务。
 
     所有路径都相对于插件被授予的根，解析后必须落在允许根内（`realpath` 之后重新校验，
     覆盖符号链接、`..`、Windows 大小写与重解析点）。绝对路径一律拒绝——接受绝对路径就
@@ -151,7 +151,7 @@ class FileAccess(Protocol):
 
 @runtime_checkable
 class HttpAccess(Protocol):
-    """带 SSRF 守卫的 HTTP 服务（`EDG-406`）。"""
+    """带 SSRF 守卫的 HTTP 服务。"""
 
     async def request(
         self,
@@ -190,7 +190,7 @@ class HttpAccess(Protocol):
 
 @runtime_checkable
 class ShellAccess(Protocol):
-    """带工作区、环境和超时约束的子进程服务（`EDG-404`、`NFR-605`）。"""
+    """带工作区、环境和超时约束的子进程服务。"""
 
     async def run(
         self,
@@ -214,7 +214,7 @@ class ShellAccess(Protocol):
 
 @runtime_checkable
 class EventSubscriber(Protocol):
-    """事件订阅面（技术方案 §6.8）。订阅在插件被禁用时由 Kernel 统一取消（`EDG-105`）。"""
+    """事件订阅面。订阅在插件被禁用时由 Kernel 统一取消。"""
 
     def subscribe(self, event: EventName, handler: EventHandler) -> None:
         """订阅一个事件名。同一 handler 重复订阅同一事件视为一次。
@@ -240,18 +240,18 @@ class PluginContext(Protocol):
 
     @property
     def config(self) -> Mapping[str, JsonValue]:
-        """**只有自己那一块**配置（`CFG-002`）。没有读取他人配置的 API，也不打算有。"""
+        """**只有自己那一块**配置。没有读取他人配置的 API，也不打算有。"""
         ...
 
     @property
     def state_dir(self) -> Path:
         """`<instance_dir>/plugins/<id>/`，已创建。插件的持久化数据只应写在这里，
-        卸载时按 `state_version` 与用户选择整体处理（`EDG-105`、§10.5）。"""
+        卸载时按 `state_version` 与用户选择整体处理（§10.5）。"""
         ...
 
     @property
     def logger(self) -> Logger:
-        """已绑定 `plugin_id` 的 logger，输出自动脱敏（`contracts.errors` 的规则）。"""
+        """已绑定 `plugin_id` 的 logger，输出自动脱敏（`contracts.errors`当前规则）。"""
         ...
 
     @property
@@ -291,7 +291,7 @@ class PluginContext(Protocol):
         **异常约定**：插件已进入停止流程时抛 `KERNEL_INVARIANT_VIOLATED`。任务自身的
         异常由 Kernel 捕获并记 `PLUGIN_FAILURE`，不会冒泡到别的插件或 turn。
         **取消语义**：插件被停止或禁用时，其全部任务被 `cancel()`，随后按
-        `plugin_stop_timeout_ms` 等待，超时即放弃等待并继续停止流程（`EDG-104`）。
+        `plugin_stop_timeout_ms` 等待，超时即放弃等待并继续停止流程。
         """
         ...
 
@@ -325,17 +325,17 @@ class PluginContext(Protocol):
         `/help`、`/capabilities`、`/plugins`、`/config`、`/session` 要回答的都是
         「这个实例现在是什么样」，而那些数据在 `kernel/` 里，
         `R4` 禁止 `builtins/` 与 `plugins/` 够到它。没有这条通道，`commands_core` 就只能
-        由 `runtime/` 特权注册——`BAS-005`「内建能力不享受特权」当场破例，而第三方也就
+        由 `runtime/` 特权注册——「内建能力不享受特权」当场破例，而第三方也就
         永远写不了 `/status` 这类命令。**这类命令本来就该是插件能写的东西。**
 
-        `config_document()` 是唯一越过 `CFG-002` 的成员，但明文凭据结构性地不在那份文档里
+        `config_document` 是唯一越过的成员，但明文凭据结构性地不在那份文档里
         （配置树自始至终持有 `${VAR}` 字面量）。
         """
         ...
 
     @property
     def turns(self) -> TurnControl:
-        """在跑 turn 的观测与取消（`/cancel` 的落点，技术方案 §10.3）。
+        """在跑 turn 的观测与取消。
 
         与 `instance` 分开而不是合成一个门面：一个是只读可观测性，一个是**控制动作**；
         两者分开后才能独立授予、替换与测试。
@@ -349,12 +349,12 @@ class KaryviaAPI(Protocol):
 
     形态对应 Pi 的 `ExtensionAPI`：`setup(api)` 拿到它，在**同步返回前**完成全部注册。
     注册先进 `RegistrationBatch` 暂存区，`setup` 正常返回才一次性并入 registry；中途抛
-    异常则整批丢弃，registry 不留半注册状态（`EDG-103`）。因此「注册」不是立即生效的
+    异常则整批丢弃，registry 不留半注册状态。因此「注册」不是立即生效的
     副作用，插件也不该在 `setup` 之后再回头注册——那时批次已经提交，registry 已冻结。
 
-    声明式扩展（`SDK-006`）不需要新方法：Skill、Prompt 片段与斜杠命令的文本模板都通过
+    声明式扩展不需要新方法：Skill、Prompt 片段与斜杠命令的文本模板都通过
     `register_context_provider` / `register_command` 承载，内容以 `ContextFragment` 形式
-    提交，因此天然受 `trust`、`priority` 与预算约束（`CMD-004`、`CMD-005`）。
+    提交，因此天然受 `trust`、`priority` 与预算约束。
     """
 
     @property
@@ -375,7 +375,7 @@ class KaryviaAPI(Protocol):
     def register_command(self, spec: CommandSpec, handler: CommandHandler) -> None:
         """注册一个斜杠命令（`CapabilityKind.COMMAND`，MULTI_UNIQUE）。
 
-        `spec.all_names`（命令名 + 别名）整体参与冲突检查（`CMD-002`）。
+        `spec.all_names`（命令名 + 别名）整体参与冲突检查。
 
         **异常约定**：同 `register_tool()`。
         """
@@ -421,7 +421,7 @@ class KaryviaAPI(Protocol):
     def register_memory_provider(self, name: str, provider: MemoryProvider) -> None:
         """注册一个长期记忆实现（`CapabilityKind.MEMORY`，MULTI_UNIQUE）。
 
-        带 `name` 即意味着可以并存多个具名实现：`MEM-003` 的降级要求换一个后端不必先
+        带 `name` 即意味着可以并存多个具名实现： 的降级要求换一个后端不必先
         卸载现有的。
 
         **异常约定**：同 `register_tool()`。
@@ -441,9 +441,9 @@ class KaryviaAPI(Protocol):
     def register_cli_entry(self, name: str, entry: CliEntry) -> None:
         """注册本地命令行入口（`CapabilityKind.CLI_ENTRY`，SINGLETON）。
 
-        CLI 入口不可禁用（`BAS-009`、`BAS-010`）：不装任何 Channel 插件也必须存在本地
+        CLI 入口不可禁用：不装任何 Channel 插件也必须存在本地
         交互入口。插件可以覆盖内建实现，但覆盖实现加载失败时 Runtime 强制回落到内建实现
-        而不是让实例失去入口（`EDG-108`）。
+        而不是让实例失去入口。
 
         **异常约定**：同 `register_session_store()`。
         """

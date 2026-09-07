@@ -1,20 +1,20 @@
-"""`tools_fs` 的配置：workspace 根、四项上限与单工具禁用清单（`TOL-006`、`CFG-002`）。
+"""`tools_fs` 的配置：workspace 根、四项上限与单工具禁用清单。
 
 职责：把 `ctx.config` 校验成一份不可变的 `FsToolSettings`，并回答「这次该注册哪几个
 工具」。
 不负责：读实例布局（`R4` 禁止内建 import `kernel/`，根由装配根经 `ctx.config["workspace"]`
 交下来）、执行工具、判定路径边界（`paths.py`）。
 
-**工具名清单是接口**（技术方案 §8.2「内建工具恰好 6 个，清单本身是接口」）：`TOOL_NAMES`
+**工具名清单是接口**：`TOOL_NAMES`
 在此写死，配置里出现表外的名字一律 `CONFIG_INVALID` 而不是静默忽略——「配置写法合法但被
 悄悄忽略」是本项目一贯拒绝的那类失败，尤其当那句配置的本意是**关掉一个能写盘的工具**时。
 
-**单工具禁用为什么在这里而不在 manifest 里**：`D16` 要求 manifest 声明的每一项都真的被
-注册（`CapabilityHost.finish()`），而 `TOL-006` 要求被禁用的工具从 registry 里消失。静态
+**单工具禁用为什么在这里而不在 manifest 里**： 要求 manifest 声明的每一项都真的被
+注册（`CapabilityHost.finish`），而  要求被禁用的工具从 registry 里消失。静态
 的 `BUILTIN_MANIFESTS` 无法按配置少声明一项，因此 `enabled_tool_names()` 同时喂给两处：
 `registration.setup()` 用它决定注册谁，装配根用它过滤 manifest 声明（`runtime/wiring.py`
 的 `keep` 参数）。两处同源于**同一次** `resolve_settings()`，「声明了但不可用」因此在结构
-上不可能发生——那正是 `TOL-006` 想要的同源。
+上不可能发生——那正是  想要的同源。
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ __all__ = [
     "resolve_settings",
 ]
 
-#: 本包交付的工具名，**顺序即注册顺序**（技术方案 §8.2 的冻结清单，`shell.exec` 是 `D21`）。
+#: 本包交付的工具名，**顺序即注册顺序**。
 TOOL_NAMES: Final[tuple[str, ...]] = ("fs.read", "fs.write", "fs.edit", "fs.list", "fs.grep")
 
 #: 六个配置键。manifest 的 `config_schema` 与这里必须一致，由测试对照。
@@ -58,7 +58,7 @@ CONFIG_MAX_RESULT_CHARS_KEY: Final = "max_result_chars"
 CONFIG_MAX_ENTRIES_KEY: Final = "max_entries"
 CONFIG_MAX_MATCHES_KEY: Final = "max_matches"
 
-#: 单次从磁盘读取的字节上限。超出不是失败，是截断（`EDG-403`）。
+#: 单次从磁盘读取的字节上限。超出不是失败，是截断。
 DEFAULT_MAX_READ_BYTES: Final = 1024 * 1024
 
 #: 单个工具结果的字符上限。默认取契约上限的一半：`MAX_TOOL_RESULT_LENGTH` 是「构造
@@ -155,10 +155,10 @@ class FsToolSettings:
 def _read_workspace(config: Mapping[str, JsonValue], ctx: PluginContext) -> Path:
     """决定 workspace 根：配置里的 `workspace`，否则退回插件私有状态目录。
 
-    **本内建不知道实例布局**（`R4`），根只能由装配根交下来：`D23` 会把
+    **本内建不知道实例布局**（`R4`），根只能由装配根交下来： 会把
     `ConfigDocument.workspace.root` 放进本插件的配置块。没配时退回 `ctx.state_dir`——那是
     每个插件都必然拥有的私有目录，比抛错更符合「插件在没有配置时也该能工作」，也比默默
-    用进程 cwd 安全得多（与 `session_jsonl.resolve_directory` 同一条先例）。
+    用进程 cwd 安全得多（与 `session_jsonl.resolve_directory` 相同原则）。
     """
     configured = config.get(CONFIG_WORKSPACE_KEY)
     if configured is None:
@@ -198,7 +198,7 @@ def _read_disabled(config: Mapping[str, JsonValue]) -> frozenset[str]:
 
 
 def resolve_settings(ctx: PluginContext) -> FsToolSettings:
-    """把 `ctx.config` 校验成一份设置（`CFG-002`：只看得到自己那一块）。
+    """把 `ctx.config` 校验成一份设置（只看得到自己那一块）。
 
     **异常约定**：类型不对、上限非正、`disable` 里有表外名字，一律抛 `CONFIG_INVALID`。
     `max_result_chars` 超过契约的 `MAX_TOOL_RESULT_LENGTH` 同样拒绝——放行它只会让每次
@@ -231,7 +231,7 @@ def resolve_settings(ctx: PluginContext) -> FsToolSettings:
 
 
 def enabled_tool_names(config: Mapping[str, JsonValue]) -> tuple[str, ...]:
-    """本次配置下该生效的工具名。装配根用它过滤 manifest 声明（`TOL-006`）。
+    """本次配置下该生效的工具名。装配根用它过滤 manifest 声明。
 
     只看配置、不碰 `ctx`：装配根在构造 `PluginContext` **之前**就要知道该声明哪几个能力，
     而这个问题只依赖 `disable` 一个键。`resolve_settings()` 与它读的是同一个函数

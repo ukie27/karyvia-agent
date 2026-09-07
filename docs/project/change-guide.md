@@ -31,8 +31,8 @@
 2. Manifest 声明 id、版本、SDK 范围、setup、依赖和能力全集。
 3. 实现只导入 `karyvia.sdk` 与 `karyvia.contracts`。
 4. 在 `setup(ctx, api)` 中通过对应 `register_*` 注册；声明与实际注册必须完全一致。
-5. 后台任务只通过 `ctx.spawn_task()` 创建，停止行为由生命周期管理器接管。
-   `setup()` 失败时 Registry 与任务/订阅分别由 RegistrationBatch 和 StartupResources 回滚，
+5. 后台任务只通过 `ctx.spawn_task` 创建，停止行为由生命周期管理器接管。
+   `setup` 失败时 Registry 与任务/订阅分别由 RegistrationBatch 和 StartupResources 回滚，
    插件不要另建宿主无法追踪的任务。
 6. 继承匹配的 `sdk.testing` 契约基类，并复制官方插件的 `inspect.signature` 守卫。
 7. 加入根 `pyproject.toml` 的 basedpyright include、CI editable 安装清单及清单防漂移测试所需
@@ -88,9 +88,9 @@
 1. 若默认值镜像 Kernel 机制常量，在 `kernel/config/defaults.py` 加常量和逐项对照测试。
 2. 在 `kernel/config/schema.py::SECTION_SPECS` 声明字段、类型、默认值和约束。
 3. 在 `kernel/config/sections.py` 的对应 frozen dataclass 加类型化属性；需要转成运行策略时更新
-   其 `to_*()`，保持相关 Kernel import 在函数内部。
-4. 在 `schema.validate_config()` 的具名构造中读取字段，不能只声明后让值被静默丢弃。
-5. 在 `kernel/config/document.py::config_to_json()` 渲染字段。
+   其 `to_*`，保持相关 Kernel import 在函数内部。
+4. 在 `schema.validate_config` 的具名构造中读取字段，不能只声明后让值被静默丢弃。
+5. 在 `kernel/config/document.py::config_to_json` 渲染字段。
 6. 若 Runtime 需要它，在唯一组装/选择位置消费；能力实现不要自己重新读 env 或文件。
 7. 在 `docs/configuration.md` 字段表和说明中记录。
 
@@ -102,7 +102,7 @@
   --basetemp=.pytest-tmp/config
 ```
 
-新增整个小节还要更新 `KaryviaConfig`、`config_to_json()` 顶层、Runtime 消费点和文档表。
+新增整个小节还要更新 `KaryviaConfig`、`config_to_json` 顶层、Runtime 消费点和文档表。
 
 ## 6. 扩展 PluginContext 资源门面
 
@@ -139,7 +139,7 @@
 
 先确定变化属于哪一层：
 
-- 模型调用前后透明行为：优先包装 `Model`，装配在 `orchestration.engine_deps()`。
+- 模型调用前后透明行为：优先包装 `Model`，装配在 `orchestration.engine_deps`。
 - 工具调用的超时/校验/副作用边界：`ToolInvoker`。
 - 单次模型工具循环：Engine。
 - Session、Context、Transcript、事件终态：Orchestrator。
@@ -168,7 +168,7 @@ Session JSONL 或未来插件状态变更时：
 5. 更新格式文档和部署升级步骤。
 6. 完成迁移后再切换默认写格式；不要同时长期双写两套格式。
 
-`SessionKey.storage_id()` 不随 Session schema 迁移一起改变。
+`SessionKey.storage_id` 不随 Session schema 迁移一起改变。
 
 ## 10. 修改 SDK 公开表面
 
@@ -208,8 +208,7 @@ Session JSONL 或未来插件状态变更时：
 
 1. 它是否解释当前仍成立的契约、安全边界、性能选择或反直觉行为？是则保留并尽量写成正面
    陈述。
-2. 它是否只记录 D 编号、提交顺序、旧实现、某次踩坑过程？把结论留下，历史移到
-   `history.md` 或 Git。
+2. 它是否只记录阶段编号、提交顺序、旧实现或某次踩坑过程？把当前结论留下，历史交给 Git。
 3. 它是否复述下一行代码？删除，优先让函数和变量名表达意图。
 4. 它是否写着“以后补”“暂时”“已知缺口”，但功能已经实现？立即改成当前行为。
 5. 它是否仍是有效缺口？放到可追踪的设计/issue 文档；局部只说明当前限制和失败方式。

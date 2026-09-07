@@ -1,4 +1,4 @@
-"""`kernel/turn/retry.py` 的验收：重试判定与 `RetryingModel` 的两条路径（开发方案 `D48`）。
+"""`kernel/turn/retry.py`当前行为：重试判定与 `RetryingModel` 的两条路径。
 
 | 验收项 | 测试 |
 | --- | --- |
@@ -117,7 +117,7 @@ class TestRetryDecision:
 
         `cancel.py::_to_error` 写的是 `retryable=reason is not CancelReason.SHUTDOWN`，
         也就是说用户按 Ctrl-C 产生的那个错误**自称可重试**。只看 `retryable` 会去重发一个
-        已经被取消的请求，因此判据必须是 `ErrorCategory`（`D44` 的同一条）。
+        已经被取消的请求，因此判据必须是 `ErrorCategory`（同一条）。
         """
         token = CancelToken()
         token.request(CancelReason.USER)
@@ -203,7 +203,7 @@ class TestEmptyAnswer:
 
 class TestComplete:
     async def test_a_transient_failure_is_retried_and_then_succeeds(self) -> None:
-        """`D48` 之前这条 turn 直接 `FAILED`，用户要自己重发。"""
+        """ 之前这条 turn 直接 `FAILED`，用户要自己重发。"""
         wrapped = Wrapped([flaky(), text_response("答")])
 
         response = await wrapped.model.complete(make_request(), CancelToken())
@@ -387,7 +387,7 @@ class TestStream:
 
 class TestEmptyResponse:
     async def test_an_empty_answer_is_retried(self) -> None:
-        """`D48` 之前：终帧空正文被 `emit_outbound` 丢掉，用户**什么都收不到**。"""
+        """ 之前：终帧空正文被 `emit_outbound` 丢掉，用户**什么都收不到**。"""
         wrapped = Wrapped([text_response(""), text_response("答")])
 
         response = await wrapped.model.complete(make_request(), CancelToken())
@@ -429,7 +429,7 @@ class TestEmptyResponse:
         assert wrapped.failures == []
 
     async def test_a_turn_that_already_ran_tools_keeps_its_empty_answer(self) -> None:
-        """**一条已经跑过工具的 turn 产出了真东西**——工具结果、产物、`D47` 挂在终帧上的
+        """**一条已经跑过工具的 turn 产出了真东西**——工具结果、产物、 挂在终帧上的
         出站附件都已经落地。因为模型的收尾句是空的就判它 `FAILED`，会把这些一起否掉。
         """
         wrapped = Wrapped([text_response("")], tool_calls=1)
@@ -441,7 +441,7 @@ class TestEmptyResponse:
         assert wrapped.failures == []
 
     async def test_the_switch_restores_the_old_behaviour(self) -> None:
-        """`retry_empty_response=false` = 原样放行，也就是 `D48` 之前的行为。"""
+        """`retry_empty_response=false` = 原样放行，也就是此前的行为。"""
         policy = RetryPolicy(max_attempts=3, base_delay_ms=1, retry_empty_response=False)
         wrapped = Wrapped([text_response("")], policy=policy)
 

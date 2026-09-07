@@ -183,7 +183,7 @@ async def test_corrupt_file_is_preserved_and_load_fails(tmp_path: Path, content:
 
 
 async def test_error_detail_carries_no_host_path(tmp_path: Path) -> None:
-    """宿主机绝对路径进模型可见的错误就是泄漏（`builtins/tools_fs` 的同一条判定）。"""
+    """宿主机绝对路径进模型可见的错误就是泄漏（`builtins/tools_fs` 采用的相同规则判定）。"""
     path = tmp_path / JOBS_FILE
     path.write_text("{ not json", encoding="utf-8")
     with pytest.raises(KaryviaError) as caught:

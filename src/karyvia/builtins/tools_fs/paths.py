@@ -1,11 +1,11 @@
-"""Workspace 路径守卫：把模型给的路径串判成一个边界内的绝对路径（技术方案 §8.3）。
+"""Workspace 路径守卫：把模型给的路径串判成一个边界内的绝对路径。
 
 职责：`WorkspaceGuard`——解析、双重校验（逻辑 + realpath）、渲染回相对显示路径，以及
 越界与形状非法两类拒绝。
 不负责：读写文件（`readers.py` / `writers.py`）、决定 workspace 根在哪（配置交下来，
 见 `settings.py`）。
 
-**判据是双重校验，缺一不可**（`EDG-405`、`NFR-302`）：
+**判据是双重校验，缺一不可**：
 
 1. **逻辑校验**：`os.path.normpath` 之后（不跟随符号链接）必须落在根内——挡住 `..`。
 2. **realpath 校验**：`Path.resolve()` 之后必须**再**落在根内——挡住符号链接与 Windows
@@ -14,7 +14,7 @@
 只做第二步会让一个指向根外、但尚不存在的路径在创建后才暴露；只做第一步则任何一个
 symlink 都能出去。两次比较都先过 `os.path.normcase`，因此 Windows 的大小写差异不构成
 绕过面，而 Linux 上 `normcase` 是恒等函数——同一段代码在两个平台给出同一套判定
-（`NFR-605`）。
+。
 
 **这是应用级守卫，不是 OS 沙箱**：校验与随后的 `open()` 之间存在 TOCTOU 窗口——目标可以
 在这期间被换成一个指向根外的符号链接。挡住它需要 `openat` + `O_NOFOLLOW` 一类的原语，
@@ -34,7 +34,7 @@ __all__ = ["RESERVED_DEVICE_NAMES", "WorkspaceGuard"]
 
 #: Windows 的保留设备名。它们能通过 containment 校验（`workspace/CON` 看起来完全正常）
 #: 却根本不是文件——打开它会连上控制台或空设备。两个平台一律拒绝而不是只在 Windows 上
-#: 拒绝：`NFR-605` 要的是同参数同语义，为它开一个平台分支等于让同一份工具调用在 Linux
+#: 拒绝： 要的是同参数同语义，为它开一个平台分支等于让同一份工具调用在 Linux
 #: 上成功、在 Windows 上失败。
 RESERVED_DEVICE_NAMES: Final = frozenset(
     {"con", "prn", "aux", "nul"}
@@ -114,7 +114,7 @@ class WorkspaceGuard:
     def relative(self, path: Path) -> str:
         """渲染成根内的 posix 相对路径，供模型消费。
 
-        工具产出里一律用它而不是绝对路径：两个平台给出同一个串（`NFR-605`），顺带也不把
+        工具产出里一律用它而不是绝对路径：两个平台给出同一个串，顺带也不把
         宿主机目录结构送进上下文。根自身渲染成 `"."`。
         """
         try:

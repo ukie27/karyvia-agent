@@ -1,4 +1,4 @@
-"""`ctx.shell` 的生产实现：受限的子进程门面（`sdk.ShellAccess`、`EDG-404`、`NFR-605`）。
+"""`ctx.shell` 的生产实现：受限的子进程门面（`sdk.ShellAccess`）。
 
 职责：`GuardedShellAccess`——校验 cwd、构造白名单环境、起进程（**不经 shell**）、并发抽干
 两个管道、超时后走「终止信号 → 宽限期 → 强杀」三步收尾。
@@ -14,7 +14,7 @@
 2. **超时不抛异常**（契约原文）：返回 `timed_out=True` 的结果，调用方拿得到超时前已经产生
    的输出。`ShellResult` 没有 `side_effect` 字段——那个三档判定是 `ToolResult` 的事。
 
-**环境是白名单，不是黑名单**（`NFR-307`）：父进程的环境默认一个字节都不进子进程。基线名单
+**环境是白名单，不是黑名单**：父进程的环境默认一个字节都不进子进程。基线名单
 在 `builtins/tools_shell/environ.py` 与这里各写一份（`R4` 让内建够不着 `runtime/`，而让
 `runtime/` 去 import 一个内建的私有模块等于把门面的安全策略绑在一个可被禁用的提供方上），
 由 `tests/runtime/test_access.py::test_shell_baseline_matches_the_builtin_tool` 逐条对照。
@@ -124,7 +124,7 @@ class GuardedShellAccess:
 
         **起不来不抛异常**：契约把「非零退出码不是异常」写死了，而一个拼错的命令名与一次
         返回 127 的执行对调用方是同一件事——都要读 stderr 再决定下一步。-1 不在 0–255 内，
-        因此「起不来」与「程序真的返回了 1」仍然分得开（`builtins/tools_shell` 的同一条判据）。
+        因此「起不来」与「程序真的返回了 1」仍然分得开（`builtins/tools_shell` 采用的相同判据）。
         """
         try:
             return await asyncio.create_subprocess_exec(
@@ -169,7 +169,7 @@ class GuardedShellAccess:
         """终止信号 → 宽限期 → 强杀 + 收尸。
 
         直接 `kill()` 会让一条写了一半的命令就地停下——那不叫超时收尾，叫留下半份产物。
-        宽限期正是留给进程自己收尾的（`builtins/tools_shell/process.py` 的同一条判据）。
+        宽限期正是留给进程自己收尾的（`builtins/tools_shell/process.py` 采用的相同判据）。
         """
         with contextlib.suppress(ProcessLookupError):
             process.terminate()
@@ -224,7 +224,7 @@ def _release(process: asyncio.subprocess.Process) -> None:
 
     被强杀之后传输对象会活到下一次 GC，届时事件循环多半已关，`__del__` 里那句 `call_soon`
     会抛 `Event loop is closed`——表现是一串挂在无辜用例上的 `ResourceWarning`，而在一个
-    跑几个月的实例里那是真实的 fd 泄漏（`D21` 踩过同一个坑）。`_transport` 是私有属性，
+    长期运行的实例中这会造成真实的 fd 泄漏。`_transport` 是私有属性，
     用 `getattr` 取：CPython 换内部名字时应当安静地少做一件清理，而不是让每次调用都炸。
     """
     transport = getattr(process, "_transport", None)

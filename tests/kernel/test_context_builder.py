@@ -2,8 +2,8 @@
 
 | 组 | 验收内容 |
 | --- | --- |
-| A Provider 调度 | 并发调用、顺序确定、超时/失败隔离（`CTX-005`、`EDG-302`） |
-| B 放置 | `trust` 决定位置；`UNTRUSTED` 被包裹且进不了系统指令位（`CMD-005`、`EDG-306`） |
+| A Provider 调度 | 并发调用、顺序确定、超时/失败隔离 |
+| B 放置 | `trust` 决定位置；`UNTRUSTED` 被包裹且进不了系统指令位 |
 | C 过滤 | `SECRET` 与过期片段被丢弃并记录 |
 | D 拦截器 | `context_assemble` 的结果进入最终渲染与统一计量 |
 | E 计量 | Builder 不裁剪，按最终 `ModelMessage` 结构重算 |
@@ -125,7 +125,7 @@ async def test_providers_are_called_concurrently_and_ordered_by_binding() -> Non
             ]
         )
 
-    # 顺序由 binding 的排序决定，与谁先返回无关（`CTX-002`）。
+    # 顺序由 binding 的排序决定，与谁先返回无关。
     assert [item.source for item in context.fragments] == ["builtin:fast", "plugin:slow"]
 
 

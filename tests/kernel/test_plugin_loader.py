@@ -1,14 +1,14 @@
-"""阶段 A 三项机制的测试（`D27`；技术方案 §7.3，需求 `PLG-003`、`CMP-001`、`EDG-503`）。
+"""加载前校验 三项机制的测试。
 
 四条主线：
 
 - **拓扑序是确定的**：同一份输入每次得到同一个顺序（同层按 id 字典序），因为加载顺序
-  必须可复现——它不决定覆盖（`EDG-102`），但它决定诊断读起来是不是同一回事。
-- **三种落榜分得开**：依赖缺失、依赖成环（错误里带整条环路，`PLG-003`）、级联。
+  必须可复现——它不决定覆盖，但它决定诊断读起来是不是同一回事。
+- **三种落榜分得开**：依赖缺失、依赖成环（错误里带整条环路）、级联。
   把三者并成一句「依赖有问题」会让用户不知道该装什么还是该改什么。
-- **配置校验带字段路径**（`CMP-001`），且指向 `config.json` 里的位置而不是插件私有
+- **配置校验带字段路径**，且指向 `config.json` 里的位置而不是插件私有
   schema 里的位置。
-- **状态版本不一致时一个字节都不改写**（`EDG-503`）：旧状态要留得住。
+- **状态版本不一致时一个字节都不改写**：旧状态要留得住。
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def node(plugin_id: str, *dependencies: str) -> PlanNode:
 
 
 def test_no_nodes_is_an_ordinary_path() -> None:
-    """未启用任何外部插件时计划为空（`PLG-007`、`EDG-101`）。"""
+    """未启用任何外部插件时计划为空。"""
     plan = plan_load_order([])
     assert plan.order == () and plan.failures == ()
 
@@ -66,7 +66,7 @@ def test_a_missing_dependency_is_a_phase_a_failure() -> None:
 
 
 def test_a_cycle_is_reported_with_the_whole_path() -> None:
-    """`PLG-003` 要求「指出环路」，因此断言的是整条环而不只是「有环」。"""
+    """ 要求「指出环路」，因此断言的是整条环而不只是「有环」。"""
     plan = plan_load_order([node("a", "b"), node("b", "a")])
     assert plan.order == ()
     codes = {failure.plugin_id: failure.error for failure in plan.failures}
@@ -99,7 +99,7 @@ def test_excluded_plugins_keep_their_dependents_out() -> None:
 
 
 def test_one_broken_plugin_does_not_take_the_others_down() -> None:
-    """`PLG-004`：不相干的插件照常排进计划。"""
+    """不相干的插件照常排进计划。"""
     plan = plan_load_order([node("a", "nope"), node("b")])
     assert plan.order == ("b",)
 
@@ -127,7 +127,7 @@ def test_a_matching_config_passes() -> None:
 
 
 def test_a_wrong_type_is_reported_with_a_pointer_into_config_json() -> None:
-    """`CMP-001`：路径指的是用户要去改的那个位置，而不是 schema 里的位置。"""
+    """路径指的是用户要去改的那个位置，而不是 schema 里的位置。"""
     error = validate_plugin_config(
         _SCHEMA, {"retries": "three"}, plugin_id="acme", pointer="/plugins/acme/config"
     )
@@ -158,7 +158,7 @@ def test_a_broken_schema_blames_the_plugin_not_the_user() -> None:
 
 
 def test_validation_never_raises_on_a_hostile_config() -> None:
-    """约定不抛：插件配置写错时实例仍要能起来（`PLG-004`）。"""
+    """约定不抛：插件配置写错时实例仍要能起来。"""
     error = validate_plugin_config(
         _SCHEMA, {"retries": 1, "extra": {"deep": [1, 2]}}, plugin_id="acme", pointer="/p"
     )
@@ -191,7 +191,7 @@ def test_a_matching_version_passes(tmp_path: Path) -> None:
 
 
 def test_a_changed_version_fails_and_keeps_the_old_state(tmp_path: Path) -> None:
-    """`EDG-503`：升级失败要保住旧状态，因此标记文件一个字节都不许被改写。"""
+    """升级失败要保住旧状态，因此标记文件一个字节都不许被改写。"""
     state_dir = tmp_path / "acme"
     state_dir.mkdir()
     check_state_version(state_dir, 1, plugin_id="acme")

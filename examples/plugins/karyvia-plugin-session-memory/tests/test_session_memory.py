@@ -1,7 +1,6 @@
 """`session-memory` 的测试：与内建 JSONL 存储**共用同一套** `SessionStoreContract`。
 
-职责：证明本插件的会话存储满足契约（需求 §16.2 第 7 条：内建默认实现与同类插件通过同一套
-契约测试），以及 manifest 的覆盖声明写对了。
+职责：证明本插件的会话存储满足契约，以及 manifest 的覆盖声明写对了。
 不负责：验证覆盖真的生效（那要装一个实例，在宿主仓库的 `tests/e2e/test_plugin_runtime.py`）。
 
 `tests/builtins/test_session_jsonl.py` 里的内建实现继承的是**同一个基类**。两份实现被同一

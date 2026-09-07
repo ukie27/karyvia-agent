@@ -1,22 +1,22 @@
-"""内建 shell 工具 `tools_shell` 的验收（开发方案 `D21`）。
+"""内建 shell 工具 `tools_shell`当前行为。
 
 | 验收项 | 测试 |
 | --- | --- |
 | 通过 `ToolContract` 全部用例 | `TestShellExec` |
-| 取消宽限期矩阵：超时后收尾 / 宽限期用尽（`EDG-407`） | `TestCancelGrace` |
-| cwd 守卫与 `tools_fs.WorkspaceGuard` 逐条相同（`EDG-405`） | `test_cwd_guard_matches_the_fs_workspace_guard` |
-| 环境变量默认全部不继承（`NFR-307`） | `TestEnvironmentVariables` |
+| 取消宽限期矩阵：超时后收尾 / 宽限期用尽 | `TestCancelGrace` |
+| cwd 守卫与 `tools_fs.WorkspaceGuard` 逐条相同 | `test_cwd_guard_matches_the_fs_workspace_guard` |
+| 环境变量默认全部不继承 | `TestEnvironmentVariables` |
 | 非零退出码是正常产出而不是错误 | `TestExitCodeSemantics` |
-| 跨平台行为契约一致（`NFR-605`） | `TestCrossPlatformContract` |
-| 单工具禁用后模型可见列表同步消失（`TOL-006`） | `TestSingleToolDisable` |
-| 内建以普通 manifest + `setup(api)` 注册（`BAS-005`） | `TestRegistration` |
+| 跨平台行为契约一致 | `TestCrossPlatformContract` |
+| 单工具禁用后模型可见列表同步消失 | `TestSingleToolDisable` |
+| 内建以普通 manifest + `setup(api)` 注册 | `TestRegistration` |
 
 三条写这些用例时的取舍：
 
 - **取消宽限期走真实进程**（`asyncio.create_subprocess_exec`），不 monkeypatch。这套机制的
   全部价值就在于它对真实的进程与信号成立；打了桩的 `terminate()` 只能证明代码路径被走到。
 - **cwd 守卫走真实文件系统**（`tmp_path`），并断言它与 `tools_fs.WorkspaceGuard` 逐条对照。
-  两个内建工具包的边界判定必须一致（`EDG-405`），而一条人工维护的「应该一致」比不上一条
+  两个内建工具包的边界判定必须一致，而一条人工维护的「应该一致」比不上一条
   失败了就停发的测试。
 - **单工具禁用走真实装配链**（manifest → `wire_capabilities(keep=…)` → registry），与
   `test_tools_fs.py::TestSingleToolDisable` 同一套做法。
@@ -127,7 +127,7 @@ def try_symlink(link: Path, target: Path, *, directory: bool = False) -> None:
 def try_junction(link: Path, target: Path) -> None:
     """建一个 Windows 目录联接（重解析点）。
 
-    技术方案 §8.3 把重解析点单列为一类逃逸面，而 Windows 上创建**符号链接**需要开发者
+    重解析点是一类独立的路径逃逸面，而 Windows 上创建**符号链接**需要开发者
     模式或管理员权限——多数开发机与 CI 上 `try_symlink` 会 skip，那条最该跑的守卫
     （`paths.py` 的 realpath 校验）就永远没跑过。目录联接不需要提权，走的又是同一条
     `resolve()` 判定，因此它是这台机器上唯一能真正验到重解析点的途径。
@@ -202,7 +202,7 @@ class TestShellExec(ToolContract):
 
 
 class TestCancelGrace:
-    """取消宽限期矩阵：进程自己退出 / 宽限期内收尾 / 宽限期用尽（`EDG-407`）。"""
+    """取消宽限期矩阵：进程自己退出 / 宽限期内收尾 / 宽限期用尽。"""
 
     async def test_a_command_completes_normally(self, tmp_path: Path) -> None:
         result = await run_process(
@@ -232,7 +232,7 @@ class TestCancelGrace:
         assert result.grace_expired is False
 
     async def test_grace_expired_when_process_ignores_termination(self, tmp_path: Path) -> None:
-        """宽限期用尽被强杀——`side_effect=UNKNOWN` 的正主（`EDG-407`）。"""
+        """宽限期用尽被强杀——`side_effect=UNKNOWN` 的正主。"""
         if os.name == "nt":
             pytest.skip("Windows 的 TerminateProcess 无法被捕获")
         # POSIX：`trap '' SIGTERM` 让进程忽略终止信号。
@@ -273,7 +273,7 @@ class TestCancelGrace:
 
 
 def test_cwd_guard_matches_the_fs_workspace_guard(tmp_path: Path) -> None:
-    """逐条对照：两个内建工具包的边界判定必须一致（`EDG-405`、`NFR-302`）。
+    """逐条对照：两个内建工具包的边界判定必须一致。
 
     这条测试的存在理由见 `paths.py` 的模块 docstring「为什么不 import `WorkspaceGuard`」：
     优先重复而非过早抽象，但重复必须由测试钉住。
@@ -320,7 +320,7 @@ class TestCwdEdgeCases:
 
     @pytest.mark.skipif(os.name != "nt", reason="目录联接是 Windows 特有的重解析点")
     def test_a_directory_junction_out_of_the_workspace_is_refused(self, tmp_path: Path) -> None:
-        """realpath 校验挡住重解析点——双重校验的第二步（`EDG-405`、`NFR-302`）。
+        """realpath 校验挡住重解析点——双重校验的第二步。
 
         逻辑校验（`normpath`）看不见联接：`ws/junction` 在字符串上完全落在根内。只有
         `resolve()` 之后再比一次才发现它指向根外。这条用例是那半边守卫在 Windows 上
@@ -359,7 +359,7 @@ class TestCwdEdgeCases:
 
 
 class TestEnvironmentVariables:
-    """默认全部不继承（`NFR-307`、`MOD-002`）。"""
+    """默认全部不继承。"""
 
     def test_baseline_contains_only_platform_essentials(self) -> None:
         """基线名单本身不含任何凭据类变量（见 `environ.py` 模块 docstring）。"""
@@ -403,7 +403,7 @@ class TestEnvironmentVariables:
     async def test_a_sentinel_credential_never_reaches_the_child_process(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """哨兵扫描：父进程里的凭据不出现在**真实子进程**的环境里（`NFR-307`、`MOD-002`）。
+        """哨兵扫描：父进程里的凭据不出现在**真实子进程**的环境里。
 
         这条刻意走真实进程而不是只断言 `build_environment()` 的返回值——那个函数是对的
         不等于调用它的那条路径是对的（漏传 `env=` 就会让子进程继承整个父环境，而单测
@@ -442,7 +442,7 @@ class TestEnvironmentVariables:
 
 
 class TestSideEffectLadder:
-    """`side_effect` 的三档判定（`EDG-401`、`EDG-407`）。
+    """`side_effect` 的三档判定。
 
     **这一组刻意在 `_fold` 上做而不是靠真实进程**：`GRACE_EXPIRED` 那一档需要一个忽略
     终止信号的进程，而 Windows 的 `TerminateProcess` 无法被捕获——只走真实进程的话，
@@ -491,7 +491,7 @@ class TestSideEffectLadder:
         assert folded.error.code is ErrorCode.CANCELLED_BY_USER
 
     def test_grace_expired_reports_unknown(self, tmp_path: Path) -> None:
-        """**本模块与 `tools_fs` 唯一的语义差异**：宽限期用尽 → `UNKNOWN`（`EDG-407`）。"""
+        """**本模块与 `tools_fs` 唯一的语义差异**：宽限期用尽 → `UNKNOWN`。"""
         folded = self._fold(
             tmp_path, self._result(ProcessOutcome.GRACE_EXPIRED, exit_code=None, timed_out=True)
         )
@@ -545,7 +545,7 @@ class TestSpawnFailure:
         """`exit_code=-1` 不是任何程序的真实退出码，诊断因此能区分「启动失败」。
 
         POSIX 才验得到：Windows 走 `create_subprocess_shell`，`shell` 配置项不生效
-        （见 `command.py` 的模块 docstring），指一个不存在的 shell 也不会让启动失败。
+        （见 `command.py` 的模块 docstring），指一个不存在 shell 也不会让启动失败。
         """
         if os.name == "nt":
             pytest.skip("Windows 上 shell 配置项不生效，起不来这条路要靠别的方式触发")
@@ -604,7 +604,7 @@ class TestExitCodeSemantics:
 
 
 class TestCrossPlatformContract:
-    """两个平台的对外行为契约一致（`NFR-605`）。"""
+    """两个平台的对外行为契约一致。"""
 
     def test_posix_argv_puts_the_command_last(self) -> None:
         """POSIX 走 `<shell> -c <command>`，命令串是最后一个参数。
@@ -634,7 +634,7 @@ class TestCrossPlatformContract:
         assert result.data["exit_code"] == 0
 
     def test_newlines_are_normalized_in_output(self) -> None:
-        """`\\r\\n` 归一成 `\\n`（`NFR-605`）——输出在 `process._decode` 之后是平台无关的。"""
+        """`\\r\\n` 归一成 `\\n`——输出在 `process._decode` 之后是平台无关的。"""
         # 测试在单元层（`_decode`），不跑真实进程——Windows 的 `echo` 会不会输出 `\r\n`
         # 取决于 shell 与重定向，而这条测试要断言的是「解码层归一了」。
         from karyvia.builtins.tools_shell.process import _decode
@@ -647,7 +647,7 @@ class TestCrossPlatformContract:
 
 
 class TestSingleToolDisable:
-    """单工具禁用后，模型可见列表中同步消失（`TOL-006`）。"""
+    """单工具禁用后，模型可见列表中同步消失。"""
 
     def test_by_default_the_only_tool_is_enabled(self) -> None:
         assert enabled_tool_names({}) == _ONLY
@@ -699,7 +699,7 @@ class TestSingleToolDisable:
         assert len(tools) == 0
 
     async def test_forgetting_the_filter_fails_loudly(self, tmp_path: Path) -> None:
-        """不过滤声明就是「声明了却没注册」，`D16` 会拒绝加载（与 `test_tools_fs` 同）。"""
+        """不过滤声明就是「声明了却没注册」， 会拒绝加载（与 `test_tools_fs` 同）。"""
         config: dict[str, JsonValue] = {
             CONFIG_WORKSPACE_KEY: str(tmp_path),
             CONFIG_DISABLE_KEY: [TOOL_NAME],
@@ -721,7 +721,7 @@ class TestSingleToolDisable:
 
 
 class TestRegistration:
-    """内建以普通 manifest + `setup(api)` 注册，与外部插件无特权差异（`BAS-005`）。"""
+    """内建以普通 manifest + `setup(api)` 注册，与外部插件无特权差异。"""
 
     def test_the_manifest_declares_exactly_one_tool(self) -> None:
         assert TOOLS_SHELL.id == "tools-shell"
@@ -834,7 +834,7 @@ class TestSettings:
 
 
 class TestArgumentValidation:
-    """参数校验：表外参数、类型不对，都是 `ok=False` 的结果而不是异常（`TOL-002`）。"""
+    """参数校验：表外参数、类型不对，都是 `ok=False` 的结果而不是异常。"""
 
     @pytest.mark.parametrize(
         "arguments",
@@ -903,7 +903,7 @@ class TestCommandEdgeCases:
 
 
 class TestTruncation:
-    """输出超限时截断并置 `truncated=True`（`TOL-003`）。"""
+    """输出超限时截断并置 `truncated=True`。"""
 
     async def test_output_within_limit_is_not_truncated(self, tmp_path: Path) -> None:
         executor = make_executor(make_workspace(tmp_path), **{CONFIG_MAX_OUTPUT_CHARS_KEY: 1000})

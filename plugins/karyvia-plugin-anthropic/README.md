@@ -31,7 +31,7 @@ karyvia plugins enable anthropic
 }
 ```
 
-凭据只能以 `${VAR}` 引用出现（`CFG-003`：明文不进配置文档）。`auth` 默认 `x_api_key`，
+凭据只能以 `${VAR}` 引用出现（明文不进配置文档）。`auth` 默认 `x_api_key`，
 即 Anthropic 官方的 `x-api-key:` 头。
 
 ## 配置项
@@ -76,7 +76,7 @@ karyvia plugins enable anthropic
 `mode="budget"` 时 `budget_tokens` 必须**小于** `max_output_tokens`，否则以
 `CONFIG_INVALID` 拒绝——本插件不会替你把输出上限抬高，那会让生效的上限不是你配的那个。
 
-开了 `adaptive` 或 `budget` 之后，`describe()` 交出的能力集自动包含 `reasoning`。
+开了 `adaptive` 或 `budget` 之后，`describe` 交出的能力集自动包含 `reasoning`。
 
 ### `prompt_caching`
 
@@ -94,7 +94,7 @@ system 块、`messages[-2]` 的最后一个块。分界点选在这里是为了�
 上限。缓存是否真的写入可以在 `model.response_received` 事件的
 `provider_metadata.cache_creation_input_tokens` 里看到。
 
-开启后 `describe()` 的能力集自动包含 `prompt_caching`。
+开启后 `describe` 的能力集自动包含 `prompt_caching`。
 
 ## 用量口径
 
@@ -109,13 +109,13 @@ cache_read_input_tokens` 三项之和**——线格式里的 `input_tokens` 只�
 
 这几条如实记在这里，不留给你去发现：
 
-- **thinking 块的回放只活到本轮 turn 结束。** `D45` 起 thinking 块（含 `signature`）会被
+- **thinking 块的回放只活到本轮 turn 结束。**当前 thinking 块（含 `signature`）会被
   原样回传，因此 thinking 与工具调用可以同时用（在此之前不行——那是相对被删除的
-  `legacy/providers/anthropic_provider.py` 的一处真实能力回退）。但 opaque 块不进
+  Provider 所需的原生能力）。但 opaque 块不进
   `SessionMessage`，跨 turn 拿不回来。需要回放的场景全都是同一条 turn 内的工具循环，
   因此这够用；真要跨 turn 得先决定一份加密的思考签名该不该成为用户资产。
 - **缺 `signature` 的 thinking 块与别家产出的 opaque 块都会被跳过。** 前者 Anthropic 直接
-  拒绝，后者的载荷形状是私有的（`EDG-305`）。
+  拒绝，后者的载荷形状是私有的。
 - **不支持图像与文档输入。** `ModelMessage.content` 是纯字符串，契约层没有多模态位置。
 - **不做重试与故障转移。** 重试是编排层的策略，本插件只把 `retryable` 与 `retry_after_ms`
   如实标在 `KaryviaError` 上。两处都做会叠成一个放大器。

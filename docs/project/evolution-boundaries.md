@@ -19,7 +19,7 @@
 
 ### 持久化与标识
 
-- `SessionKey.storage_id()` 的编码必须保持可逆、无碰撞和向后兼容。
+- `SessionKey.storage_id` 的编码必须保持可逆、无碰撞和向后兼容。
 - Session JSONL 与插件 `state_version` 是外部可观察的存储契约。
 - 改字段含义、键格式或版本判定必须先写迁移设计和旧数据失败策略。
 
@@ -95,7 +95,7 @@ Turn，而使用普通 Tool/Command 无法表达。
 当前禁止的捷径：
 
 - 把 `TurnOrchestrator`、Registry 或 Runtime Instance 直接交给插件；
-- 让插件自己 import Kernel 并调用 `run_turn()`；
+- 让插件自己 import Kernel 并调用 `run_turn`；
 - 用全局函数或 service locator 绕过取消、预算、事件和 Session 调度；
 - 为 Multi-Agent 给 `EngineDeps` 增加第五个宿主对象槽。
 
@@ -112,7 +112,7 @@ Turn，而使用普通 Tool/Command 无法表达。
 - Memory 作用域：user/session/workspace/agent/organization 等可审计范围。
 
 应新增独立 `MemoryScopeKey` 或 `MemoryRequest` 一类契约，使作用域选择显式且可授权。不要
-改变 `SessionKey.storage_id()`，也不要默认把同名用户跨平台合并。
+改变 `SessionKey.storage_id`，也不要默认把同名用户跨平台合并。
 
 当前禁止的捷径：
 

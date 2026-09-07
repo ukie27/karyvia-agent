@@ -1,4 +1,4 @@
-"""工具进度提示的验收（开发方案 `D34`）。
+"""工具进度提示的验收。
 
 | 验收项 | 测试 |
 | --- | --- |
@@ -143,6 +143,7 @@ class TestSubscription:
         channel.on_tool_call(tool_event(channel_id="cli"))
         assert channel._hints.empty()  # noqa: SLF001
 
+
     def test_an_instance_level_event_without_correlation_is_ignored(self) -> None:
         channel, _, _ = make_channel()
         event = RuntimeEvent(
@@ -155,12 +156,14 @@ class TestSubscription:
         channel.on_tool_call(event)
         assert channel._hints.empty()  # noqa: SLF001
 
+
     def test_a_payload_without_a_tool_name_is_ignored(self) -> None:
         channel, _, _ = make_channel()
         event = tool_event()
         object.__setattr__(event, "payload", {"call_id": "call-1"})
         channel.on_tool_call(event)
         assert channel._hints.empty()  # noqa: SLF001
+
 
     def test_a_full_queue_drops_instead_of_raising(self) -> None:
         """提示是锦上添花——为它把事件发布堵住或炸掉是本末倒置。"""
@@ -230,7 +233,7 @@ class TestDelivery:
         await channel.stop()
 
     async def test_each_conversation_only_sees_its_own_hints(self) -> None:
-        """`D33` 起 `deliver` 可并发，缓冲按 conversation 分片——提示不该串台。"""
+        """ 起 `deliver` 可并发，缓冲按 conversation 分片——提示不该串台。"""
         channel, client, clock = make_channel()
         await channel.start()
         other = "oc_chat_2"

@@ -1,16 +1,16 @@
-"""内建 Model Provider `model_openai` 的验收（开发方案 `D19`）。
+"""内建 Model Provider `model_openai`当前行为。
 
 | 验收项 | 测试 |
 | --- | --- |
 | 通过 `ModelProviderContract` 全部用例 | `TestOpenAIModelProvider` |
 | 请求体符合 OpenAI 线格式 | `TestRequestEncoding` |
 | 响应解码，内容过滤是正常响应而非异常 | `TestResponseDecoding` |
-| 流式 tool_call 增量拼装与 `EDG-304` | `TestStreaming` |
-| 四类错误映射到正确的 `ErrorCategory` 且 `retryable` 正确（`MOD-003`） | `TestFaultMapping` |
-| 认证信息不进日志与事件（`MOD-002`） | `TestCredentialNeverLeaks` |
+| 流式 tool_call 增量拼装与  | `TestStreaming` |
+| 四类错误映射到正确的 `ErrorCategory` 且 `retryable` 正确 | `TestFaultMapping` |
+| 认证信息不进日志与事件 | `TestCredentialNeverLeaks` |
 | 取消语义 | `TestCancellation` |
 | 配置校验在 `setup()` 时发生 | `TestSettings` |
-| 内建以普通 manifest + `setup(api)` 注册（`BAS-005`） | `TestRegistration` |
+| 内建以普通 manifest + `setup(api)` 注册 | `TestRegistration` |
 
 三条写这些用例时的取舍：
 
@@ -348,7 +348,7 @@ class TestResponseDecoding:
         assert response.stop_reason is expected
 
     def test_content_filter_is_a_normal_response_not_an_exception(self) -> None:
-        """`EDG-304`：过滤掉的输出不是完整答案，但它也不是一次失败的调用。"""
+        """过滤掉的输出不是完整答案，但它也不是一次失败的调用。"""
         response = decode_response(
             chat_body(content="", finish_reason="content_filter"), model_id=MODEL_ID
         )
@@ -539,7 +539,7 @@ class TestStreaming:
         assert chunks[-1].stop_reason is StopReason.END_TURN
 
     async def test_a_stream_that_fails_midway_emits_done_error_first(self) -> None:
-        """`EDG-304`：没有这个 DONE(ERROR)，消费方分不清「流干净结束了」与「断在半截」，
+        """没有这个 DONE(ERROR)，消费方分不清「流干净结束了」与「断在半截」，
         一份残缺的回答会被当成完整答案。"""
         stream = "data: " + json.dumps({"choices": [{"delta": {"content": "半"}}]}) + "\n\ndata: {not json\n\n"
         provider = make_provider(lambda _: httpx.Response(200, text=stream))
@@ -561,7 +561,7 @@ class TestStreaming:
         assert seen == []
 
     async def test_streaming_requires_the_declared_capability(self) -> None:
-        """没声明就必须报缺失，不得自行降级为一次性返回（`MOD-005`）。"""
+        """没声明就必须报缺失，不得自行降级为一次性返回。"""
         provider = make_provider(
             ok_handler(), **{CONFIG_CAPABILITIES_KEY: ["tool_calls"]}
         )
@@ -580,7 +580,7 @@ class TestStreaming:
 
 
 class TestFaultMapping:
-    """`MOD-003` 的四类错误。逐条断言 `ErrorCategory` 与 `retryable`。"""
+    """ 的四类错误。逐条断言 `ErrorCategory` 与 `retryable`。"""
 
     def test_401_is_a_missing_credential(self) -> None:
         """与 `ctx.secret()` 在凭据缺失时抛的是同一个码——用户看到的是同一件事。"""
@@ -678,7 +678,7 @@ class TestFaultMapping:
 
 
 class TestCredentialNeverLeaks:
-    """`MOD-002`：认证信息不进日志、事件与错误。"""
+    """认证信息不进日志、事件与错误。"""
 
     def test_the_credential_reaches_only_the_authorization_header(self) -> None:
         """明文只该出现在认证头里：不进 URL（会被中间设备记进 access log）、
@@ -708,9 +708,9 @@ class TestCredentialNeverLeaks:
         assert request.headers["authorization"] == f"Bearer {SENTINEL_KEY}"
 
     def test_the_module_has_no_logging_path_to_leak_through(self) -> None:
-        """`MOD-002` 说的是「不进日志与事件」。事件那半边由下面两条用例盯着；
+        """ 说的是「不进日志与事件」。事件那半边由下面两条用例盯着；
         日志这半边的最强形态不是「日志里没有」，而是**根本没有日志调用**——
-        与 `D18` 用「没有语法途径」判定只读内建是同一种判据。"""
+        与  用「没有语法途径」判定只读内建是同一种判据。"""
         package = Path(model_openai_module.__file__).parent
         for path in sorted(package.glob("*.py")):
             source = path.read_text(encoding="utf-8")
@@ -788,7 +788,7 @@ class TestCancellation:
 
     async def test_streaming_checks_cancellation_between_chunks(self) -> None:
         """取消发生在流中途：已 yield 的分片由调用方保留，且必须先给一个 DONE(ERROR)
-        （`EDG-304`）——否则半截回答会被当成完整答案。"""
+        ——否则半截回答会被当成完整答案。"""
         stream = sse(
             [
                 {"choices": [{"delta": {"content": "第一片"}}]},
@@ -814,7 +814,7 @@ class TestCancellation:
 
 class TestSettings:
     def test_defaults_are_usable_without_any_configuration(self) -> None:
-        """`BAS-001`：配置一份凭据就能用。"""
+        """配置一份凭据就能用。"""
         settings = resolve_settings(FakePluginContext())
         info = settings.describe(MODEL_ID)
         assert info.provider == PROVIDER_NAME
@@ -823,7 +823,7 @@ class TestSettings:
         assert info.supports(ModelCapability.STREAMING)
 
     def test_unsupported_capabilities_are_absent_not_downgraded(self) -> None:
-        """`MOD-005`：缺席即报缺失，不静默降级后假装支持。"""
+        """缺席即报缺失，不静默降级后假装支持。"""
         info = resolve_settings(make_context()).describe(MODEL_ID)
         assert not info.supports(ModelCapability.IMAGE_INPUT)
         assert not info.supports(ModelCapability.REASONING)
@@ -909,6 +909,7 @@ class TestSettings:
                 registered.append((name, provider))
 
         setup(RecordingApi())  # type: ignore[arg-type]
+
         assert len(registered) == 1
         assert registered[0][0] == CAPABILITY_NAME
         assert isinstance(registered[0][1], OpenAIModelProvider)
@@ -927,6 +928,7 @@ class TestSettings:
                 registered.append(provider)
 
         setup(RecordingApi())  # type: ignore[arg-type]
+
         assert len(registered) == 1
 
     def test_a_missing_credential_reports_the_configuration_problem(self) -> None:
@@ -1027,7 +1029,7 @@ class TestHttpClient:
         assert str(seen[0]) == f"{BASE_URL}{CHAT_COMPLETIONS_PATH}"
 
     async def test_aclose_is_idempotent(self) -> None:
-        """`ModelProvider` 协议里没有生命周期钩子，`D23` 的装配根负责调它。"""
+        """`ModelProvider` 协议里没有生命周期钩子， 的装配根负责调它。"""
         provider = make_provider(ok_handler())
         await provider.complete(make_request(), ManualCancel())
         await provider.aclose()
@@ -1057,7 +1059,7 @@ class TestHttpClient:
                 seen.append(chunk)
         assert caught.value.code is ErrorCode.TIMEOUT_MODEL_REQUEST
         assert caught.value.retryable
-        # 已经吐过内容，因此仍要有那个 DONE(ERROR)（`EDG-304`）。
+        # 已经吐过内容，因此仍要有那个 DONE(ERROR)。
         assert seen[-1].stop_reason is StopReason.ERROR
 
     async def test_a_transport_failure_midstream_is_wrapped(self) -> None:
@@ -1078,7 +1080,7 @@ class TestHttpClient:
 
 
 class TestRegistration:
-    """内建的落地形态：一份普通 manifest + 一个 `setup(api)`，没有第二条路（`BAS-005`）。"""
+    """内建的落地形态：一份普通 manifest + 一个 `setup(api)`，没有第二条路。"""
 
     def test_the_manifest_is_listed_as_a_builtin(self) -> None:
         assert MODEL_OPENAI in BUILTIN_MANIFESTS

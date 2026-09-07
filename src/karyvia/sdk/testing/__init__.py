@@ -1,10 +1,10 @@
-"""公开测试工具包：Fake 实现与契约测试基类（技术方案 §12.3、`NFR-702`）。
+"""公开测试工具包：Fake 实现与契约测试基类。
 
 职责：把 `fakes.py` 的 Fake 能力与 `contracts.py` 的 8 个契约测试基类作为一个入口导出。
 不负责：任何生产行为——本包只应出现在测试代码里。
 
 刻意**不**被 `karyvia.sdk` 的包根导入：夹具只在测试期需要，让
-`import karyvia.sdk` 顺带拉起它们不合理（`NFR-401`）。用
+`import karyvia.sdk` 顺带拉起它们不合理。用
 `from karyvia.sdk.testing import FakeModelProvider` 显式获取。
 """
 

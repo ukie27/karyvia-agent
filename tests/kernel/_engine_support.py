@@ -181,7 +181,7 @@ class ScriptedProvider:
     `stream_chunks` 是流式脚本的便捷形态：每次 `stream()` 都回放同一串分片。
 
     两个取消钩子都在「已经交付内容之后」触发，因为要测的正是「取消后已产生的内容是否
-    还在」（`KER-007`）：
+    还在」：
 
     - `cancel_after_chunk=(token, n)`：第 n 个分片**已交给 engine** 后请求取消。
     - `cancel_after_response=token`：响应已构造、即将返回前请求取消。

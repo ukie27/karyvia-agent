@@ -27,7 +27,7 @@ shell 那种带默认值的语法：
 - 缺失即 `CONFIG_SECRET_MISSING`，不静默回落到默认配置。
 
 解析结果是按 JSON Pointer 索引的 `SecretMap`，**配置树自始至终持有 `${VAR}` 字面量**。
-要落盘一份配置前先过 `prepare_for_write()`。
+要落盘一份配置前先过 `prepare_for_write`。
 
 ## Windows 兼容
 
@@ -35,14 +35,14 @@ Karyvia 明确支持 Windows。几处容易踩的：
 
 - **起子进程必须走 `create_subprocess_shell`**（`builtins/tools_shell/command.py` 的模块
   docstring 是唯一出处）：`cmd.exe` 接在 `/c` 后的是原始命令行尾巴，而 `subprocess` 用
-  `list2cmdline()` 把 argv 拼回字符串时会把内层引号转义成 `\"`，`cmd` 不认识——任何带
+  `list2cmdline` 把 argv 拼回字符串时会把内层引号转义成 `\"`，`cmd` 不认识——任何带
   引号的命令当场残掉。平台分派只在 `process._spawn` 一处，有测试数 `os.name` 的出现次数。
-- **判断 PID 是否存活一律用 `kernel/config/process.py::process_is_alive()`**，绝不用
+- **判断 PID 是否存活一律用 `kernel/config/process.py::process_is_alive`**，绝不用
   `os.kill(pid, 0)`：Windows 上 CPython 把非 CTRL 信号映射到 `TerminateProcess`，
   那个「探测」会**杀掉目标进程**。返回值是三态，`UNKNOWN` 不得用来回收锁。
 - 一律用 `pathlib.Path`，不要假设 `/` 分隔符；路径比较过 `os.path.normcase`。
 - 测试里拦网络要拦 `connect` / `connect_ex` / `getaddrinfo` 的**目标**并放行回环，
-  **不要**拦 `socket.socket` 的构造——`ProactorEventLoop` 用 `socketpair()` 做 self-pipe，
+  **不要**拦 `socket.socket` 的构造——`ProactorEventLoop` 用 `socketpair` 做 self-pipe，
   那样只会证明事件循环起不来。
 
 ## 上下文污染会一直留着
@@ -52,8 +52,8 @@ Karyvia 明确支持 Windows。几处容易踩的：
 必须有界且已脱敏。
 
 **`trust=SYSTEM` 是进入系统指令位置的唯一凭据**，`kind` 不参与判定；`UNTRUSTED` 的包裹
-由契约层的 `as_model_text()` 完成，组装器不许自己拼字符串。运维配置的自定义指令是
-`TrustLevel.OPERATOR` 而不是 `SYSTEM`——它因此进不了 system 消息位置（`CMD-005`）。
+由契约层的 `as_model_text` 完成，组装器不许自己拼字符串。运维配置的自定义指令是
+`TrustLevel.OPERATOR` 而不是 `SYSTEM`——它因此进不了 system 消息位置。
 
 ## 会话写入的原子性
 
@@ -70,4 +70,4 @@ Karyvia 明确支持 Windows。几处容易踩的：
 `await` 都会把 turn 的执行卡在回调上。要异步处理就在回调里 `put_nowait` 进自己的**有界**
 队列，再由一条后台任务消费（`plugins/karyvia-plugin-feishu/` 的 `_drain_hints`）。
 
-连续 5 次失败、或单次投递超过 50 ms 达 5 次，订阅者会被**自动退订**——查 `bus.health()`。
+连续 5 次失败、或单次投递超过 50 ms 达 5 次，订阅者会被**自动退订**——查 `bus.health`。

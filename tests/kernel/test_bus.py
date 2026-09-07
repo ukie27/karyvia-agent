@@ -1,4 +1,4 @@
-"""`kernel/observability/bus.py` 的行为测试（`D12`：`OBS-002`、`OBS-003`、`NFR-204`）。
+"""`kernel/observability/bus.py` 的行为测试。
 
 四类验收点：序号单调且可按序重放、订阅者异常与「超时」被隔离且不影响 publish 返回、
 连续 strike 触发熔断退订、重入 publish 不递归。
@@ -55,7 +55,7 @@ def _bus(**kwargs: object) -> EventBus:
     return EventBus(INSTANCE, **base)  # pyright: ignore[reportArgumentType]
 
 
-# ------------------------------------------------------------------ 序号与重放（OBS-002）
+# ------------------------------------------------------------------ 序号与重放
 
 
 def test_sequence_starts_at_zero_and_is_monotonic() -> None:
@@ -88,7 +88,7 @@ def test_explicit_occurred_at_wins() -> None:
     assert _bus().publish(EventName.INSTANCE_READY, occurred_at=stamp).occurred_at == stamp
 
 
-# ------------------------------------------------------------------ 脱敏（OBS-003）
+# ------------------------------------------------------------------ 脱敏
 
 
 def test_payload_is_redacted_before_the_event_exists() -> None:
@@ -104,7 +104,7 @@ def test_payload_is_redacted_before_the_event_exists() -> None:
     assert delivered[0].payload["api_key"] == MASK
 
 
-# ------------------------------------------------------------------ 隔离（NFR-204）
+# ------------------------------------------------------------------ 隔离
 
 
 def test_a_raising_subscriber_does_not_affect_others_or_publish() -> None:

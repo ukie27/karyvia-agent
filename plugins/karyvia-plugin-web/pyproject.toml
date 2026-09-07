@@ -13,7 +13,7 @@ license = { text = "MIT" }
 # （见 README「两个工具走两条出网路径」一节）；`web.fetch` 一个字节都不碰它，走 `ctx.net`。
 dependencies = ["karyvia>=0.3.0", "httpx>=0.28.0,<1.0.0"]
 
-# 发现的唯一入口（技术方案 §7.1）。name 必须等于 manifest 里的 `id`。
+# 发现的唯一入口。name 必须等于 manifest 里的 `id`。
 [project.entry-points."karyvia.plugins"]
 web = "karyvia_plugin_web:MANIFEST"
 

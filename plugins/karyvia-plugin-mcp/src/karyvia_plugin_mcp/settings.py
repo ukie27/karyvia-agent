@@ -1,4 +1,4 @@
-"""配置解析与一次性校验（`CFG-002`：插件只看得见自己那一块）。
+"""配置解析与一次性校验（插件只看得见自己那一块）。
 
 职责：把 `plugins.mcp.config` 变成一组不可变的 server 设置。
 不负责：连接（`client.py`）、命名（`naming.py`）。
@@ -33,7 +33,7 @@ __all__ = [
 ]
 
 #: 唯一的凭据名。远端 server 的鉴权 header 里写 `{api_key}` 即被替换（`web` 插件
-#: `custom` 后端的同一条约定）。做成固定常量是因为 manifest 的
+#: `custom` 后端采用的相同规则约定）。做成固定常量是因为 manifest 的
 #: 固定名字使配置路径与 `ctx.secret()` 调用保持同源。
 SECRET_NAME: Final = "api_key"
 

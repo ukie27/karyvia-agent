@@ -84,7 +84,7 @@ def test_init_puts_a_named_instance_under_the_instances_container(tmp_path: Path
 def test_init_refuses_to_overwrite_and_returns_three(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`EDG-501`：已存在的配置一个字节都不动，退出码说明「不需要初始化」。"""
+    """已存在的配置一个字节都不动，退出码说明「不需要初始化」。"""
     write_config(tmp_path)
     original = (tmp_path / "config.json").read_text(encoding="utf-8")
 
@@ -143,7 +143,7 @@ def test_config_show_prints_the_effective_document(
 def test_config_show_can_report_origins(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`CFG-005`：每个生效值都查得到来源。"""
+    """每个生效值都查得到来源。"""
     write_config(tmp_path, routing={"command_prefix": "!"})
     assert app(["config", "show", "--origins", "--instance-dir", str(tmp_path)]) == 0
     assert "/routing/command_prefix" in capsys.readouterr().out

@@ -1,13 +1,13 @@
-"""覆盖解析：从登记集合算出谁最终生效（技术方案 §6.1，需求 `EDG-102`、`EDG-107`、`NFR-502`）。
+"""覆盖解析：从登记集合算出谁最终生效。
 
 职责：定义 `ResolutionReport`（`active` / `shadowed` / `disabled` / `failures` 四段可序列化
 报告）与 `Resolution`，实现纯函数 `resolve()` 及把结论写回注册表并冻结的 `resolve_into()`。
-不负责：登记与存储（`capability.py`）、读配置决定谁被禁用（`kernel/config/`，`D10`）、
-按 `on_override_failure` 回落到内建（`runtime/`，`D27`）。本模块不读文件、不访问网络。
+不负责：登记与存储（`capability.py`）、读配置决定谁被禁用（`kernel/config/`）、
+按 `on_override_failure` 回落到内建（`runtime/`）。本模块不读文件、不访问网络。
 
 解析是**一次性全量**计算，不是逐条判定：冲突语义（同名重复、覆盖目标缺失、两个插件抢
 同一目标、SINGLETON 多实现）只有在看到全部登记之后才能判定。逐条判定必然退化成
-「先注册的赢」，那正是 `EDG-102` 要堵的路。
+「先注册的赢」，那正是  要堵的路。
 
 四条本模块自己定的规则，规格没有明写但必须固定下来：
 
@@ -17,7 +17,7 @@
 - **冲突的双方都不生效**。同名重复且无覆盖声明时，选任何一边都是在替用户做决定；
   两边都退出，用户会立刻看到能力缺失并去解决冲突，而不是运行在一个「大概是对的」实例上。
 - **覆盖目标被禁用等同于不存在**。目标不在生效候选里就报 `override_target_missing`，
-  不静默把覆盖降级为新增注册（§6.1 规则 2）。`D10` 引入按能力禁用后若要放宽，
+  不静默把覆盖降级为新增注册（§6.1 规则 2）。 引入按能力禁用后若要放宽，
   应在那里显式论证，而不是在这里留一条隐式回退。
 - **SINGLETON 的分组键是 kind 本身**，与 name 无关。`register_session_store("sqlite", …)`
   和 `register_session_store("jsonl", …)` 是同一个槽位的两份实现，不是两个槽位——
@@ -49,7 +49,7 @@ __all__ = [
 ]
 
 #: 覆盖目标的定位键：`(kind, 目标提供方, 目标能力名)`。kind 取自**声明覆盖的那一方**，
-#: 因为覆盖目标串里不带 kind（技术方案 §7.2：重复编码只会多出一处可以对不上的信息）。
+#: 因为覆盖目标串里不带 kind。
 _TargetKey = tuple[CapabilityKind, ProviderId, str]
 
 #: 唯一性分组键：`(kind 值, 分组名)`。SINGLETON 的分组名恒为空串，见模块 docstring。
@@ -84,7 +84,7 @@ def _error_json(error: KaryviaError) -> dict[str, JsonValue]:
 
 
 class ResolutionReport:
-    """解析结论，可序列化，供 `karyvia capabilities` 与诊断接口输出（`NFR-502`、`PLG-006`）。
+    """解析结论，可序列化，供 `karyvia capabilities` 与诊断接口输出。
 
     四段是互斥且完备的：每一条登记恰好落在 `active`、`shadowed` 的被覆盖侧、`disabled`
     或某条 `failures` 所述的冲突里。用类而不是 dataclass 是因为四个字段都要在构造时定序，
@@ -143,7 +143,7 @@ class ResolutionReport:
             raise self._failures[0]
 
     def to_json(self) -> dict[str, JsonValue]:
-        """整份报告的 JSON 形态（`NFR-502`：报告必须可序列化）。"""
+        """整份报告的 JSON 形态（报告必须可序列化）。"""
         return {
             "active": [_ref_json(ref) for ref in self._active],
             "shadowed": [

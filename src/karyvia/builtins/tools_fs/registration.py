@@ -1,15 +1,15 @@
-"""内建注册入口：把启用的工具交给 Host（`BAS-005`、`TOL-006`）。
+"""内建注册入口：把启用的工具交给 Host。
 
 职责：`setup(api)`、工具名到 `(spec, handler)` 的装配表。
 不负责：声明自己（manifest 在 `builtins/registry.py`）、决定 workspace 在哪
 （`settings.py`）、实现工具（`readers.py` / `writers.py` / `search.py`）。
 
 **只注册启用的工具**。被 `disable` 关掉的工具在这里根本不会被 `register_tool`，因此它
-不在 registry 里，也就不在模型可见的工具列表里——`TOL-006` 要的「可见列表与可执行集合
+不在 registry 里，也就不在模型可见的工具列表里—— 要的「可见列表与可执行集合
 同源」不是靠两处保持一致维持的，而是因为只有一处。
 
 装配根必须用**同一份配置**过滤 manifest 声明（`runtime/wiring.py` 的 `keep` 参数 +
-`settings.enabled_tool_names()`），否则 `D16` 的 `CapabilityHost.finish()` 会以
+`settings.enabled_tool_names`），否则的 `CapabilityHost.finish` 会以
 `PLUGIN_LOAD_FAILED` 拒绝加载：manifest 声明了五个而这里只注册了四个。那个报错是对的，
 它说的正是「你的声明和你的行为对不上」。
 """

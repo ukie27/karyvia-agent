@@ -164,7 +164,7 @@ class FakeSessionStore:
 
 
 class FailingStore(FakeSessionStore):
-    """写入必失败的存储（`SES-003`）。"""
+    """写入必失败的存储。"""
 
     async def append(self, key: SessionKey, messages: Sequence[SessionMessage]) -> None:
         raise KaryviaError(ErrorCode.PERSISTENCE_WRITE_FAILED, "磁盘满了。")
@@ -365,7 +365,7 @@ def build(
         dedup=DedupCache(),
         limits=limits or TurnLimits(),
         # 默认「只试一次」：绝大多数用例的脚本恰好写了几条响应，让重试去多要一条会把
-        # 它们变成 `模型脚本已耗尽`。要验重试的用例自己传一个策略（`D48`）。
+        # 它们变成 `模型脚本已耗尽`。要验重试的用例自己传一个策略。
         retry=retry or RetryPolicy(max_attempts=1),
         model_id="fake-model",
         turn_compactor=turn_compactor

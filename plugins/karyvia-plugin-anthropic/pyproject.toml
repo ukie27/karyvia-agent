@@ -14,7 +14,7 @@ license = { text = "MIT" }
 # 与内建 `model_openai` 同构。
 dependencies = ["karyvia>=0.3.0"]
 
-# 发现的唯一入口（技术方案 §7.1）。name 必须等于 manifest 里的 `id`。
+# 发现的唯一入口。name 必须等于 manifest 里的 `id`。
 [project.entry-points."karyvia.plugins"]
 anthropic = "karyvia_plugin_anthropic:MANIFEST"
 

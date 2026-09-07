@@ -1,15 +1,15 @@
-"""内建会话存储 `session_jsonl` 的验收（开发方案 `D17`）。
+"""内建会话存储 `session_jsonl`当前行为。
 
 | 验收项 | 测试 |
 | --- | --- |
 | 通过 `SessionStoreContract` 全部用例 | `TestJsonlSessionStore` |
-| 跨进程重启后历史可完整恢复（`SES-006`） | `TestCrossProcess` |
-| 半写模拟：无半条记录、无半批（`EDG-504`） | `TestCrashRecovery` |
+| 跨进程重启后历史可完整恢复 | `TestCrossProcess` |
+| 半写模拟：无半条记录、无半批 | `TestCrashRecovery` |
 | 损坏不得伪装成空历史 | `TestCorruption` |
-| 删除 / 过期 / 压缩的数据保留语义（`SES-005`） | `TestRetention` |
+| 删除 / 过期 / 压缩的数据保留语义 | `TestRetention` |
 | 文档示例可被实现直接解析（防漂移） | `TestDocumentedFormat` |
 | 文件名与 `InstanceLayout.session_paths()` 一致 | `test_filenames_match_the_instance_layout` |
-| 内建以普通 manifest + `setup(api)` 注册（`BAS-005`） | `TestRegistration` |
+| 内建以普通 manifest + `setup(api)` 注册 | `TestRegistration` |
 
 两条写这些用例时的取舍：
 
@@ -17,7 +17,7 @@
   `committed_bytes` 的性质，可以确定性地构造出来；真去 kill 一个子进程只能碰运气撞上
   那个窗口，失败时还分不清是实现坏了还是没撞上。跨进程那条则真的开子进程——那里要证明的
   恰好是「另一个进程能读懂」。
-- **文档示例从 Markdown 里抠出来喂给解码器**。`SES-006` 承诺格式可被外部实现读取，而
+- **文档示例从 Markdown 里抠出来喂给解码器**。 承诺格式可被外部实现读取，而
   外部实现读的是文档不是源码。文档漂移在这里失败，比在某个用户的迁移脚本里失败好。
 """
 
@@ -169,7 +169,7 @@ class TestBasics:
         assert restored == record
 
     async def test_different_session_keys_never_share_a_file(self, tmp_path: Path) -> None:
-        """`EDG-203` 在存储层的形态：文件名只由 `storage_id()` 决定。"""
+        """ 在存储层的形态：文件名只由 `storage_id` 决定。"""
         store = self.store(tmp_path)
         first = SessionKey(channel_id="a", conversation_id="b:c")
         second = SessionKey(channel_id="a:b", conversation_id="c")
@@ -205,7 +205,7 @@ class TestBasics:
 def test_filenames_match_the_instance_layout(tmp_path: Path) -> None:
     """存储层与实例布局对同一个会话必须给出同一对路径。
 
-    `InstanceLayout.session_paths()`（`D10`）是实例目录的唯一来源，本模块是唯一的写入方。
+    `InstanceLayout.session_paths`是实例目录的唯一来源，本模块是唯一的写入方。
     两边各写一份后缀，对不上时 `karyvia session` 会在一个空目录里找文件——而两处都「自洽」，
     没有任何单元测试会失败。所以对照断言只能写在这里。
     """
@@ -243,7 +243,7 @@ class TestCrossProcess:
     async def test_history_written_by_another_process_is_fully_recovered(
         self, tmp_path: Path
     ) -> None:
-        """`SES-006`：另一个进程写的历史，这个进程要能完整读回来。"""
+        """另一个进程写的历史，这个进程要能完整读回来。"""
         directory = tmp_path / "sessions"
         completed = subprocess.run(
             [sys.executable, "-c", _CHILD_APPEND, str(directory)],
@@ -267,7 +267,7 @@ class TestCrossProcess:
 
 
 class TestCrashRecovery:
-    """`EDG-504`：写到一半被杀死，重启后文件可解析、无半条记录、无半批。"""
+    """写到一半被杀死，重启后文件可解析、无半条记录、无半批。"""
 
     async def prepared(self, tmp_path: Path) -> JsonlSessionStore:
         store = JsonlSessionStore(tmp_path / "sessions")
@@ -529,7 +529,7 @@ class TestCorruption:
 
 
 class TestRetention:
-    """`SES-005`：删除、过期、压缩各自的数据保留语义，一条一条钉住。"""
+    """删除、过期、压缩各自的数据保留语义，一条一条钉住。"""
 
     async def prepared(self, tmp_path: Path) -> JsonlSessionStore:
         store = JsonlSessionStore(tmp_path / "sessions")
@@ -594,7 +594,7 @@ def _fenced_blocks(language: str) -> list[str]:
 
 
 class TestDocumentedFormat:
-    """`SES-006` 承诺的是**文档**可被外部实现读懂，所以断言的对象是文档里的字节。"""
+    """ 承诺的是**文档**可被外部实现读懂，所以断言的对象是文档里的字节。"""
 
     def test_the_documented_records_decode(self) -> None:
         blocks = _fenced_blocks("jsonl")
@@ -622,7 +622,7 @@ class TestDocumentedFormat:
     def test_the_encoded_field_names_are_frozen(self) -> None:
         """写出去的键必须落在已发布的清单内，且必填的四个一个不少。
 
-        新增字段只能是可选的（`SES-006`）：外部实现按文档写的解码器不认识多出来的键。
+        新增字段只能是可选的：外部实现按文档写的解码器不认识多出来的键。
         这条与文档的字段表是同一件事的两面，因此它在这里而不是在 `TestBasics` 里。
         """
         record = SessionMessage(
@@ -662,7 +662,7 @@ class TestDocumentedFormat:
 
 
 class TestIoFailures:
-    """`SES-003`：持久化失败不得伪装成成功。每条 IO 路径都要能把 `OSError` 报出来。
+    """持久化失败不得伪装成成功。每条 IO 路径都要能把 `OSError` 报出来。
 
     用 monkeypatch 造故障，而不是靠只读目录或磁盘配额：后者在 Windows、Linux 与 CI 容器
     上的表现各不相同，而这里要断言的只是「`OSError` 被折成哪一个错误码」。
@@ -791,7 +791,7 @@ class TestIoFailures:
 
 
 class TestRegistration:
-    """内建的落地形态：一份普通 manifest + 一个 `setup(api)`，没有第二条路（`BAS-005`）。"""
+    """内建的落地形态：一份普通 manifest + 一个 `setup(api)`，没有第二条路。"""
 
     def test_the_manifest_is_listed_as_a_builtin(self) -> None:
         assert SESSION_JSONL in BUILTIN_MANIFESTS

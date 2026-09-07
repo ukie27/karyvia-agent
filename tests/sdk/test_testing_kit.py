@@ -1,4 +1,4 @@
-"""`sdk/testing/` 自测：Fake 符合契约，5 个契约基类真的会跑（`D05`、`NFR-702`）。
+"""`sdk/testing/` 自测：Fake 符合契约，5 个契约基类真的会跑。
 
 契约基类如果只是空壳，继承它的实现会「全绿地」通过一组什么都没断言的用例——那比没有
 契约测试更危险。这里做两件事：用 Fake 把 5 个基类各跑一遍（证明骨架可用），再喂一个
@@ -109,7 +109,7 @@ def _turn_end_context(correlation: Correlation) -> HookContext:
 
 
 def test_fakes_satisfy_their_protocols() -> None:
-    """结构化子类型：Fake 不继承任何宿主基类（`PLG-002`）。"""
+    """结构化子类型：Fake 不继承任何宿主基类。"""
     assert isinstance(FakeModelProvider(), ModelProvider)
     assert isinstance(InMemorySessionStore(), SessionStore)
     assert isinstance(ManualCancel(), CancelSignal)
@@ -183,7 +183,7 @@ class TestFakeModelProviderContract(ModelProviderContract):
 
 
 class TestNonStreamingProviderContract(ModelProviderContract):
-    """未声明流式的 provider 必须报缺失而不是降级——同一套契约覆盖两种声明（`MOD-005`）。"""
+    """未声明流式的 provider 必须报缺失而不是降级——同一套契约覆盖两种声明。"""
 
     def make_provider(self) -> ModelProvider:
         return FakeModelProvider(

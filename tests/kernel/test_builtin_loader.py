@@ -1,16 +1,16 @@
-"""静态清单 bootstrap 的测试（`D16`；`EDG-103`、`EDG-101`、`PLG-004`、`PLG-007`）。
+"""静态清单 bootstrap 的测试。
 
 三条主线：
 
-- **零请求是一等路径**。`D16` 的 `BUILTIN_MANIFESTS` 就是空元组，而「未启用任何插件时实例
-  照常启动」是 `PLG-007`/`EDG-101` 写死的需求，因此它有自己的用例。
-- **事务性**。`setup` 中途抛异常，registry 不得留下半注册状态（`EDG-103`）——这是
+- **零请求是一等路径**。 的 `BUILTIN_MANIFESTS` 就是空元组，而「未启用任何插件时实例
+  照常启动」是 / 写死的需求，因此它有自己的用例。
+- **事务性**。`setup` 中途抛异常，registry 不得留下半注册状态——这是
   `RegistrationBatch` 存在的全部理由，必须在真实调用链上被断言一次。
-- **失败隔离**（`PLG-004`、`EDG-106`）：提供方失败记进结果，只跳过其依赖方，
+- **失败隔离**：提供方失败记进结果，只跳过其依赖方，
   无关提供方继续加载。
 
 `resolve_setup` 全程注入假解析器：本模块的可测性不该依赖任何真实内建存在，
-而 `D16` 恰好一个都没有。只有 `import_setup` 自己的用例碰导入系统。
+而  恰好一个都没有。只有 `import_setup` 自己的用例碰导入系统。
 """
 
 from __future__ import annotations
@@ -83,7 +83,7 @@ def resolver(setup: SetupFn) -> object:
 
 
 async def test_zero_requests_loads_nothing_and_leaves_the_registry_writable() -> None:
-    """`PLG-007`/`EDG-101`：没有任何内建时装配链照常跑完，registry 仍可写。"""
+    """/：没有任何内建时装配链照常跑完，registry 仍可写。"""
     registry = CapabilityRegistry()
     outcomes = await load_into(registry, (), host_for=host_for)
     assert outcomes == ()
@@ -120,7 +120,7 @@ async def test_an_async_setup_is_awaited() -> None:
 
 
 async def test_requests_load_in_the_given_order() -> None:
-    """静态清单里的顺序**就是**加载顺序（`D16` 没有拓扑排序，那是 `D27`）。"""
+    """静态清单里的顺序**就是**加载顺序。"""
     registry = CapabilityRegistry()
     requests = [request_for(plugin="a"), request_for(plugin="b")]
     outcomes = await load_into(
@@ -133,7 +133,7 @@ async def test_requests_load_in_the_given_order() -> None:
 
 
 async def test_a_failing_setup_discards_the_whole_batch() -> None:
-    """`EDG-103`：注册到一半抛异常，registry 不留半注册状态。"""
+    """注册到一半抛异常，registry 不留半注册状态。"""
 
     def half_then_boom(api: object) -> None:
         assert isinstance(api, CapabilityHost)
@@ -150,7 +150,7 @@ async def test_a_failing_setup_discards_the_whole_batch() -> None:
 
 
 async def test_a_third_party_exception_message_is_not_carried_into_the_error() -> None:
-    """第三方异常文本可能带着凭据，因此只留类型名（与 `D13` 的命令 handler 同一条理由）。"""
+    """第三方异常文本可能带着凭据，因此只留类型名（与的命令 handler 同一条理由）。"""
 
     def leaky(api: object) -> None:
         del api
@@ -187,7 +187,7 @@ async def test_an_unfulfilled_declaration_fails_the_load() -> None:
 
 
 async def test_a_provider_failure_is_reported_without_propagating() -> None:
-    """`PLG-004`：提供方不能决定中断宿主。"""
+    """提供方不能决定中断宿主。"""
 
     def boom(api: object) -> None:
         del api
@@ -206,7 +206,7 @@ async def test_a_provider_failure_is_reported_without_propagating() -> None:
 
 
 async def test_a_failure_does_not_stop_the_remaining_providers() -> None:
-    """`EDG-106`：插件坏掉，实例继续装配，其余能力照常注册。"""
+    """插件坏掉，实例继续装配，其余能力照常注册。"""
     calls: list[str] = []
 
     def flaky(api: object) -> None:
@@ -228,7 +228,7 @@ async def test_a_failure_does_not_stop_the_remaining_providers() -> None:
 
 
 async def test_a_failed_dependency_skips_only_its_transitive_dependents() -> None:
-    """阶段 A 排好顺序后，阶段 B 的失败仍必须沿依赖图级联，但不能波及无关插件。"""
+    """加载前校验 排好顺序后，注册阶段 的失败仍必须沿依赖图级联，但不能波及无关插件。"""
     calls: list[str] = []
 
     def resolve(target: str) -> SetupFn:

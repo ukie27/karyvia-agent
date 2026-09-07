@@ -1,16 +1,16 @@
-"""`${VAR}` 凭据引用的解析与写回保护（技术方案 §6.7、`CFG-003`、`EDG-502`）。
+"""`${VAR}` 凭据引用的解析与写回保护。
 
 职责：在配置文档里找出 `${VAR}` 引用、按环境变量解析成 `SecretStr`，并在写盘之前把明文
 换回原始 `${VAR}` 字面量。
 不负责：读环境变量之外的任何来源（`sources.py`）、校验字段形状（`schema.py`）、
-真的写文件（`kernel/config/` 一个字节都不写，生成 `config.json` 是 `D24`）、
+真的写文件（`kernel/config/` 一个字节都不写，生成 `config.json` 是 ）、
 决定插件是否使用某个密钥。
 
 三条必须在这一层说清楚的事：
 
 - **明文不进配置文档。** `resolve_secrets()` 不返回一份替换过的文档，而是返回按 JSON
   Pointer 索引的 `SecretMap`：配置树自始至终持有 `${VAR}` 字面量，明文只活在
-  `SecretStr` 里。于是 `CFG-003`（写回不得回写明文）不是一条要人记得遵守的流程，而是
+  `SecretStr` 里。于是 （写回不得回写明文）不是一条要人记得遵守的流程，而是
   **没有别的东西可写**——加载路径根本不产生含明文的文档。
 - **任何位置的引用都算密钥。** 字符串里只要出现 `${VAR}`（整串或内嵌 `Bearer ${TOKEN}`），
   整个值解析后就是 `SecretStr`。不提供「插值但不是密钥」的第二种语义，也没有
@@ -57,7 +57,7 @@ __all__ = [
 SECRET_REF_PATTERN: Final = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 #: 变量缺失的两种原因。分开记是为了让错误消息能说清「没导出」还是「导成了空串」，
-#: 两者的修法不同；两者都**不含值**（空串也没有值可言），`EDG-502` 因此不受影响。
+#: 两者的修法不同；两者都**不含值**（空串也没有值可言）， 因此不受影响。
 REASON_UNSET: Final = "unset"
 REASON_EMPTY: Final = "empty"
 
@@ -109,7 +109,7 @@ class SecretMap:
     refs: Mapping[str, SecretRef] = _NO_REFS
     #: pointer -> 该位置解析后的**整值**。
     values: Mapping[str, SecretStr] = _NO_SECRETS
-    #: 变量名 -> 明文。`D19` / `D26` 按变量名取值时用它，不必再读一次环境。
+    #: 变量名 -> 明文。 /  按变量名取值时用它，不必再读一次环境。
     variables: Mapping[str, SecretStr] = _NO_SECRETS
 
     def __repr__(self) -> str:
@@ -137,7 +137,7 @@ class SecretMap:
 def scan_secret_refs(data: Mapping[str, JsonValue]) -> tuple[SecretRef, ...]:
     """列出文档里的全部 `${VAR}` 引用。**纯扫描，不碰环境变量。**
 
-    `D24` 生成初始配置、`karyvia doctor` 检查「哪些变量需要被导出」都只需要这一步，不该因为
+     生成初始配置、`karyvia doctor` 检查「哪些变量需要被导出」都只需要这一步，不该因为
     某个变量还没导出就失败。
     """
     found: list[SecretRef] = []
@@ -184,11 +184,11 @@ def _lookup(
 def _missing_error(
     entries: Sequence[tuple[str, str, str]], *, source: str = ""
 ) -> KaryviaError:
-    """构造缺失变量的错误。**只有变量名、位置与原因，没有任何值**（`EDG-502`）。
+    """构造缺失变量的错误。**只有变量名、位置与原因，没有任何值**。
 
     `source` 是那份配置在磁盘上的位置。它由调用方传进来而不是本模块推导——`kernel/config/`
     的解析路径接的是一棵已经在内存里的树，它并不知道那棵树是从哪个文件读来的。
-    带上它是 `BAS-006` 的一半：「指出配置位置**和**字段名」，指针给的是后一半。
+    带上它是的一半：「指出配置位置**和**字段名」，指针给的是后一半。
     """
     names = sorted({name for name, _, _ in entries})
     detail: list[JsonValue] = [
@@ -218,7 +218,7 @@ def resolve_text(
 ) -> SecretStr | str:
     """解析单个字符串。**含引用则返回 `SecretStr`，不含则原样返回 `str`**。
 
-    返回类型是联合而不是恒为 `SecretStr`：调用方（`D19` 的 provider 凭据）拿到的可能是
+    返回类型是联合而不是恒为 `SecretStr`：调用方拿到的可能是
     一个用户直接写在配置里的明文值，把它也包成 `SecretStr` 会让「这个值来自环境变量」
     这条信息消失，而那正是决定要不要提醒用户「别把密钥写进文件」的依据。
 
@@ -280,7 +280,7 @@ def prepare_for_write(
     document: Mapping[str, object],
     secrets: SecretMap,
 ) -> dict[str, JsonValue]:
-    """把待写文档里的明文换回 `${VAR}` 字面量，返回可以安全落盘的副本（`CFG-003`）。
+    """把待写文档里的明文换回 `${VAR}` 字面量，返回可以安全落盘的副本。
 
     两条替换规则，按顺序：
 
@@ -295,7 +295,7 @@ def prepare_for_write(
 
     换不回去的 `SecretStr` 一律抛错。「找不到来源就写明文」是这条防线唯一不能有的行为。
 
-    本函数**不写文件**（`EDG-501`）：`kernel/config/` 全包不写文件，落盘是 `D24` 的事。
+    本函数**不写文件**：`kernel/config/` 全包不写文件，落盘是的事。
 
     **异常约定**：文档里的 `SecretStr` 无法对应到任何已知引用时抛
     `KaryviaError(KERNEL_INVARIANT_VIOLATED)`，`detail` 只含位置。

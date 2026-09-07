@@ -1,4 +1,4 @@
-"""只读工具：`fs.read` 与 `fs.list`（技术方案 §8.2）。
+"""只读工具：`fs.read` 与 `fs.list`。
 
 职责：两个工具的 `ToolSpec` 与 `ToolHandler` 实现。
 不负责：路径判定（`paths.py`）、解码与截断（`content.py`）、注册（`registration.py`）。
@@ -7,7 +7,7 @@
 `ToolSpec.__post_init__` 会核对前两者一致，`ToolContract` 会核对第三者。
 
 **输出里的路径一律是 workspace 相对路径**（`guard.relative()`）：两个平台给出同一个串
-（`NFR-605`），顺带也不把宿主机的目录结构送进模型上下文。
+，顺带也不把宿主机的目录结构送进模型上下文。
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ class ReadTool(FsTool):
                 "end_line": end_line,
                 "total_lines": len(lines),
                 # 有损解码是结果的一部分而不是日志里的一句话：模型看到 `�` 时得知道
-                # 那是文件坏了，不是它读错了地方（`EDG-205`）。
+                # 那是文件坏了，不是它读错了地方。
                 "lossy": lossy,
             },
             truncated=oversized or end_line < len(lines) or start_line > 1,
@@ -151,7 +151,7 @@ class ReadTool(FsTool):
         """读取至多 `max_read_bytes` 字节，返回 `(字节, 是否被大小上限截断)`。
 
         目录被当成文件读会得到一个平台相关的 `OSError`（Linux 是 `IsADirectoryError`，
-        Windows 是 `PermissionError`），因此先显式判一次——`NFR-605` 要的正是同参数
+        Windows 是 `PermissionError`），因此先显式判一次—— 要的正是同参数
         同语义。
         """
         if target.is_dir():
@@ -197,7 +197,7 @@ class ListTool(FsTool):
         """收集条目，返回 `(渲染好的行, 是否还有更多)`。
 
         排序在收集之后统一做：`os.scandir` 的顺序是文件系统给的，两个平台不一样，而
-        `NFR-605` 要求同一个目录在哪里列出来都是同一份输出。
+         要求同一个目录在哪里列出来都是同一份输出。
         """
         if not target.is_dir():
             raise KaryviaError(
@@ -220,7 +220,7 @@ class ListTool(FsTool):
 
         **不跟随符号链接出界**：每个条目都重新过一次 `guard.resolve()`，指向根外的链接
         直接跳过而不是报错——一个目录里混进一条越界链接不该让整次列目录失败，但它也不该
-        出现在给模型的清单里（`EDG-405`）。
+        出现在给模型的清单里。
         """
         stack = [target]
         while stack:

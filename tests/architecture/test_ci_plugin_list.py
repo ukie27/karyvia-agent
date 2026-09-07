@@ -1,4 +1,4 @@
-"""CI 的插件安装清单必须等于磁盘上的插件集合（`D41`）。
+"""CI 的插件安装清单必须等于磁盘上的插件集合。
 
 职责：断言 `.github/workflows/ci.yml` 里 `pip install --no-deps -e <路径>` 的那组路径，
 与 `plugins/` ∪ `examples/plugins/` 下真实存在的发行包一一对应。
@@ -9,12 +9,12 @@
 装进环境就**根本 import 不到**。因此清单漏一个的后果不是「少跑几个用例」，而是**收集期
 `ModuleNotFoundError` 直接中断整个作业**。
 
-而这件事真的发生过：`D36`–`D40` 连续新增官方插件时没有同步这张清单，`web` /
+而这件事真的发生过：– 连续新增官方插件时没有同步这张清单，`web` /
 `mcp` / `memory` / `cron` 五个全漏，约 1100 个用例在 CI 里从未跑过——本地开发环境装了插件，
-所以没有任何人看见。`D40` 收口时才发现。
+所以没有任何人看见。 收口时才发现。
 
 规则本身是纪律性的（「加插件记得改 CI」），而这个仓库对纪律的一贯答案是把它变成守卫：
-`R1`–`R6` 的依赖边界、`scripts/check_startup_cost.py` 的冷启动预算、
+`R1`–`R6` 的依赖边界、`scripts/check_startup_cost.py`既定冷启动预算、
 `tests/e2e/test_plugin_docs.py` 直接 `exec` 文档代码块——都是同一种做法。少的正是这一条。
 
 **不解析 YAML。** `pyyaml` 不在本仓库的依赖里，而架构守卫是独立作业、刻意不装可选依赖
@@ -55,7 +55,7 @@ def _distributions() -> list[Path]:
 
 
 def test_ci_installs_every_plugin_on_disk() -> None:
-    """磁盘上有、CI 没装 —— 这正是 `D36`–`D40` 那次回归的形状。"""
+    """磁盘上有、CI 没装 —— 这正是 – 那次回归的形状。"""
     expected = {rel(root) for root in _distributions()}
     installed = set(_installed_paths())
     missing = sorted(expected - installed)

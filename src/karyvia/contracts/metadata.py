@@ -1,4 +1,4 @@
-"""元数据契约：受控扩展数据的上限与归一化（需求 §10.2 校验规则、`MSG-002`、`MSG-004`）。
+"""元数据契约：受控扩展数据的上限与归一化。
 
 职责：定义 `metadata` 的四项上限常量，并提供把任意映射校验、深拷贝、冻结为
 `Mapping[str, JsonValue]` 的纯函数 `normalize_metadata()`。
@@ -6,7 +6,7 @@
 
 `metadata` 在 `InboundMessage`、`OutboundMessage`、`ToolResult`、`ModelResponse` 四处
 出现，四份等价校验没有意义，因此集中在此。非 JSON 值一律抛错而不是静默 `str()`：
-SDK 对象混进 metadata 说明 Channel/Provider 的归一化没做完（`MSG-004`），静默通过
+SDK 对象混进 metadata 说明 Channel/Provider 的归一化没做完，静默通过
 只会让问题推迟到持久化层才炸。
 """
 

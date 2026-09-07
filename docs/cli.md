@@ -72,7 +72,7 @@ karyvia run [-p 提示词] [--reasoning]
 `1` 失败。
 
 **两次 `Ctrl-C` 的语义**：第一次在有 turn 在跑时**取消那些 turn**，会话继续；
-没有 turn 在跑时它就是「退出」。第二次请求入口的取消令牌，先跑一遍 `stop()`
+没有 turn 在跑时它就是「退出」。第二次请求入口的取消令牌，先跑一遍 `stop`
 （实例锁因此正常释放）再强制结束进程——读 stdin 的线程没有可移植的唤醒方式，
 干等它只会让你按第三次。
 
@@ -87,7 +87,7 @@ karyvia run [-p 提示词] [--reasoning]
 karyvia serve [--host <地址>] [--port <端口>]
 ```
 
-无头模式：装配实例 → `start()` → 等信号 → `stop()`。它启动**全部已启用的 Channel 能力**
+无头模式：装配实例 → `start` → 等信号 → `stop`。它启动**全部已启用的 Channel 能力**
 并常驻。
 
 - **它是通用的，不是给某一个插件写的**：HTTP 接口、飞书、cron 调度器都用这一条。
@@ -96,8 +96,8 @@ karyvia serve [--host <地址>] [--port <端口>]
   但这两个参数是网络 Channel 的公分母、而 `--set` 的完整路径写起来太长。
   别的 Channel 的监听参数一律走 `--set`。
 - 没有任何可服务的 Channel 时退出码 `1` 并指路 `karyvia plugins list`。
-- `Ctrl-C` **只有一档**（这里没有阻塞在 `readline()` 的线程）：按一次就干净地走完
-  `stop()`，在跑的 turn 先被请求取消、已产生的内容因此落库。停止过程中再按一次才强制退出。
+- `Ctrl-C` **只有一档**（这里没有阻塞在 `readline` 的线程）：按一次就干净地走完
+  `stop`，在跑的 turn 先被请求取消、已产生的内容因此落库。停止过程中再按一次才强制退出。
 - 配置文件不存在时与 `karyvia run` 走完全同一条首次运行分支：只生成、只指路。
 
 ## `karyvia config show`
@@ -123,7 +123,7 @@ karyvia session list
 karyvia session show <会话 id>
 ```
 
-会话 id 就是 `SessionKey.storage_id()`，形如 `cli~local~default`；`list` 会把它印出来。
+会话 id 就是 `SessionKey.storage_id`，形如 `cli~local~default`；`list` 会把它印出来。
 
 - **只装会话存储那一条能力**：一条只读诊断不该因为模型凭据没导出而失败，
   也不该跟正在跑的实例抢实例锁。

@@ -1,4 +1,4 @@
-"""**SDK 出口②**：飞书的 WebSocket 长连接（开发方案 `D34`，**本插件风险最高的一块**）。
+"""**SDK 出口②**：飞书的 WebSocket 长连接。
 
 职责：惰性 import `lark_oapi`、把模块全局 loop 换成可追踪的代理、连接与干净停止、
 事件注册、把 SDK 事件拍成本插件自己的 `RawInbound`。
@@ -30,7 +30,7 @@ legacy 要跑 N 个实例，因此起了一个专用 daemon 线程 + 专用 loop
 handle message、ping），且重连之后新建的 receive loop 也自动被追踪；而猴补依赖「patch 的是
 实例属性所以能活过重连」这条隐性前提。
 
-**重连交给 SDK 自己的 `_auto_reconnect`**（`D32` 定的调子：重连是外部组件的策略，
+**重连交给 SDK 自己的 `_auto_reconnect`**（ 定的调子：重连是外部组件的策略，
 我们不写第二套）。但**首次** `_connect()` 失败仍然折成 `EXTERNAL_CHANNEL` 抛出——
 那通常是 app_id/secret 错，重连一万次也不会好。
 """
@@ -207,7 +207,7 @@ class FeishuGateway:
     async def close(self) -> None:
         """断开。**约定不抛**（`Channel.stop()` 的契约），多次调用安全。
 
-        **五步的顺序是 legacy 用血换来的**（`legacy/channels/feishu/websocket.py:107–109`）：
+        **以下五步的顺序不可交换**：
         不先取消 `recv()` 就关 socket，SDK 会把 close code 1000 记成 error，
         `_receive_message_loop` 的 except 分支随即触发一次**不该有的重连**。
         """
@@ -252,7 +252,7 @@ class FeishuGateway:
     def _dispatch(self, event: Any) -> None:  # boundary: lark 的事件对象
         """SDK 的事件回调是**同步**的。派一个任务回主 loop，不阻塞收包。
 
-        **一条消息炸掉不该让 bot 下线**（`MSG-004`），因此整个回调包一层。
+        **一条消息炸掉不该让 bot 下线**，因此整个回调包一层。
         """
         with suppress(Exception):
             asyncio.get_running_loop().create_task(self._on_event(event))
@@ -274,7 +274,7 @@ def _import_lark(domain: str) -> tuple[Any, Any, Any]:
     `ResourceWarning`）。
 
     在线程里 import 是必需的：`lark_oapi` 会拉进一整套生成代码，在主 loop 上做这件事会
-    把冷启动卡住（`NFR-405` 的 300 ms 预算）。
+    把冷启动卡住。
     """
     try:
         import lark_oapi as lark

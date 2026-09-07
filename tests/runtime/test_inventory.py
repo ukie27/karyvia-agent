@@ -1,12 +1,12 @@
-"""插件清单的测试（`D25`；技术方案 §7.1–§7.3，需求 `DST-002`、`CMP-001`、`SDK-005`）。
+"""插件清单的测试。
 
 四条主线：
 
 - **启用判定发生在读取之前**。未启用的候选连 manifest 都不读——用一份「读了就炸」的插件
   把这条变成可断言的事实，而不是一句承诺。
-- **校验失败一律带字段路径与来源**（`CMP-001`）：缺必填字段 / id 非法 / 版本非 PEP 440
+- **校验失败一律带字段路径与来源**：缺必填字段 / id 非法 / 版本非 PEP 440
   各有一条。
-- **不兼容与不匹配是两回事**：`sdk_range` 对不上是失败（不带病加载，`SDK-005`），
+- **不兼容与不匹配是两回事**：`sdk_range` 对不上是失败（不带病加载），
   平台不匹配只是跳过（用户什么都不用改）。
 - **产出直接就是 `/plugins` 的数据源**，因此 `statuses()` 的投影逐条断言。
 """
@@ -131,7 +131,7 @@ def test_an_unenabled_module_plugin_is_not_imported(tmp_path: Path) -> None:
 
 
 def test_twenty_unenabled_entry_points_import_nothing() -> None:
-    """`NFR-401`：未启用的插件不产生启动开销。20 个候选、0 次导入。"""
+    """未启用的插件不产生启动开销。20 个候选、0 次导入。"""
     points = tuple((f"ghost{i}", f"karyvia_ghost_{i}.plugin:MANIFEST") for i in range(20))
     started = time.perf_counter()
     inventory = build_inventory(entry_points=lambda: points)
@@ -181,7 +181,7 @@ def test_an_id_that_disagrees_with_its_source_name_fails(tmp_path: Path) -> None
 
 
 def test_an_incompatible_sdk_range_is_a_failure(tmp_path: Path) -> None:
-    """`SDK-005`：不带病加载。"""
+    """不带病加载。"""
     _plugin(tmp_path, "acme", _manifest_text("acme").replace(">=0.1", ">=99.0"))
     (failure,) = _inventory(tmp_path, enabled=["acme"]).failures
     assert failure.error.code is ErrorCode.PLUGIN_SDK_INCOMPATIBLE

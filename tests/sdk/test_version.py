@@ -1,4 +1,4 @@
-"""SDK 版本与兼容判定（技术方案 §7.6、`SDK-005`）。"""
+"""SDK 版本与兼容判定。"""
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ def test_current_version_satisfies_its_own_major_range() -> None:
 
 @pytest.mark.parametrize("bad", [">>1", "not-a-range", "0.1"])
 def test_invalid_range_is_rejected_rather_than_treated_as_compatible(bad: str) -> None:
-    """「解析不了就当全兼容」正好会让最该被拦下的插件通过（`CMP-001`）。"""
+    """「解析不了就当全兼容」正好会让最该被拦下的插件通过。"""
     with pytest.raises(KaryviaError) as excinfo:
         is_compatible(bad)
     assert excinfo.value.code is ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED

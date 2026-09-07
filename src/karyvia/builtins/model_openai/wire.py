@@ -1,4 +1,4 @@
-"""OpenAI 兼容 Chat Completions 的线格式翻译（技术方案 §8.1）。
+"""OpenAI 兼容 Chat Completions 的线格式翻译。
 
 职责：`ModelRequest` → 请求体 JSON；响应体 JSON → `ModelResponse`；SSE 分片 → `ModelChunk`；
 流式 tool_call 增量按 `index` 的拼装与 `call_id` 补救。
@@ -62,7 +62,7 @@ __all__ = [
 ]
 
 #: 两种输出上限字段名。gpt-5、o1/o3/o4 只认后者，发错就是 400——所以它是配置项而不是
-#: 一张按模型名前缀猜的表（旧实现那张表只会越滚越大）。
+#: 不维护按模型名前缀猜测行为的表；该信息由配置明确声明。
 MAX_TOKENS_FIELD: Final = "max_tokens"
 MAX_COMPLETION_TOKENS_FIELD: Final = "max_completion_tokens"
 
@@ -141,7 +141,7 @@ def _encode_tool_calls(calls: Sequence[ToolCall]) -> list[JsonValue]:
 
 
 def encode_messages(messages: Sequence[ModelMessage]) -> list[JsonValue]:
-    """把契约消息投影成 OpenAI 线格式（`EDG-305`：投影可以变，持久化格式不跟着变）。
+    """把契约消息投影成 OpenAI 线格式（投影可以变，持久化格式不跟着变）。
 
     **带 `tool_calls` 的 assistant 消息 `content` 必须是 `null`**：多个兼容网关会拒绝
     「正文与 tool_calls 同时非空」的 assistant 消息。这不是我们的偏好，是它们的校验。
@@ -402,7 +402,7 @@ def decode_response(body: Mapping[str, JsonValue], *, model_id: str) -> ModelRes
     """非流式响应体 → `ModelResponse`。
 
     **内容过滤是 HTTP 200 上的正常响应**，走 `StopReason.CONTENT_FILTER` 而不是异常
-    （`is_complete_answer` 因此为假，Channel 侧的呈现规则据此区分——`EDG-304`）。
+    （`is_complete_answer` 因此为假，Channel 侧的呈现规则据此区分）。
     """
     choices = body.get("choices")
     if not isinstance(choices, Sequence) or isinstance(choices, str | bytes) or not choices:

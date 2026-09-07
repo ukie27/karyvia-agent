@@ -1,12 +1,12 @@
-"""插件生命周期的测试（`D28`；技术方案 §7.4，需求 `NFR-201`、`PLG-005`、`EDG-104`）。
+"""插件生命周期的测试。
 
 四条主线：
 
 - **状态机只有一张转换表**：非法转换是错误而不是被静默接受，失败记得住「发生在哪个
   阶段」——「发现时就坏了」与「停的时候超时了」的补救动作毫无共同之处。
-- **停止顺序是启动拓扑序的逆序**（`PLG-005`），且它取自 `plan_load_order()` 的产物，
+- **停止顺序是启动拓扑序的逆序**，且它取自 `plan_load_order` 的产物，
   不是第二次拓扑排序。
-- **一个停不下来的插件只连累它自己**（`EDG-104`）：超时即放弃等待，后面的插件照停，
+- **一个停不下来的插件只连累它自己**：超时即放弃等待，后面的插件照停，
   调用方在预算内拿到结果。
 - **阶段是判定口径、`PluginState` 是显示口径**：投影表逐条覆盖，不存在第二套枚举。
 """
@@ -137,7 +137,7 @@ def unit(plugin_id: str, log: list[str], *, hang: bool = False, boom: bool = Fal
 
 
 def test_stop_order_is_the_reverse_of_the_load_order() -> None:
-    """构造 A→B→C 依赖链，断言停止顺序 C→B→A（`PLG-005`）。"""
+    """构造 A→B→C 依赖链，断言停止顺序 C→B→A。"""
     plan = plan_load_order(
         [
             PlanNode("c", dependencies=("b",)),
@@ -161,7 +161,7 @@ async def test_units_are_stopped_in_the_given_order() -> None:
 
 
 def test_units_for_skips_ids_without_an_action() -> None:
-    """阶段 A 落榜的插件在 `order` 里根本不存在，但装配根的表可能少于顺序表。"""
+    """加载前校验 落榜的插件在 `order` 里根本不存在，但装配根的表可能少于顺序表。"""
     units = units_for(("a", "b", "c"), {"a": unit("a", []).stop, "c": unit("c", []).stop})
     assert [item.plugin_id for item in units] == ["c", "a"]
 
@@ -170,7 +170,7 @@ def test_units_for_skips_ids_without_an_action() -> None:
 
 
 async def test_a_hanging_plugin_does_not_hold_up_the_rest() -> None:
-    """`EDG-104`：超时即放弃等待、记一条 `TIMEOUT_PLUGIN_STOP`、继续停其余插件。"""
+    """超时即放弃等待、记一条 `TIMEOUT_PLUGIN_STOP`、继续停其余插件。"""
     log: list[str] = []
     units = (unit("slow", log, hang=True), unit("fast", log))
     outcomes = await asyncio.wait_for(stop_plugins(units, timeout_ms=50), timeout=5)
@@ -193,7 +193,7 @@ async def test_a_hanging_plugin_leaves_its_lifecycle_in_failed() -> None:
 
 
 async def test_a_raising_stop_action_is_folded_and_does_not_leak_its_message() -> None:
-    """第三方插件的异常文本可能带凭据，因此只放类型名（`D13` 的先例）。"""
+    """第三方插件的异常文本可能带凭据，因此只放类型名。"""
     log: list[str] = []
     lifecycle = PluginLifecycle(plugin_id="boom", phase=PluginPhase.STARTED)
     broken = unit("boom", log, boom=True)
@@ -234,5 +234,5 @@ async def test_a_loaded_but_never_started_plugin_can_be_stopped() -> None:
 
 
 async def test_no_units_is_an_ordinary_path() -> None:
-    """未启用任何插件时停止流程什么都不做（`PLG-007`、`EDG-101` 的收尾侧）。"""
+    """未启用任何插件时停止流程什么都不做（的收尾侧）。"""
     assert await stop_plugins(()) == ()

@@ -1,17 +1,17 @@
-"""契约基类会「拦」的证明：6 个基类各配一个故意违约的实现（`D16` 验收、`NFR-702`）。
+"""契约基类会「拦」的证明：6 个基类各配一个故意违约的实现。
 
 契约基类如果只是空壳，继承它的实现会**全绿地**通过一组什么都没断言的用例——那比没有契约
 测试更危险，因为它给出的是虚假的可替换性保证。`tests/sdk/test_testing_kit.py` 已经为
-`ModelProviderContract` 立了这个范式（`_IgnoresCancellation`），`D16` 把它补齐到 5 个，
-`D39` 随 `MemoryProviderContract` 补上第 6 个。
+`ModelProviderContract` 立了这个范式（`_IgnoresCancellation`）， 把它补齐到 5 个，
+ 随 `MemoryProviderContract` 补上第 6 个。
 
 **这些违约实现都不是臆造的**，每一个都对应一条真实的踩坑路径：
 
 - `SessionStore`：「第一次说话」被当成错误抛出——最常见的实现偷懒方式。
-- `ContextProvider`：空会话时抛错，而 `CTX-001` 不允许把「没有贡献」当成失败。
+- `ContextProvider`：空会话时抛错，而  不允许把「没有贡献」当成失败。
 - `ToolHandler`：坏参数直接抛异常。逸出的异常会让 Kernel 只能把副作用标成 `UNKNOWN`，
   这是 `TOL` 系列契约里最要紧的一条。
-- `Channel`：`stop()` 第二次调用就炸。停止阶段的异常只会拖住整个实例退出（`EDG-104`）。
+- `Channel`：`stop` 第二次调用就炸。停止阶段的异常只会拖住整个实例退出。
 - `MemoryProvider`：`recall()` 按插入顺序返回。契约写死「顺序即相关性排序」，而按插入
   顺序返回是最省事、也最难被发现的一种违约——调用方拿到的东西看起来完全正常。
 
@@ -101,7 +101,7 @@ async def test_contract_rejects_a_store_that_raises_on_a_new_session() -> None:
 
 
 class _FailsOnEmptySession:
-    """违约实现：空会话时抛错，而 `CTX-001` 要求「没有贡献」是正常结果。"""
+    """违约实现：空会话时抛错，而  要求「没有贡献」是正常结果。"""
 
     async def provide(
         self, snapshot: SessionSnapshot, correlation: Correlation, cancel: CancelSignal
@@ -175,7 +175,7 @@ async def test_contract_rejects_a_tool_that_raises_instead_of_failing() -> None:
 
 
 class _StopIsNotIdempotent:
-    """违约实现：`stop()` 第二次调用就炸，而契约要求它不抛（`EDG-104`）。"""
+    """违约实现：`stop` 第二次调用就炸，而契约要求它不抛。"""
 
     def __init__(self) -> None:
         self._stopped = False
@@ -269,7 +269,7 @@ def test_every_contract_base_class_has_a_reverse_sample() -> None:
     """本文件的存在意义就是这张清单——6 个基类一个都不能漏。
 
     `ModelProviderContract` 的反向样例在 `test_testing_kit.py`（`_IgnoresCancellation`），
-    那是 `D05` 立的范式，不搬过来是为了不动既有文件的结构。
+    那是  立的范式，不搬过来是为了不动既有文件的结构。
     """
     covered = {
         SessionStoreContract: _EmptySessionSuite,
@@ -286,7 +286,7 @@ def test_every_contract_base_class_has_a_reverse_sample() -> None:
 
 
 class TestEchoToolContract(ToolContract):
-    """`D16` 之前 `ToolContract` 没有任何随 SDK 发布的参考实现，插件作者无样例可抄。"""
+    """ 之前 `ToolContract` 没有任何随 SDK 发布的参考实现，插件作者无样例可抄。"""
 
     def make_tool(self) -> tuple[ToolSpec, ToolHandler]:
         return ECHO_SPEC, EchoTool()

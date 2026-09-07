@@ -11,7 +11,7 @@
 **四条会影响正确性的规则**：
 
 1. **`UNTRUSTED` 的包裹不在这里做**。片段一律经 `fragment.as_model_text()` 渲染，数据块
-   与固定前缀由契约层加（`CMD-005`、`EDG-306`）——组装器自己拼字符串就等于开了一条绕过
+   与固定前缀由契约层加——组装器自己拼字符串就等于开了一条绕过
    包裹的路，而这正是 `contracts/context.py` 把包裹放在契约上的理由。
 2. **`trust=SYSTEM` 是进入系统指令位置的唯一凭据**，`kind` 不参与判定。一个
    `kind=SYSTEM` 但 `trust=UNTRUSTED` 的片段（例如「从检索结果里捞到的系统提示」）只能
@@ -159,7 +159,7 @@ def context_providers_from(registry: CapabilityRegistry) -> tuple[ContextProvide
 
 
 def replay_history(snapshot: SessionSnapshot) -> tuple[ReplayedMessage, ...]:
-    """把会话历史投影成模型消息（`EDG-305`：投影可以变，持久化格式不变）。
+    """把会话历史投影成模型消息（投影可以变，持久化格式不变）。
 
     **只取 user / assistant / system 且正文非空的记录**。`role=TOOL` 的记录被跳过：
     `SessionMessage` 不保存 assistant 的 `tool_calls`，一条没有对应调用声明的 tool 消息
@@ -206,7 +206,7 @@ async def assemble(
 ) -> AssembledContext:
     """走完 §10.2 第 7 步的 a–e，产出一份可直接交给 engine 的消息序列。
 
-    `extra_fragments` 是命令注入的片段（`CommandResult.fragments`，`CMD-004`）：它们与
+    `extra_fragments` 是命令注入的片段（`CommandResult.fragments`）：它们与
     Provider 产出的片段同批参与拦截、过滤与放置，没有旁路。
 
     `memory` 是长期记忆的召回（`None` = 不启用）。它产出的片段**与上面两批完全同
@@ -216,7 +216,7 @@ async def assemble(
     （`MemoryRecall` 自己挡掉空串）；策略与降级全在 `memory.py`，这里只调它。
 
     **异常约定**：Provider 失败交给 `on_failure` 后跳过；空上下文直接拒绝。
-    记忆后端的失败按 `MemoryRecall.critical` 分叉（`MEM-003`），判定在那一侧。
+    记忆后端的失败按 `MemoryRecall.critical` 分叉，判定在那一侧。
     **取消语义**：`cancel` 透传给每个 Provider 与记忆后端；本函数自身不设检查点
     （检查点 1 在 orchestrator，就在调用本函数之前）。
     """
@@ -259,9 +259,9 @@ async def _collect(
     timeout_ms: int,
     on_failure: Callable[[KaryviaError], None] | None,
 ) -> tuple[ContextFragment, ...]:
-    """并发调用全部 Provider，各自独立超时；失败上报后跳过（`CTX-005`、`EDG-302`）。
+    """并发调用全部 Provider，各自独立超时；失败上报后跳过。
 
-    片段的顺序由 `sort_key` 决定，与谁先返回无关——`CTX-002` 要的是确定的组合顺序，
+    片段的顺序由 `sort_key` 决定，与谁先返回无关—— 要的是确定的组合顺序，
     并发只是为了不让一个慢 Provider 串起全部延迟。**排序在这里做而不是指望调用方传进来
     就是有序的**：那样一来「顺序确定」就变成了一条要人记得遵守的约定。
     """

@@ -225,7 +225,7 @@ def _cancel(hub: SessionHub, waiter: Waiter) -> None:
     """客户端断开：请求取消。
 
     **这是请求而不是保证**：取消经 `CancelToken` 在检查点生效，好让 turn 把已产生的
-    内容落库再退出（`KER-007`）。因此「断连」不等于「立刻停止」。
+    内容落库再退出。因此「断连」不等于「立刻停止」。
     """
     if hub.turns is None or waiter.turn_id is None:
         return
@@ -296,7 +296,7 @@ def _terminal_chunk(
 ) -> bytes:
     """终态分片。
 
-    **被取消或失败的 turn 不能装成正常收尾**（`EDG-304`）：`finish_reason` 照 OpenAI
+    **被取消或失败的 turn 不能装成正常收尾**：`finish_reason` 照 OpenAI
     的取值给 `stop`（客户端只认那几个），但额外带一个 `x_karyvia_state`——
     分得出来的客户端能分出来，分不出来的至少不会崩。
     """
@@ -330,7 +330,7 @@ def _usage_chunk(chunk_id: str, created: int, model: str, usage: TurnUsage) -> b
 
 def _finish_reason(state: StreamState) -> str:
     """`STOPPED_BY_LIMIT` 也映射到 `length` 之外的 `stop`：`StreamState` 层面看不到
-    预算与自然结束的区别（`D14` 把两者都折成 `FINAL`）。"""
+    预算与自然结束的区别。"""
     return "stop"
 
 

@@ -1,9 +1,9 @@
-"""`kernel/observability/diagnostics.py` 的行为测试（`D12`：`PLG-006`、`OBS-002`、`OBS-004`）。
+"""`kernel/observability/diagnostics.py` 的行为测试。
 
 三类验收点：`capabilities()` 转发的是真实的 `ResolutionReport`、`plugins()` 在插件运行时
 落地前默认为空、`turn(turn_id)` 能按 `sequence` 完整重放单个 turn 且不串到别的 turn。
 
-「单 turn 事件序列可完整重放」（`OBS-002`）在这里做端到端：用真的 `EventBus` 驱动一段
+「单 turn 事件序列可完整重放」在这里做端到端：用真的 `EventBus` 驱动一段
 含 turn / model / tool 事件的序列，再从诊断查回来。
 """
 
@@ -124,7 +124,7 @@ def test_plugin_states_mirror_the_frozen_event_names() -> None:
     assert {state.value for state in PluginState} - {"disabled"} <= event_suffixes
 
 
-# ------------------------------------------------------------------ turn()（OBS-002）
+# ------------------------------------------------------------------ turn
 
 
 def test_a_single_turn_can_be_replayed_in_full() -> None:
@@ -164,7 +164,7 @@ def test_turn_query_returns_empty_for_an_unknown_turn() -> None:
 
 
 def test_dropped_events_tells_missing_from_evicted() -> None:
-    """查不到某个 turn 时，「从来没有」和「被挤出去了」是两个结论（`NFR-404`）。"""
+    """查不到某个 turn 时，「从来没有」和「被挤出去了」是两个结论。"""
     ring = MemoryRingSink(capacity=2)
     bus = EventBus(INSTANCE)
     bus.subscribe(ring, name="ring")

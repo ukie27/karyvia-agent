@@ -1,43 +1,13 @@
-"""官方插件 `anthropic`：Anthropic 原生 Messages API 的 Model Provider（开发方案 `D32`）。
+"""官方 Anthropic 插件：Anthropic Messages API 的原生 Model Provider。
 
-职责：声明一条 `MODEL` 能力，把 `ModelRequest` 翻成 `POST /v1/messages`、把响应与 SSE
-翻回 `ModelResponse` / `ModelChunk`。
-不负责：执行 turn、裁剪上下文、重试与故障转移（分别是 `kernel/turn/` 与编排层的事）。
+职责：把 `ModelRequest` 编码为 `/v1/messages` 请求，并把普通响应与 SSE 解码为 Karyvia
+模型契约。不负责：Turn 执行、Context 裁剪、重试或故障转移。
 
-**它与内建 `model-openai` 并存，不是取代它**（manifest 里因此没有 `overrides`）。
-OpenAI 兼容层能连到 Anthropic 的中转，但 prompt caching 的断点、thinking 的四种形态与
-`stop_sequence` 这个终止原因在那条路上表达不出来——本插件存在的理由就是这三样。
-
-**它取代的是被 `D32` 删掉的 `legacy/providers/anthropic_provider.py`**，但不是移植：
-
-- 旧实现有四张按模型名版本号 gating 的表（哪些模型只认 adaptive thinking、哪些拒绝
-  `temperature`……）。**一张都没搬。** `D19` 拒过同类的 slug 表，理由不变：表只会越滚越大，
-  而用户换一个新模型要等我们发版。这里改成 `thinking.mode` / `supports_temperature` /
-  `effort` 三个配置项。
-- 旧实现自带指数退避重试引擎。**没搬**：重试是编排层的策略（技术方案 §6.2.2），
-  provider 只把 `retryable` 与 `retry_after_ms` 如实标在 `KaryviaError` 上。两处都做会叠成
-  一个放大器——旧实现给 SDK 传 `max_retries=0` 正是被这个坑过。
-- 旧实现用 `anthropic` 官方 SDK。这里直接用 httpx，因此可以注入 `httpx.MockTransport`
-  让整套用例零真实网络地跑，宿主发行版也不必再依赖那个 SDK。
-
-**thinking 块的多轮回放在 `D45` 补上了。** `D32`–`D44` 期间它是相对旧实现的一处真实能力
-回退：Anthropic 要求同一模型的多轮续写把 `thinking` 块（含 `signature`）原样回传，而契约的
-`ModelMessage` 没有放 provider 私有块的槽位，因此 thinking 与工具调用**不能同时用**。
-`contracts.OpaqueBlock` 补上了那个槽位（`ModelResponse.provider_blocks` →
-`folding.assistant_message()` → `wire.thinking_blocks()`）。
-
-**它只活到本轮 turn 结束**：opaque 块不进 `SessionMessage`，因此跨 turn 拿不回来。这够用——
-需要回放的场景全都是同一条 turn 内的工具循环。要跨 turn 得先决定「一份加密的思考签名该不该
-成为用户资产」（`SES-006` 一旦发布就是契约），那是另一个决定。
-
-**三条如实记着的边界**，写在这里而不是留给用户发现：
-
-- **不回放别家产出的 opaque 块**（`OpaqueBlock.owned_by`，`EDG-305`），也不回放缺
-  `signature` 的 thinking 块——Anthropic 拒绝无签名的思考块，留一半比不留更糟。
-- **不支持图像与文档输入。** `ModelMessage.content` 是纯字符串，契约层没有多模态位置，
-  旧实现的 `_convert_image_block` 因此没有搬运源。
-- **不声明任何 server tool**（web_search / code_execution 等）。它们会绕过 `ToolExecutor`，
-  等于给模型开一条不受主 Turn、`TurnLimits` 与取消链约束的副作用通道。
+该 Provider 与内建 OpenAI 兼容 Provider 并存，提供原生 prompt caching、thinking 块和
+`stop_sequence` 语义。模型差异通过显式配置表达，不维护按模型名称猜测的版本表；HTTP 使用
+可注入 transport，Provider 本身不重试。thinking 块以 `OpaqueBlock` 在同一 Turn 的工具循环
+中原样回传，但不写入 Session。其他 Provider 的 opaque 块、缺少签名的 thinking 块、图像与
+文档输入以及 server tools 均不受支持。
 """
 
 from __future__ import annotations
@@ -110,7 +80,7 @@ __all__ = [
 ]
 
 #: `models.<id>` 条目允许的键。与下面 `config_schema` 里那份由测试对照——两处都「自洽」
-#: 而对不上时，一个写对了的配置会在阶段 A 被拒，且错误指向的是 schema 而不是这张表。
+#: 而对不上时，一个写对了的配置会在加载前校验 被拒，且错误指向的是 schema 而不是这张表。
 ENTRY_PROPERTIES: Final[ManifestJsonSchema] = {
     "context_window_tokens": {"type": "integer", "minimum": 1},
     "max_output_tokens": {"type": "integer", "minimum": 1},
@@ -145,13 +115,13 @@ ENTRY_PROPERTIES: Final[ManifestJsonSchema] = {
     },
 }
 
-#: 插件配置块的 JSON Schema。它由 `D27` 的阶段 A 在**加载之前**校验一次，
+#: 插件配置块的 JSON Schema。它由的加载前校验 在**加载之前**校验一次，
 #: `settings.py` 在 `setup()` 里再按语义校验一次——前者挡形状，后者挡取值之间的关系
 #: （例如 `budget_tokens` 与 `max_output_tokens` 的大小）。
 #:
 #: 标注成 `ManifestJsonSchema` 而不是 `contracts.JsonSchema`：契约那个类型进不了
 #: pydantic 模型（会 `RecursionError`），细节与另外两个被否掉的候选见
-#: `sdk/manifest.py::ManifestJsonValue`。`D41` 之前这里刻意不标注，因为当时的字段
+#: `sdk/manifest.py::ManifestJsonValue`。这里必须显式标注，因为字段
 #: 类型是 pydantic 的 `JsonValue`，`dict` 值不变导致嵌套字面量怎么标都不成子类型。
 CONFIG_SCHEMA: Final[ManifestJsonSchema] = {
     "type": "object",
@@ -187,7 +157,7 @@ MANIFEST: Final = PluginManifest(
     sdk_range=">=5.0.0,<6.0.0",
     setup="karyvia_plugin_anthropic:setup",
     # **不写 `overrides`**：本插件与内建 `openai` 并存而不是取代它。
-    # **也不写 `priority`**：默认值 100 会被原样采纳，而内建基准是 0（`D16` 记的坑）。
+    # **也不写 `priority`**：默认值 100 会被原样采纳，而内建基准是 0。
     capabilities=(CapabilityDecl(kind=CapabilityKind.MODEL, name=CAPABILITY_NAME),),
     config_schema=CONFIG_SCHEMA,
 )

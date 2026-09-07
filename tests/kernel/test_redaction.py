@@ -1,4 +1,4 @@
-"""`kernel/observability/redaction.py` 的行为测试（`D12`：`OBS-003`、`NFR-305`、`NFR-404`）。
+"""`kernel/observability/redaction.py` 的行为测试。
 
 三类验收点：脱敏复用 `contracts.errors.redact` 且顺序是「先脱敏后截断」、条数上界生效、
 `event_to_json` / `error_to_json` 产出的是真 JSON（`json.dumps` 往返）。
@@ -61,7 +61,7 @@ def test_redaction_happens_before_truncation() -> None:
     assert prepared["note"] == f"用了 {MASK} 这个凭据"
 
 
-# ------------------------------------------------------------------ 条数上界（NFR-404）
+# ------------------------------------------------------------------ 条数上界
 
 
 def test_mapping_entries_are_capped() -> None:

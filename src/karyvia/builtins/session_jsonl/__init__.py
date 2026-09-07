@@ -7,9 +7,9 @@
 
 **这是内建能力的标准形态**：一份写在 `BUILTIN_MANIFESTS` 里的 `PluginManifest`，加一个
 `setup(api)`。没有别的路——`tests/architecture/test_builtin_no_privilege.py` 会拦下任何
-内建专用的注册通道（`BAS-005`、`SDK-007`）。
+内建专用的注册通道。
 
-存储格式是**对外发布的契约**（`SES-006`），说明见
+存储格式是**对外发布的契约**，说明见
 [`docs/session-storage.md`](../../../../docs/session-storage.md)。
 """
 

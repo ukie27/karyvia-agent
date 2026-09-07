@@ -4,8 +4,8 @@
 `model.request_started` 的发布时机，并把协作者装成 engine 的四个槽（`engine_deps()`）。
 不负责：任何流程（`orchestrator.py`）、任何 IO。
 
-**与流程分成两个模块**有两个理由，都不是「文件太长」：`orchestrator.py` 的 ≤500 行是
-技术方案 §6.2 写死的硬约束，而装配方（`D23` 的 wiring）只需要这里的三样东西、用不到编排
+**与流程分成两个模块**不只是为了文件规模：装配方只需要这里的三样东西，
+用不到编排
 细节——让它 import 一个不含流程的模块，「谁依赖谁」在 import 清单上就是可读的。
 """
 
@@ -59,12 +59,12 @@ __all__ = [
     "utc_now",
 ]
 
-#: 终帧 metadata 里「有几个附件因为超上界没带上」的键（`D47`）。Channel 可以据此加一句
+#: 终帧 metadata 里「有几个附件因为超上界没带上」的键。Channel 可以据此加一句
 #: 说明；没有它时不该猜——`attachments` 的长度只说明发了几个，不说明丢了几个。
 DROPPED_ATTACHMENTS_KEY: Final = "attachments_dropped"
 
 #: 契约要求 `DELTA` / `FINAL` 有正文；`CANCELLED` / `FAILED` 允许空正文，由 Channel 按
-#: `EDG-304` 附加标记后呈现。空正文的前两种直接不发，而不是硬塞一个占位符。
+#: 附加标记后呈现。空正文的前两种直接不发，而不是硬塞一个占位符。
 _NEEDS_CONTENT: Final = (StreamState.DELTA, StreamState.FINAL)
 
 
@@ -85,10 +85,10 @@ async def emit_outbound(
     """产出并投递一条出站消息，返回它（不该发时返回 `None`）。
 
     寻址三件套（`channel_id` / `conversation_id` / `turn_id`）从 `Correlation` 取，
-    Channel 因此不必维护自己的 Session 映射（`MSG-006`）；契约会当场校验它们与
+    Channel 因此不必维护自己的 Session 映射；契约会当场校验它们与
     `session_key` 一致。
 
-    **附件只挂在终帧上**（`final=True`，`D47`）：中间帧是同一段正文的分片，把附件挂上去
+    **附件只挂在终帧上**（`final=True`）：中间帧是同一段正文的分片，把附件挂上去
     等于让 Channel 收到 N 份同样的附件。终帧包含 `CANCELLED` / `FAILED`——已经生成出来的
     文件该交给用户，而契约允许这两种状态空正文。**只有附件、没有正文的终帧照发**：
     契约的「内容与附件不能同时为空」本来就是二选一。
@@ -142,7 +142,7 @@ class TurnReceipt:
 
 @dataclass(frozen=True, slots=True)
 class OrchestratorDeps:
-    """装配一次实例所需的全部协作者（`D23` 的 wiring 按这张表接线）。
+    """装配一次实例所需的全部协作者。
 
     槽位比 `EngineDeps` 的四个多得多，这是分层的直接结果：engine 之所以能只有四个槽，
     正是因为「有状态、有 IO 的部分」全在这一层。
@@ -167,10 +167,10 @@ class OrchestratorDeps:
     scope: str = "default"
     context_provider_timeout_ms: int = DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS
     deliver: Callable[[OutboundMessage], Awaitable[None]] | None = None
-    #: 长期记忆的召回（`D44`）。`None` = 没有 kernel 侧召回，这也是默认——配置里没写
+    #: 长期记忆的召回。`None` = 没有 kernel 侧召回，这也是默认——配置里没写
     #: `memory.provider` 时装配根不装它。见 `memory.py` 的模块 docstring。
     memory: MemoryRecall | None = None
-    #: 模型请求的重试策略（`D48`）。默认值就是开箱行为：可重试的失败重发两次、空回复
+    #: 模型请求的重试策略。默认值就是开箱行为：可重试的失败重发两次、空回复
     #: 当故障。见 `retry.py` 的模块 docstring。
     retry: RetryPolicy = field(default_factory=RetryPolicy)
     #: 一个实例共享一份计量状态；Provider usage 为同 Session 的后续请求留下真实前缀锚点。

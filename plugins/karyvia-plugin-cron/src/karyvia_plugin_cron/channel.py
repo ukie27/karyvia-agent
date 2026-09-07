@@ -10,8 +10,8 @@
 `channel.start()` 并为它派生泵，而泵把消息投进 lane 之后**立即回来接着拉**
 （`runtime/instance.py::_fanout_for`），因此一条跑十分钟的 turn 不会堵住调度。
 
-于是本插件**既不需要 `ctx.spawn_task` 也不需要 Hook**——开发方案里那条「依赖后台任务与
-Hook」的备注写在 Channel 泵按 conversation 扇出（`D33`）落地之前，现在有更短的路。
+本插件**既不需要 `ctx.spawn_task` 也不需要 Hook**：Channel 泵已按 conversation
+扇出 turn，`receive` 只需作为调度循环产生入站消息。
 
 **到期的任务注入的是「原会话」的消息**，即创建它时那个 `channel_id + conversation_id`
 （见 `job.Origin`）。出站按 `message.channel_id` 路由回对应 Channel
@@ -23,12 +23,12 @@ Hook」的备注写在 Channel 泵按 conversation 扇出（`D33`）落地之前
 `/cron list` 因此把 origin 印出来，让人自己看得见。
 
 **任务表损坏时不让实例起不来。** `AgentInstance.start()` 里的 `await channel.start()`
-没有 try/except，在这里抛异常会连 CLI 一起带走，而 `BAS-009` 要求任何配置下都存在本地
+没有 try/except，在这里抛异常会连 CLI 一起带走，而  要求任何配置下都存在本地
 交互入口。因此 `start()` 读不出任务表时进入**降级态**：零任务、不调度、任何改动都以
 `PERSISTENCE_READ_FAILED` 拒绝并指向那份 `.corrupt-<时间戳>` 备份。**不静默用空表覆盖**。
 
 **时钟与 `sleep` 都是注入点**：用例不真的等到明天早上 9 点。注入的 `sleep` 必须真的让出
-事件循环——一个不让出的替身会把调度循环变成饿死事件循环的死循环（`D33` 在这上面挂过）。
+事件循环——一个不让出的替身会把调度循环变成饿死事件循环的死循环。
 """
 
 from __future__ import annotations
@@ -69,7 +69,7 @@ CHANNEL_NAME: Final = "cron"
 #: 注入消息的发送者标识。
 SENDER_ID: Final = "cron"
 
-#: 注入消息 `metadata` 里的命名空间键（`MSG-002`：平台私有字段只能落在命名空间下）。
+#: 注入消息 `metadata` 里的命名空间键（平台私有字段只能落在命名空间下）。
 METADATA_KEY: Final = "cron"
 
 _DEGRADED: Final = "定时任务表当前不可用（启动时读取失败），已保全备份；修复后重启实例。"
@@ -450,7 +450,7 @@ class CronChannel:
     async def receive(self) -> AsyncIterator[InboundMessage]:
         """调度循环。`stop()` 之后结束。
 
-        **一条坏任务不该终止整条 Channel**（`MSG-004`）：构造消息时出错的任务在
+        **一条坏任务不该终止整条 Channel**：构造消息时出错的任务在
         `_next_after` / `_compose` 那一层就已经被折成「不再排期」，因此这里不需要
         再包一层 try。
         """
@@ -470,7 +470,7 @@ class CronChannel:
         真正会走到这里的只有一种情况：有人手改 `jobs.json` 把 origin 的 channel 写成了
         `cron` 自己。那条消息没有可投递的去处，丢掉它比编一个去处诚实。
 
-        **不抛**（`EDG-204`：投递失败不该把一次成功的 turn 变成失败）。
+        **不抛**（投递失败不该把一次成功的 turn 变成失败）。
         """
         del message
 

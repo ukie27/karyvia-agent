@@ -1,4 +1,4 @@
-"""`karyvia` 的进程入口：argv 解析与子命令派发（技术方案 §4.2）。
+"""`karyvia` 的进程入口：argv 解析与子命令派发。
 
 职责：解析顶层 argv 与实例选择参数，把控制权交给 `run` / `config` / `session` 三个子命令，
 并把未捕获的异常折成可读诊断与非零退出码。
@@ -7,7 +7,7 @@
 
 **入口与能力是两件事**：`builtins/cli_entry/` 是可被插件覆盖的
 **能力**（把 stdin 变成 `InboundMessage`），本模块是不可被覆盖的**进程入口**——它决定
-argv 怎么解析、实例怎么装、退出码是什么。`BAS-010` 的「插件可覆盖 CLI 实现」说的是前者。
+argv 怎么解析、实例怎么装、退出码是什么。 的「插件可覆盖 CLI 实现」说的是前者。
 
 **信号处理在这里**（进程归 `runtime/`）：首个 `Ctrl-C` 取消在跑的 turn 并让会话继续，
 第二个退出进程（§10.3、`contracts.CliEntry.run` 的取消语义）。
@@ -114,7 +114,7 @@ def app(argv: list[str] | None = None) -> int:
 
     command = args[0]
     # 子命令延迟导入：`karyvia --version` 与 `karyvia --help` 不该付出装配根那条 import 链的代价
-    # （`NFR-405` 的冷启动预算）。
+    # （冷启动预算）。
     if command == "run":
         from .commands.run import run_command
 

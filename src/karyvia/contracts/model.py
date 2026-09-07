@@ -1,4 +1,4 @@
-"""模型契约：请求、响应与流式增量（需求 §10.6、`MOD-001`–`MOD-005`）。
+"""模型契约：请求、响应与流式增量。
 
 职责：定义模型能力声明 `ModelInfo`、采样参数、模型消息、`ModelRequest`、终止原因、
 用量统计、`ModelResponse` 与流式 `ModelChunk`。
@@ -8,7 +8,7 @@ Provider 实现，本模块不含任何 IO。
 `ModelResponse.provider_metadata` 是 `Mapping[str, JsonValue]` 且走
 `normalize_metadata()`，这就是「Provider 私有响应对象不得直接越过 Provider 边界」
 （§10.6 末段）在类型层的强制：SDK 对象连塞进来的机会都没有，切换 Provider 时历史里
-也不会残留只有旧 SDK 才认识的结构（`EDG-305`）。
+也不会残留只有旧 SDK 才认识的结构。
 
 `OpaqueBlock` 是那条规则的**受控例外**：有些供应商要求把自己产出的某些块原样回传
 才肯继续（Anthropic 的 `thinking`）。它仍然只能是归一化 JSON、仍然带着 `provider` 所有权
@@ -54,10 +54,10 @@ MAX_OPAQUE_BLOCKS: Final = 64
 
 
 class ModelCapability(StrEnum):
-    """可声明的模型能力（`MOD-001`）。
+    """可声明的模型能力。
 
     不具备的能力必须缺席这个集合，由 Kernel 显式报「能力缺失」，不允许 Provider
-    静默降级后假装支持（`MOD-005`）。
+    静默降级后假装支持。
     """
 
     TOOL_CALLS = "tool_calls"
@@ -73,7 +73,7 @@ class StopReason(StrEnum):
     """终止原因（§10.6「终止原因」）。
 
     `CONTENT_FILTER` 与 `ERROR` 必须与 `END_TURN` 可区分：前两者的输出不是完整答案，
-    Channel 侧的呈现规则依赖这个区分（`EDG-304`）。
+    Channel 侧的呈现规则依赖这个区分。
     """
 
     END_TURN = "end_turn"
@@ -105,7 +105,7 @@ class OpaqueBlock:
     开了 extended thinking 又要跑工具循环时，续写请求必须带回上一轮的 `thinking` 块（含
     `signature`），否则请求会被供应商拒绝。
 
-    **三条规则，全部为了 `EDG-305`（切换 Provider 不残留只有旧 SDK 认识的结构）：**
+    **三条规则，全部为了 （切换 Provider 不残留只有旧 SDK 认识的结构）：**
 
     1. **`provider` 是所有权标记，消费方必须按它过滤。** 一个 Provider 遇到不是自己产出的
        块要**跳过**而不是尝试解释——`payload` 的形状是私有的，两家供应商的 `thinking` 块
@@ -114,7 +114,7 @@ class OpaqueBlock:
        强制：SDK 对象连塞进来的机会都没有。Kernel 从不读它的内容。
     3. **它不进 `SessionMessage`，因此活不过本轮 turn。** 这是刻意的、也是够用的：
        需要回放的场景全都是「同一条 turn 内的工具循环」。跨 turn 回放要先决定这些私有块
-       该不该成为用户资产（一份加密的思考签名存进会话文件里，`SES-006` 一旦发布就是契约），
+       该不该成为用户资产（一份加密的思考签名存进会话文件里， 一旦发布就是契约），
        那是另一个决定。**如实写在这里，不假装它是持久的。**
     """
 
@@ -138,10 +138,10 @@ class OpaqueBlock:
 
 @dataclass(frozen=True, slots=True)
 class ModelInfo:
-    """模型能力声明（`MOD-001`）。
+    """模型能力声明。
 
     `context_window_tokens` 与 `max_output_tokens` 是 Context 预算推导的输入
-    （`CTX-003`：不得生成超过模型限制的请求），因此必须由 Provider 如实声明，
+    （不得生成超过模型限制的请求），因此必须由 Provider 如实声明，
     而不是让组装器去猜一个保守值。
     """
 
@@ -174,7 +174,7 @@ class ModelInfo:
 class SamplingParams:
     """采样与输出参数（§10.6「采样、最大输出和超时等受支持参数」）。
 
-    全部可选：Provider 不支持某项时按 `MOD-005` 显式报不支持，而不是悄悄忽略。
+    全部可选：Provider 不支持某项时按  显式报不支持，而不是悄悄忽略。
     """
 
     temperature: float | None = None
@@ -209,7 +209,7 @@ class ModelMessage:
     """送入模型的一条消息（§10.6「有序消息与 Context」）。
 
     与 `SessionMessage` 分开：前者是持久化资产，后者是本次请求的投影。同一段历史在
-    不同 Provider 下可能投影成不同形状（`EDG-305`），持久化格式不该跟着变。
+    不同 Provider 下可能投影成不同形状，持久化格式不该跟着变。
     """
 
     role: Role
@@ -259,7 +259,7 @@ class ModelMessage:
 class ModelRequest:
     """一次模型请求（§10.6 请求五条）。
 
-    `correlation` 让请求、响应、工具调用与事件挂在同一个 `turn_id` 上（`KER-010`）；
+    `correlation` 让请求、响应、工具调用与事件挂在同一个 `turn_id` 上；
     `stream=True` 且模型不支持流式时由 Provider 报不支持，契约层不替它降级。
     """
 
@@ -362,7 +362,7 @@ class ModelResponse:
         if len(call_ids) != len(set(call_ids)):
             raise KaryviaError(
                 ErrorCode.KERNEL_INVARIANT_VIOLATED,
-                "同一响应内的 tool call id 必须唯一（EDG-303 重复 Tool Call）。",
+                "同一响应内的 tool call id 必须唯一。",
                 detail={"model_id": self.model_id, "tool_calls": len(call_ids)},
             )
         object.__setattr__(
@@ -373,7 +373,7 @@ class ModelResponse:
 
     @property
     def is_complete_answer(self) -> bool:
-        """只有 `END_TURN` 才是模型给出的完整答案（`EDG-304`、`EDG-303` 空响应）。"""
+        """只有 `END_TURN` 才是模型给出的完整答案（空响应）。"""
         return self.stop_reason is StopReason.END_TURN
 
 

@@ -83,7 +83,7 @@ class TestAssignNames:
 
     def test_a_collision_disables_every_side(self) -> None:
         """选任何一边都是替用户做决定，而模型拿到一个「名字对得上、行为却是另一个工具」
-        的调用比少一个工具危险得多（registry 对同名冲突的同一条判定）。"""
+        的调用比少一个工具危险得多（registry 对同名冲突采用的相同规则判定）。"""
         tools = [RemoteTool(name="get-file", description=""), RemoteTool(name="get_file", description="")]
         assignment = assign_names(DEFAULT_PREFIX, "files", tools)
         assert assignment.assigned == {}

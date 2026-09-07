@@ -1,4 +1,4 @@
-"""第 3 层：插件 SDK，插件的唯一依赖面（技术方案 §7.5、§7.6）。
+"""第 3 层：插件 SDK，插件的唯一依赖面。
 
 职责：暴露注册面 `KaryviaAPI`、受限运行时 `PluginContext`、manifest 数据类型与
 `SDK_VERSION`；`__all__` 是对外的**规范性稳定清单**。
@@ -7,7 +7,7 @@
 
 两条使用约定：
 
-- **不在 `__all__` 里的名字不提供兼容承诺**（`NFR-103`）。
+- **不在 `__all__` 里的名字不提供兼容承诺**。
   `tests/sdk/test_public_surface.py` 对它做快照断言，任何增删都会让测试失败，强制走评审。
 - **契约类型从 `karyvia.contracts` 导入，本模块不转发**。`ToolSpec`、`ModelRequest`
   这些是插件与 Kernel 共享的数据契约，`R4` 明确允许插件直接依赖 `contracts/`；
@@ -16,7 +16,7 @@
 
 `karyvia.sdk.testing` 是给插件作者的验收工具（Fake 与契约测试基类），**刻意不在这里
 导入**：它只在测试期需要，让 `import karyvia.sdk` 顺带拉起一堆夹具没有道理
-（`NFR-401`）。用 `from karyvia.sdk.testing import ...` 显式获取。
+。用 `from karyvia.sdk.testing import ...` 显式获取。
 """
 
 from __future__ import annotations

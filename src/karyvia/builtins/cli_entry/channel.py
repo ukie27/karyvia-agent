@@ -1,4 +1,4 @@
-"""CLI 的 `Channel` 一侧：把控制台接到与其它平台完全相同的契约路径上（`MSG-004`、`MSG-007`）。
+"""CLI 的 `Channel` 一侧：把控制台接到与其它平台完全相同的契约路径上。
 
 职责：实现 `contracts.Channel` 的四个成员，正文全部委托给 `CliConsole`。
 不负责：读 stdin、渲染细节、把消息喂给 orchestrator（那是装配根的 Channel 泵）。

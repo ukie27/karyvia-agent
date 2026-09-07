@@ -1,4 +1,4 @@
-"""内建 CLI 入口：`CLI_ENTRY:stdio` 与 `CHANNEL:cli` 两条能力（技术方案 §8.1、`BAS-009`）。
+"""内建 CLI 入口：`CLI_ENTRY:stdio` 与 `CHANNEL:cli` 两条能力。
 
 职责：解析本内建的配置块，装出一个共享的 `CliConsole`，并把入口与 Channel 两条能力注册
 进 Host。
@@ -6,13 +6,13 @@
 Channel 泵）、信号处理（进程归 `runtime/`）。
 
 **为什么是两条能力**：`CliEntry` 拥有进程（决定 `karyvia` 什么时候返回、返回什么退出码），
-`Channel` 拥有消息路径（`MSG-007`：输入输出不得绕过 `InboundMessage` / `OutboundMessage`）。
+`Channel` 拥有消息路径（输入输出不得绕过 `InboundMessage` / `OutboundMessage`）。
 合成一条就得让其中一件事走近路。两者共用同一个 `CliConsole`，那是它们唯一的耦合点。
 
 stdin/stdout 是进程自己的 IO，不经过 Workspace 资源服务。要读写文件请用 `tools_fs`，
 那里有路径守卫。
 
-**`instance_id` 经配置块交下来**（`D17` 的 `dir`、`D20` 的 `workspace` 是同一条先例）：
+**`instance_id` 经配置块交下来**：
 `R4` 禁止 `builtins/` 够到 `kernel/`，内建不可能自己知道实例标识。装配根不填时退回
 `default`——`InboundMessage.instance_id` 只是一个可追溯的标签，编排用的是
 `OrchestratorDeps.instance_id`，因此填错不会让消息投错实例，只会让诊断难读。
@@ -58,7 +58,7 @@ __all__ = [
 ]
 
 #: 能力名。`CLI_ENTRY` 是 SINGLETON，插件覆盖它要在 manifest 里写
-#: `overrides: ["builtin:stdio"]`（`EDG-108` 的回落由装配根兑现）。
+#: `overrides: ["builtin:stdio"]`（回落由装配根兑现）。
 CLI_ENTRY_NAME: Final = "stdio"
 CHANNEL_NAME: Final = "cli"
 
@@ -121,7 +121,7 @@ def _text(config: Mapping[str, JsonValue], key: str, fallback: str) -> str:
 
 
 def resolve_settings(ctx: PluginContext) -> CliSettings:
-    """解析配置块。**在 `setup()` 时校验一次**，不拖到第一次输入（`D18` 的先例）。"""
+    """解析配置块。**在 `setup` 时校验一次**，不拖到第一次输入。"""
     config: dict[str, JsonValue] = dict(ctx.config)
     reasoning = config.get(CONFIG_REASONING_KEY, False)
     if not isinstance(reasoning, bool):

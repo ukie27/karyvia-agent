@@ -1,12 +1,12 @@
-"""`TurnOrchestrator` 的行为测试（`D14` 验收：技术方案 §10.2 的 14 步、§10.3）。
+"""`TurnOrchestrator` 的行为测试。
 
 | 组 | 验收内容 |
 | --- | --- |
-| A 事件序列 | 模型类 / 命令类 turn 各一条完整可追踪序列（`KER-010`、`OBS-002`） |
-| B 准入 | 去重不产生第二次副作用（`EDG-201`）；队列满即拒（`EDG-202`）；MERGE 归一个 turn |
-| C 分流 | 命令已处理不进模型、改写输入继续、被拒可诊断且会话仍可用（`CMD-003`） |
+| A 事件序列 | 模型类 / 命令类 turn 各一条完整可追踪序列 |
+| B 准入 | 去重不产生第二次副作用；队列满即拒；MERGE 归一个 turn |
+| C 分流 | 命令已处理不进模型、改写输入继续、被拒可诊断且会话仍可用 |
 | D 终态 | 四个终态各自的事件、出站状态与 `TurnOutcome` |
-| E 持久化 | 空 assistant / 孤儿 tool / 二次截断三条基线决定；写失败 → FAILED（`SES-003`） |
+| E 持久化 | 空 assistant / 孤儿 tool / 二次截断三条基线决定；写失败 → FAILED |
 | F 取消 | 已产生内容留存并标 `interrupted`、未执行工具 `side_effect=NONE`、会话可继续 |
 | G Hook | `turn_start` 拒绝、`before_model_request` 只分发一次/轮、观察者失败不影响 turn |
 | H 预算 | `STOPPED_BY_LIMIT` 后发一次不带 tools 的收尾请求 |
@@ -161,7 +161,7 @@ async def test_every_turn_event_carries_the_same_correlation() -> None:
 
 
 async def test_a_command_turn_still_gets_a_full_event_stream() -> None:
-    """`KER-010`：命令即使不进模型也发 turn 事件，否则事件流里会出现无头无尾的 turn。"""
+    """命令即使不进模型也发 turn 事件，否则事件流里会出现无头无尾的 turn。"""
     handler = ScriptedCommand(
         CommandResult(disposition=Disposition.COMMAND_HANDLED, content="可用命令：/help")
     )
@@ -203,7 +203,7 @@ async def test_a_duplicate_message_never_runs_a_second_time() -> None:
 
     assert second.admitted is False
     assert second.duplicate_of == first.turn_id
-    assert harness.provider.call_count == 1  # `EDG-201`：不产生第二次副作用
+    assert harness.provider.call_count == 1  # ：不产生第二次副作用
     assert harness.events.of(EventName.TURN_REJECTED)[0].payload["reason"] == "duplicate"
 
 
@@ -328,7 +328,7 @@ async def test_a_rejected_command_keeps_the_session_usable() -> None:
     assert rejected.outcome is not None
     assert rejected.outcome.status is TurnStatus.FAILED
     assert harness.events.of(EventName.TURN_REJECTED)[0].payload["reason"] == "command"
-    assert followup.content == "后续正常"  # 会话仍然可用（`CMD-003`）
+    assert followup.content == "后续正常"  # 会话仍然可用
 
 
 # ------------------------------------------------------------------ D 终态
@@ -463,7 +463,7 @@ async def test_a_persistence_failure_fails_the_turn_instead_of_pretending() -> N
     receipt = await harness.send()
 
     assert receipt.outcome is not None
-    assert receipt.outcome.status is TurnStatus.FAILED  # `SES-003`
+    assert receipt.outcome.status is TurnStatus.FAILED  #
     assert receipt.outcome.error is not None
     assert receipt.outcome.error.code is ErrorCode.PERSISTENCE_WRITE_FAILED
     assert names(harness)[-1] == "turn.failed"
@@ -819,7 +819,7 @@ async def test_turn_start_rejection_stops_the_turn_with_a_permission_error() -> 
 
 
 async def test_before_model_request_is_dispatched_once_per_iteration() -> None:
-    """`D09` 已在 engine 里每轮分发一次，`D14` 不得再分发一次（§6.2.1）。"""
+    """ 已在 engine 里每轮分发一次， 不得再分发一次（§6.2.1）。"""
     hooks = RecordingHookDispatcher()
     harness = build(
         ScriptedProvider([tool_response(tool_call("fs.read")), text_response("好")]),
@@ -854,7 +854,7 @@ async def test_a_context_provider_failure_only_records_an_event() -> None:
     receipt = await harness.send()
 
     assert receipt.outcome is not None
-    assert receipt.outcome.status is TurnStatus.COMPLETED  # `NFR-204`
+    assert receipt.outcome.status is TurnStatus.COMPLETED  #
     assert "plugin.failed" in names(harness)
 
 
@@ -946,7 +946,7 @@ def test_the_receipt_type_is_what_the_scheduler_carries() -> None:
     assert scheduler.policy is ConcurrencyPolicy.QUEUE
 
 
-# ------------------------------------------------------------------ J 出站附件（`D47`）
+# ------------------------------------------------------------------ J 出站附件
 
 
 def _png(name: str) -> AttachmentRef:
@@ -1041,7 +1041,7 @@ async def test_a_final_frame_with_only_attachments_is_still_sent() -> None:
     assert records[-1].attachments == (_png("a.png"),)
 
 
-# ------------------------------------------------------------------ K 重试（`D48`）
+# ------------------------------------------------------------------ K 重试
 
 RETRY_FAST = RetryPolicy(max_attempts=3, base_delay_ms=1, max_delay_ms=1)
 
@@ -1052,7 +1052,7 @@ def _flaky() -> KaryviaError:
 
 
 async def test_a_transient_model_failure_no_longer_kills_the_turn() -> None:
-    """`D48` 之前：一次 429 / 503 直接把整条 turn 打成 `FAILED`，用户要自己重发。
+    """ 之前：一次 429 / 503 直接把整条 turn 打成 `FAILED`，用户要自己重发。
 
     重试**不**重新分发 `before_model_request`，因此 `model.request_started` 的条数仍然
     等于迭代数（engine 的那条不变量），重试只多出一条 `model.request_failed`。
@@ -1115,7 +1115,7 @@ async def test_a_persistent_failure_still_fails_the_turn_with_the_real_reason() 
 
 
 async def test_a_silent_model_becomes_a_failure_with_a_sentence() -> None:
-    """`D48` 之前：终帧空正文被 `emit_outbound` 丢掉，用户**一条消息都收不到**。"""
+    """ 之前：终帧空正文被 `emit_outbound` 丢掉，用户**一条消息都收不到**。"""
     harness = build(
         ScriptedProvider([text_response(""), text_response(""), text_response("")]),
         retry=RETRY_FAST,
@@ -1129,11 +1129,11 @@ async def test_a_silent_model_becomes_a_failure_with_a_sentence() -> None:
     assert receipt.messages[-1].content == "模型连续 3 次返回空回答。"
 
 
-# ------------------------------------------------------------------ L 截断（`EDG-304`）
+# ------------------------------------------------------------------ L 截断
 
 
 async def test_max_tokens_turn_has_cancelled_stream_state() -> None:
-    """续写上限耗尽的答案出站时 `stream_state=CANCELLED`，Channel 因此会附加标记（`EDG-304`）。
+    """续写上限耗尽的答案出站时 `stream_state=CANCELLED`，Channel 因此会附加标记。
 
     `TurnStatus` 仍然是 `COMPLETED`——模型没报错、turn 也没被取消——只是出站消息的
     呈现状态要说清楚这不是一个完整答案。

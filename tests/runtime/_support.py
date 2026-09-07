@@ -5,12 +5,12 @@
 的入口。
 不负责：任何断言。
 
-**只换模型这一项**：`D23` 要验的是装配链本身（配置块怎么交下去、能力怎么取回、Channel
+**只换模型这一项**： 要验的是装配链本身（配置块怎么交下去、能力怎么取回、Channel
 泵怎么转），把内建换成 Fake 就等于让这套用例证明一条没人会走的路（`tests/integration/`
-的同一条判据）。模型是唯一必须换掉的——它是清单里唯一会出网的那个。
+采用的相同判据）。模型是唯一必须换掉的——它是清单里唯一会出网的那个。
 
 `setup` 用 `"tests.runtime._support:setup_fake_model"` 引用本模块：`import_setup()` 接受
-任何 `module:func`，内建与外部插件在这一点上没有区别（`SDK-007`）。
+任何 `module:func`，内建与外部插件在这一点上没有区别。
 """
 
 from __future__ import annotations
@@ -163,9 +163,9 @@ class ScriptedChannel:
         self.delivered: list[OutboundMessage] = []
         self.started = 0
         self.stopped = 0
-        #: 投递时抛的东西（`D43`）。契约允许 `Channel.deliver` 抛 `EXTERNAL_CHANNEL`——
+        #: 投递时抛的东西。契约允许 `Channel.deliver` 抛 `EXTERNAL_CHANNEL`——
         #: 这个开关就是为了驱动那条路径：路由点必须捕获它、发一条
-        #: `channel.delivery_failed`，而 turn 照样走到自己的终态（`EDG-204`）。
+        #: `channel.delivery_failed`，而 turn 照样走到自己的终态。
         self.fail_delivery_with: Exception | None = None
         self._inbox: asyncio.Queue[InboundMessage | None] = asyncio.Queue()
 
@@ -219,7 +219,7 @@ def manifests_with_multi_channel() -> tuple[PluginManifest, ...]:
     return (*TEST_MANIFESTS, MULTI_CHANNEL)
 
 
-# ----------------------------------------------------------- 假记忆后端（`D44`）
+# ----------------------------------------------------------- 假记忆后端
 
 #: 这条假 `MEMORY` 能力的名字。用例把它写进 `memory.provider`。
 MEMORY_NAME: str = "fake-memory"

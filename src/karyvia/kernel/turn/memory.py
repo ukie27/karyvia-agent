@@ -1,13 +1,13 @@
-"""长期记忆的召回路径：把一条 `MEMORY` 能力接到上下文组装上（需求 §9.8 `MEM-003`，`D44`）。
+"""长期记忆的召回路径：把一条 `MEMORY` 能力接到上下文组装上。
 
 职责：从 registry 里挑出生效的 `MemoryProvider`、每轮 turn 用本次输入去召回、把结果变成
 可以进 `extra_fragments` 的 `ContextFragment` 序列，并按配置在故障时降级或失败。
 不负责：存储（`MemoryProvider` 的实现方）、决定片段怎么进模型消息（`context_builder.py`）、
 选哪个 Provider（那是配置，装配根读它）——本模块不做任何 IO，只 await 注入进来的 Provider。
 
-**它存在的理由**：`D39` 交了 `MEMORY` 能力与一个实现它的插件，但 kernel 里没有消费者
+**它存在的理由**： 交了 `MEMORY` 能力与一个实现它的插件，但 kernel 里没有消费者
 （`memory_providers_from()` 除测试外无调用方），因此**只注册一条 `MEMORY` 能力、记忆永远
-进不了模型**。那条能力当时只是「契约形状」。本模块把它通上电：第三方现在可以只写一条
+进不了模型**。本模块把该能力接入 Turn：第三方可以只写一条
 `MEMORY` 能力，不必再自带一个 Context Provider。
 
 **四条会影响正确性的判定：**
@@ -24,7 +24,7 @@
    声明 `SYSTEM` 的记忆会进系统指令位置，那与一个 Context Provider 声明 `SYSTEM` 是同一件
    事、同一份 manifest 担保。（`plugins/karyvia-plugin-memory/` 在**写入**侧就把 trust
    钉死成 `UNTRUSTED`，那是它的判断，不是这里替它做的。）
-3. **失败按配置分叉，默认降级**（`MEM-003`）。`degrade` = 记一条错误、这一轮没有记忆、
+3. **失败按配置分叉，默认降级**。`degrade` = 记一条错误、这一轮没有记忆、
    turn 照常跑；`fail` = 原样上抛，turn `FAILED`。**降级不等于静默**：错误一定经
    `on_failure` 报出去，否则「记忆一直召不回来」查不出原因。
 4. **空查询直接返回空**，不去打扰 Provider：命令类 turn 与刚开的会话都会走到这里，
@@ -76,7 +76,7 @@ DEFAULT_MEMORY_RECALL_TIMEOUT_MS: Final = 3_000
 #: 召回片段的 priority 下界。取 100 = 插件基准（`sdk/manifest.py` 的默认值）。
 DEFAULT_MEMORY_FRAGMENT_PRIORITY: Final = 100
 
-#: `MEM-003` 的两种处置。`degrade` 是默认：一个记忆后端挂了不该让实例不能对话。
+#: 的两种处置。`degrade` 是默认：一个记忆后端挂了不该让实例不能对话。
 MEMORY_ON_FAILURE_CHOICES: Final[tuple[str, ...]] = ("degrade", "fail")
 DEFAULT_MEMORY_ON_FAILURE: Final = "degrade"
 
@@ -95,7 +95,7 @@ class MemoryRecall:
     limit: int = DEFAULT_MEMORY_RECALL_LIMIT
     timeout_ms: int = DEFAULT_MEMORY_RECALL_TIMEOUT_MS
     priority_floor: int = DEFAULT_MEMORY_FRAGMENT_PRIORITY
-    #: `True` = 故障时上抛（`MEM-003` 的 `fail`）。默认降级。
+    #: `True` = 故障时上抛。默认降级。
     critical: bool = False
 
     @property
@@ -169,7 +169,7 @@ class MemoryRecall:
         *,
         cause: BaseException | None = None,
     ) -> tuple[ContextFragment, ...]:
-        """`MEM-003` 的两种处置，唯一的判定点：报出去并当作没有记忆，或者上抛。"""
+        """ 的两种处置，唯一的判定点：报出去并当作没有记忆，或者上抛。"""
         if self.critical:
             raise error from cause
         if on_failure is not None:

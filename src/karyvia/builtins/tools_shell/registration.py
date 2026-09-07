@@ -1,10 +1,10 @@
-"""`tools_shell` 的注册：唯一的 `setup` 入口（技术方案 §7.1、§8.1）。
+"""`tools_shell` 的注册：唯一的 `setup` 入口。
 
 职责：实现 manifest 声明的 `setup`——解析配置、构造 `ShellExecutor`、调 `api.register_tool`。
 不负责：构造 `PluginManifest`（那在 `builtins/registry.py`，是内建能力唯一的发现来源）、
 判定冲突（`kernel.registry`）。
 
-**内建不享受特权**（`BAS-005`）：这里的注册调用与外部插件写的那段代码是同一个形状——
+**内建不享受特权**：这里的注册调用与外部插件写的那段代码是同一个形状——
 没有一个「只有内建能用」的 API，也没有一条「内建优先级默认为 0」的特殊分支。基准优先级
 是装配根在翻译 manifest 时给上去的（`runtime/wiring.py`），本函数看不见也改不了它。
 """
@@ -27,7 +27,7 @@ def setup(api: KaryviaAPI) -> None:
     让加载当场失败，而不是等模型第一次调 `shell.exec` 才炸。
 
     被 `disable` 关掉时**一个都不注册**，因此 `shell.exec` 不在模型可见的工具列表里——
-    `TOL-006` 要的「可见列表与可执行集合同源」不是靠两处保持一致维持的，而是因为只有一处。
+     要的「可见列表与可执行集合同源」不是靠两处保持一致维持的，而是因为只有一处。
     装配根必须用**同一份配置**过滤 manifest 声明（`runtime/wiring.py` 的 `keep` 参数 +
     `settings.enabled_tool_names()`），否则 `CapabilityHost.finish()` 会以
     `PLUGIN_LOAD_FAILED` 拒绝加载——manifest 声明了一个而这里注册了零个。那个报错是对的。

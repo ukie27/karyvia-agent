@@ -11,7 +11,7 @@
 
 - **一切写入都是 `trust=UNTRUSTED`。** 契约的 `MemoryProvider.remember` 只要求模型生成
   内容按 `UNTRUSTED` 写入，但 `/memory` 命令写的内容同样来自聊天窗口里的某个人。统一之后
-  召回内容恒被 `contracts/context.py::as_model_text()` 包成带来源的数据块（`EDG-306`），
+  召回内容恒被 `contracts/context.py::as_model_text` 包成带来源的数据块，
   没有一条「人手输入因此获得指令优先级」的路径。写入时传进来的 `trust` 因此被**忽略**
   而不是被信任——这是本模块唯一一处刻意不采纳调用方声明的地方，值得单独一条用例。
 - **`Sensitivity.SECRET` 拒绝写入。** 组装器本来就不会把 SECRET 片段送进模型，
@@ -102,7 +102,7 @@ class MemoryRecord:
     sequence: int
     tags: tuple[str, ...] = ()
     expires_at: datetime | None = None
-    #: 写入者，只用于展示与审计（`MEM-004` 的「来源标记」）。`tool` / `command` / 插件自填。
+    #: 写入者，只用于展示与审计（「来源标记」）。`tool` / `command` / 插件自填。
     origin: str = ""
 
     def is_expired(self, now: datetime) -> bool:
@@ -199,7 +199,7 @@ def decode_record(raw: str, **detail: object) -> MemoryRecord:
 
     **异常约定**：形状不符一律 `PERSISTENCE_RECORD_CORRUPT`——与 `session_jsonl` 同一个码，
     理由也相同：读到的字节和格式对不上，读的一方没有别的判断依据。**不退化成「跳过这条」**，
-    那是调用方（`store.py`）按 `SES` 系列的先例决定的事。
+    那是调用方（`store.py`）按 `SES` 系列的既有实现决定的事。
     """
     try:
         parsed = json.loads(raw)

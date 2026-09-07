@@ -1,4 +1,4 @@
-"""只读诊断路径（`D29` 的 `runtime/inspect.py`）。
+"""只读诊断路径。
 
 职责：验三条承诺——**不取实例锁**、**不装完整实例**、**插件的问题只记不抛**，
 以及「已发现 = 真的会被加载的那一批」在诊断路径上同样成立。
@@ -41,7 +41,7 @@ def _states(root: Path) -> dict[str, PluginState]:
 
 
 def test_an_enabled_plugin_is_listed_as_discovered(tmp_path: Path) -> None:
-    """只跑到阶段 A——`setup` 一次都没被导入，因此状态停在 `discovered`。"""
+    """只跑到加载前校验——`setup` 一次都没被导入，因此状态停在 `discovered`。"""
     write_plugin(tmp_path / "ext", "alpha")
     _instance(tmp_path, enabled=["alpha"])
     assert _states(tmp_path)["alpha"] is PluginState.DISCOVERED
@@ -58,7 +58,7 @@ def test_a_skipped_plugin_carries_the_reason_from_the_inventory(tmp_path: Path) 
 
 
 def test_a_phase_a_failure_is_recorded_instead_of_raised(tmp_path: Path) -> None:
-    """依赖缺失的插件从 `discovered` 移进 `failures`（`D27` 的「已发现 = 会被加载的」）。"""
+    """依赖缺失的插件从 `discovered` 移进 `failures`（「已发现 = 会被加载的」）。"""
     write_plugin(tmp_path / "ext", "alpha", dependencies=("missing",))
     _instance(tmp_path, enabled=["alpha"])
     inspection = inspect_plugins(instance_dir=tmp_path, manifests=TEST_MANIFESTS)
@@ -104,7 +104,7 @@ async def test_capabilities_reports_the_active_providers(tmp_path: Path) -> None
 
 
 async def test_capabilities_sees_an_external_plugin(tmp_path: Path) -> None:
-    """外部插件以 `plugin:<id>` 身份出现——与内建在报告里分得开（`PLG-006`）。"""
+    """外部插件以 `plugin:<id>` 身份出现——与内建在报告里分得开。"""
     write_plugin(tmp_path / "ext", "alpha")
     _instance(tmp_path, enabled=["alpha"])
     inspection = await inspect_capabilities(instance_dir=tmp_path, manifests=TEST_MANIFESTS)

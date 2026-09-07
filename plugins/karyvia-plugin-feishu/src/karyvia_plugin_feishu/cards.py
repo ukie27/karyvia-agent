@@ -1,4 +1,4 @@
-"""markdown → 飞书卡片元素（开发方案 `D34`）。
+"""markdown → 飞书卡片元素。
 
 职责：把一段 markdown 拆成 `markdown` / `div` / `table` 三种卡片元素，并**按「一张卡片
 最多一个表格」拆成多组**。纯函数，零 IO。

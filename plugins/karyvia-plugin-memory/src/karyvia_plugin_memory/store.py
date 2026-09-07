@@ -11,12 +11,12 @@
 静默丢用户的记忆。
 
 **`forget()` 真的删**：重写整个分区文件（临时文件 → `fsync` → `os.replace`），不留墓碑。
-`MEM-005` 要的是删除，而一条留在明文文件里的墓碑不是删除。分区是 10²–10³ 条的量级，
+ 要的是删除，而一条留在明文文件里的墓碑不是删除。分区是 10²–10³ 条的量级，
 重写的代价可以接受；真到了需要墓碑 + 定期压缩的规模，那也该是换一个后端而不是改这里。
 
 **不用 `ctx.fs`**：`sdk.api.FileAccess` 只有 `read_text` / `write_text` / `list_dir`，
 没有追加、`fsync` 与原子替换，因此实现直接用 `pathlib`——与 `builtins/session_jsonl`
-是同一条先例。插件私有状态的持久化由拥有数据的插件负责。
+是相同原则。插件私有状态的持久化由拥有数据的插件负责。
 
 **IO 全部经 `asyncio.to_thread`**：召回发生在每一轮 turn 的组装路径上，在事件循环里同步
 读几个文件会卡住同一实例的其他 turn。
@@ -60,7 +60,7 @@ __all__ = [
 SCHEMA_VERSION: Final = 1
 
 #: `meta.json` 的字段清单。`scope` / `token` 冗余存一份是刻意的：文件名是编码结果，
-#: 人读不方便，而迁移工具需要一眼看出这份记忆属于谁（`session_jsonl` 的同一条理由）。
+#: 人读不方便，而迁移工具需要一眼看出这份记忆属于谁（`session_jsonl` 基于相同理由）。
 META_FIELDS: Final = (
     "schema_version",
     "scope",
@@ -398,7 +398,7 @@ class ContractMemoryProvider:
 
     **本插件自己不经它工作**：Context Provider、三条工具与 `/memory` 命令直接用
     `MemoryStore`，因为它们都拿得到 `SessionKey`。它仍然有两个消费者——第三方换后端时的
-    契约形状（可被 `sdk.testing.MemoryProviderContract` 驱动，`MEM-001`），以及 `D44` 起
+    契约形状（可被 `sdk.testing.MemoryProviderContract` 驱动），以及当前
     kernel 的召回路径（`memory.provider = "jsonl"` 时装配根就取这个对象）。**后者默认不开**，
     而两边同时开会重复召回，处置写在 README 的「已知边界」第 1 条。
     """
@@ -461,7 +461,7 @@ def _failed(message: str, code: ErrorCode, error: OSError) -> KaryviaError:
     """把一个 `OSError` 折成契约错误。
 
     **只放 `errno` 与异常类型名，不放 `strerror` 与路径**：那两样会把宿主机的绝对路径写进
-    一条可能被模型看到的错误里（`builtins/tools_fs` 的同一条判定）。
+    一条可能被模型看到的错误里（`builtins/tools_fs` 采用的相同规则判定）。
     """
     return KaryviaError(
         code,

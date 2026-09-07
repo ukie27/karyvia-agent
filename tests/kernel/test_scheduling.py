@@ -1,4 +1,4 @@
-"""工具批次划分的单元测试（`D09`：`scheduling.py`）。
+"""工具批次划分的单元测试（`scheduling.py`）。
 
 批次划分是**纯函数**，因此这里全部同步测试；真正的并发行为（是否重叠、完成顺序）在
 `test_engine.py` 用 `asyncio.Barrier` 验证——用 barrier 而不是看时序痕迹，因为串行化时

@@ -1,4 +1,4 @@
-"""依赖规则 `R1`–`R5` 的可复用检查器（技术方案 §3.1）。
+"""依赖规则 `R1`–`R5` 的可复用检查器。
 
 职责：对任意源码树做 AST 扫描，收集 import 目标并判定其违反了哪条规则。
 不负责：断言与夹具——检查器必须能作用于临时树，否则「注入违规样例必须失败」的
@@ -12,8 +12,7 @@
     R4  builtins/ 与外部插件  只能 import sdk/ 与 contracts/
     R5  只有 runtime/ 可同时 import kernel/ 与 builtins/（唯一组装根）
 
-`R6`（新层禁止 import legacy/）随 `D35` 删掉 `legacy/` 一并退休：没有隔离区了，
-规则也就没有可判定的对象。它服役期间只拦下过一处例外（`D31` 删掉的 legacy_entry）。
+仓库不设置额外兼容隔离区；文件级边界只覆盖当前层次。
 """
 
 from __future__ import annotations

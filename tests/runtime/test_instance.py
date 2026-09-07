@@ -1,4 +1,4 @@
-"""`D23` `AgentInstance`：Channel 泵、被拒 turn 的回音、停止顺序与 `Ctrl-C` 状态机。
+""" `AgentInstance`：Channel 泵、被拒 turn 的回音、停止顺序与 `Ctrl-C` 状态机。
 
 职责：验运行期那几条容易被忽略的路径——重复投递怎么给用户交代、一条炸掉的消息会不会
 把泵带走、`stop()` 会不会漏掉插件派生的任务、两次 `Ctrl-C` 各做什么。
@@ -56,7 +56,7 @@ def console_of(instance: AgentInstance) -> object:
 
 
 async def test_a_duplicate_message_gets_an_explicit_echo(tmp_path: Path) -> None:
-    """`EDG-201`：重复投递不产生第二次副作用，但用户要知道发生了什么。
+    """重复投递不产生第二次副作用，但用户要知道发生了什么。
 
     被去重的消息没有终态事件（那条 turn 从未开始），泵因此自己合成一条出站消息——
     否则 CLI 会永远等一个不会到来的终态。
@@ -69,11 +69,13 @@ async def test_a_duplicate_message_gets_an_explicit_echo(tmp_path: Path) -> None
         first = console.submit("在吗")  # type: ignore[attr-defined]
         await asyncio.wait_for(console.wait_for_turn(), timeout=2)  # type: ignore[attr-defined]
 
+
         # 同一个 message_id 再投一次：去重命中。
         console._counter -= 1  # type: ignore[attr-defined] # noqa: SLF001 - 复现同一个 id
         again = console.submit("在吗")  # type: ignore[attr-defined]
         assert again.message_id == first.message_id
         await asyncio.wait_for(console.wait_for_turn(), timeout=2)  # type: ignore[attr-defined]
+
         assert "重复投递" in console.rendered[-1]  # type: ignore[attr-defined]
         assert console.last_state is StreamState.FAILED  # type: ignore[attr-defined]
     finally:
@@ -134,7 +136,7 @@ name = "{MULTI_CHANNEL_ID}"
 
 
 async def test_stop_cancels_plugin_tasks(tmp_path: Path) -> None:
-    """`EDG-104`/`EDG-105`：插件派生的后台任务在停止时被收走。"""
+    """/：插件派生的后台任务在停止时被收走。"""
     write_config(tmp_path)
     instance = await _boot(tmp_path, manifests=TEST_MANIFESTS)
     await instance.start()
@@ -164,11 +166,11 @@ def setup_failing_channel(api: KaryviaAPI) -> None:
     api.register_channel(MULTI_CHANNEL_ID, channel)
 
 
-# ---------------------------------------------------------------- D28 生命周期
+# ----------------------------------------------------------------  生命周期
 
 
 async def test_stop_walks_the_lifecycle_in_reverse_load_order(tmp_path: Path) -> None:
-    """`PLG-005`：停止顺序是加载顺序的逆序，且每个提供方都走完状态机。"""
+    """停止顺序是加载顺序的逆序，且每个提供方都走完状态机。"""
     write_config(tmp_path)
     instance = await _boot(tmp_path, manifests=TEST_MANIFESTS)
     loaded = [lifecycle.plugin_id for lifecycle in instance.lifecycles]
@@ -215,7 +217,7 @@ async def test_plugin_start_and_cleanup_follow_the_load_topology(tmp_path: Path)
 
 
 async def test_stop_unsubscribes_the_plugin_event_bridge(tmp_path: Path) -> None:
-    """`EDG-105` 第二项：停止后事件订阅失效，handler 不再收到投递。"""
+    """ 第二项：停止后事件订阅失效，handler 不再收到投递。"""
     write_config(tmp_path)
     instance = await _boot(tmp_path, manifests=TEST_MANIFESTS)
     await instance.start()
@@ -237,7 +239,7 @@ async def test_stop_unsubscribes_the_plugin_event_bridge(tmp_path: Path) -> None
 
 
 async def test_a_stopped_plugin_cannot_spawn_new_tasks(tmp_path: Path) -> None:
-    """`EDG-105` 第三项的另一半：停止之后派生的任务不在任何一轮取消的覆盖范围里。"""
+    """ 第三项的另一半：停止之后派生的任务不在任何一轮取消的覆盖范围里。"""
     write_config(tmp_path)
     instance = await _boot(tmp_path, manifests=TEST_MANIFESTS)
     await instance.start()
@@ -254,10 +256,10 @@ async def test_a_stopped_plugin_cannot_spawn_new_tasks(tmp_path: Path) -> None:
 
 
 async def test_a_disabled_plugin_leaves_no_capability_behind(tmp_path: Path) -> None:
-    """`EDG-105` 第一项：被禁用的提供方在这次实例里一项能力都查不到。
+    """ 第一项：被禁用的提供方在这次实例里一项能力都查不到。
 
-    首版不热更新（技术方案 §10.4）：禁用在**下一次启动**生效，因此「注销能力」的兑现
-    形态是「它的 `setup()` 根本没跑过」——registry 解析后只读（`NFR-403`），运行期没有
+    首版不热更新：禁用在**下一次启动**生效，因此「注销能力」的兑现
+    形态是「它的 `setup` 根本没跑过」——registry 解析后只读，运行期没有
     第二条把已冻结的能力摘掉的路径。
     """
     write_config(tmp_path, plugins={"disable": ["tools-shell"]})
@@ -273,7 +275,7 @@ async def test_a_disabled_plugin_leaves_no_capability_behind(tmp_path: Path) -> 
 
 
 async def test_a_hanging_plugin_does_not_hold_up_the_instance(tmp_path: Path) -> None:
-    """`EDG-104`：吞掉取消的后台任务不能扣住实例退出。"""
+    """吞掉取消的后台任务不能扣住实例退出。"""
     write_config(tmp_path, plugins={"stop_timeout_ms": 50})
     instance = await _boot(tmp_path, manifests=TEST_MANIFESTS)
     await instance.start()
@@ -441,7 +443,7 @@ async def test_two_conversations_on_one_channel_do_not_block_each_other(
 async def test_the_same_conversation_still_enters_the_scheduler_in_arrival_order(
     tmp_path: Path,
 ) -> None:
-    """`EDG-202` 的逐字断言：同 Session 严格 FIFO、单写者。
+    """ 的逐字断言：同 Session 严格 FIFO、单写者。
 
     事件流里第二条 turn 的 `turn.started` 一定在第一条的终态之后——这就是「同一时刻至多
     一个写者」在事件层面的形状。
@@ -586,7 +588,7 @@ async def test_stop_drains_every_channel_submission(tmp_path: Path) -> None:
     assert instance._channel_tasks == {}  # noqa: SLF001 - 停机所有权的最终状态
 
 
-# --------------------------------------------- 投递失败：`channel.delivery_failed`（`D43`）
+# --------------------------------------------- 投递失败：`channel.delivery_failed`
 
 
 def _events(instance: AgentInstance) -> list[object]:
@@ -601,7 +603,7 @@ def _names(seen: list[object]) -> list[EventName]:
 
 
 async def test_a_failing_delivery_does_not_fail_the_turn(tmp_path: Path) -> None:
-    """`EDG-204` 与 `Channel.deliver` 的 docstring 从此不再矛盾。
+    """ 与 `Channel.deliver` 的 docstring 从此不再矛盾。
 
     契约说投递失败抛 `EXTERNAL_CHANNEL`，而这条 turn 的模型输出与会话历史都已经正确产生
     了——它必须走到 `turn.completed`。「答案没算出来」与「答案没送出去」的处置不同
@@ -622,7 +624,7 @@ async def test_a_failing_delivery_does_not_fail_the_turn(tmp_path: Path) -> None
         names = _names(seen)
         assert EventName.CHANNEL_DELIVERY_FAILED in names
         assert EventName.TURN_FAILED not in names
-        # 投递失败不该被折进 `plugin.failed`——内建 CLI 的投递失败与插件无关，而 `D43`
+        # 投递失败不该被折进 `plugin.failed`——内建 CLI 的投递失败与插件无关，而
         # 之前它正是那么记的。
         assert EventName.PLUGIN_FAILED not in names
     finally:
@@ -633,7 +635,7 @@ async def test_a_failing_delivery_does_not_fail_the_turn(tmp_path: Path) -> None
 async def test_the_delivery_failure_event_points_at_the_turn_it_belongs_to(
     tmp_path: Path,
 ) -> None:
-    """`OBS-002`：这条事件挂在它所属的那个 turn 上，不需要靠猜。
+    """这条事件挂在它所属的那个 turn 上，不需要靠猜。
 
     出站消息自带 `session_key + turn_id`，因此关联标识是齐的——发一条 `correlation=None`
     的事件等于让排查的人回到「按时间戳对齐」。

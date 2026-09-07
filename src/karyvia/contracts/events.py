@@ -1,12 +1,12 @@
-"""运行时事件契约（技术方案 §6.8、需求 `OBS-001`–`OBS-005`）。
+"""运行时事件契约。
 
 职责：定义冻结的事件名清单、事件族，以及带 `Correlation` 与单调 `sequence`、
 构造时即完成脱敏的不可变 `RuntimeEvent`。
 不负责：分配 `sequence`、发布与扇出、写 sink、决定订阅者——那些都在
 `kernel/observability/`；本模块不含任何 IO。
 
-事件必带实例标识与单调序号，因此单个 turn 的执行过程可以按序完整重放（`OBS-002`）。
-脱敏在构造时完成而不是在 sink 端（`OBS-003`）：新增一个 sink 不应重新引入泄漏面。
+事件必带实例标识与单调序号，因此单个 turn 的执行过程可以按序完整重放。
+脱敏在构造时完成而不是在 sink 端：新增一个 sink 不应重新引入泄漏面。
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ _EMPTY_PAYLOAD: Mapping[str, "JsonValue"] = MappingProxyType({})
 
 
 class EventFamily(StrEnum):
-    """事件族。事件名的第一段必须是其中之一（`OBS-002`）。"""
+    """事件族。事件名的第一段必须是其中之一。"""
 
     INSTANCE = "instance"
     PLUGIN = "plugin"

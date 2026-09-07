@@ -1,11 +1,11 @@
-"""插件配置块的解析与校验（`CFG-002`：插件只看得见自己那一块）。
+"""插件配置块的解析与校验（插件只看得见自己那一块）。
 
 职责：把 `plugins.openai-api.config` 收窄成一个 `ApiSettings`，非法值在 `setup()` 时就
 以 `CONFIG_INVALID` + JSON Pointer 报出来。
 不负责：读凭据（`__init__.py`）、起服务（`channel.py`）、决定端点行为（`http.py`）。
 
 **在 `setup()` 校验一次，不拖到第一次请求**：一份写错的配置应当让 `karyvia serve` 当场失败，
-而不是在某个客户端连上来时才变成一个 500（`D18` 定的规矩）。
+而不是在某个客户端连上来时才变成一个 500。
 """
 
 from __future__ import annotations
@@ -105,7 +105,7 @@ def _str(config: Mapping[str, JsonValue], key: str, default: str) -> str:
 
 def _bool(config: Mapping[str, JsonValue], key: str, default: bool) -> bool:
     value = config.get(key, default)
-    # `1` 不是 `True`：布尔项收到非布尔一律拒绝（`D18` 的先例）。
+    # `1` 不是 `True`：布尔项收到非布尔一律拒绝。
     if not isinstance(value, bool):
         raise _invalid(key, "应当是布尔值")
     return value
@@ -127,7 +127,7 @@ def _port(config: Mapping[str, JsonValue]) -> int:
 
 
 def _invalid(key: str, expectation: str) -> KaryviaError:
-    """错误里给指针而不是值：配置值可能是凭据的一部分（`EDG-502`）。"""
+    """错误里给指针而不是值：配置值可能是凭据的一部分。"""
     return KaryviaError(
         ErrorCode.CONFIG_INVALID,
         f"OpenAI 兼容接口的配置项 `{key}` {expectation}。",

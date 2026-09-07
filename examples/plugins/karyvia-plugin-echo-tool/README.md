@@ -18,7 +18,7 @@ Karyvia 的**最小工具插件**示例：注册一项 `TOOL` 能力 `echo.say`�
 pip install -e examples/plugins/karyvia-plugin-echo-tool
 ```
 
-安装**不等于**启用（技术方案 §7.1）。在实例配置里显式列出来才会被加载：
+安装**不等于**启用。在实例配置里显式列出来才会被加载：
 
 ```json
 {

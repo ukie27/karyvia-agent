@@ -1,11 +1,11 @@
-"""首次运行的写盘与指引（`D24`：`runtime/first_run.py`）。
+"""首次运行的写盘与指引（`runtime/first_run.py`）。
 
 职责：验 `config.json` 永不被覆盖、派生 schema 会被刷新、指引里有「文件/字段/变量名」
 且没有任何值，以及本模块自写的四个常量与内建模型供应商一致。
 不负责：模板内容（`tests/kernel/test_scaffold.py`）、`karyvia init` 的退出码
 （`tests/runtime/cli/test_cli.py`）、端到端路径（`tests/e2e/`）。
 
-**「永不覆盖」是 `EDG-501` 的可执行形态**：一个能覆盖用户配置的实现，在测试里表现为
+**「永不覆盖」是的可执行形态**：一个能覆盖用户配置的实现，在测试里表现为
 「第二次调用之后文件内容变了」——因此这里逐字节比对。
 """
 
@@ -59,7 +59,7 @@ class TestEnsureInitialConfig:
         }
 
     def test_an_existing_config_is_never_touched(self, tmp_path: Path) -> None:
-        """`EDG-501`：不得静默回退后覆盖原文件。这里连一个字节都不许变。"""
+        """不得静默回退后覆盖原文件。这里连一个字节都不许变。"""
         layout = layout_at(tmp_path)
         layout.ensure()
         mine = '{"model": {"name": "my-model"}}'
@@ -114,7 +114,7 @@ class TestEnsureInitialConfig:
 
 class TestGuidance:
     def test_it_names_the_file_the_field_and_the_variable(self, tmp_path: Path) -> None:
-        """`BAS-006` 的三样：哪个文件、哪个字段、哪个环境变量。"""
+        """ 的三样：哪个文件、哪个字段、哪个环境变量。"""
         result = ensure_initial_config(layout_at(tmp_path), env={})
         text = "\n".join(guidance_lines(result))
         assert str(result.config_path) in text
@@ -123,7 +123,7 @@ class TestGuidance:
         assert "/model/name" in text
 
     def test_it_never_prints_a_credential_value(self, tmp_path: Path) -> None:
-        """`EDG-502`：只说变量名。本模块从头到尾没读过任何凭据的值。"""
+        """只说变量名。本模块从头到尾没读过任何凭据的值。"""
         result = ensure_initial_config(
             layout_at(tmp_path), env={MODEL_API_KEY_ENV: SENTINEL_KEY}
         )
@@ -150,7 +150,7 @@ class TestGuidance:
 def test_defaults_match_the_builtin_model_provider() -> None:
     """本模块自写的四个常量与 `builtins/model_openai/` 必须一致。
 
-    各写一份是刻意的（`karyvia init` 不该为了四个字符串把 httpx 拉进进程，`NFR-405`），
+    各写一份是刻意的（`karyvia init` 不该为了四个字符串把 httpx 拉进进程），
     与 `estimate_tokens` / `DEFAULT_GRACE_MS` 同一种做法——**因此必须有这条对照**。
     """
     from karyvia.builtins.model_openai import CAPABILITY_NAME, SECRET_NAME

@@ -1,7 +1,7 @@
-"""`D23` 的配置扩展：`plugins.<plugin_id>.{config,secrets}`（技术方案 §6.7）。
+""" 的配置扩展：`plugins.<plugin_id>.{config,secrets}`。
 
 职责：验插件条目的形状校验、保留键与插件 id 的边界、诊断视图里的呈现，
-以及「凭据只以 `${VAR}` 引用形式出现」这条（`CFG-003`）。
+以及「凭据只以 `${VAR}` 引用形式出现」这条。
 不负责：解析 `${VAR}`（`test_secrets.py`）、把块交给插件（`tests/runtime/test_bootstrap.py`）。
 """
 
@@ -73,7 +73,7 @@ def test_an_unknown_top_level_field_is_still_rejected() -> None:
 def test_malformed_entries_report_their_pointer(
     document: dict[str, JsonValue], pointer: str
 ) -> None:
-    """每处问题都要带 JSON Pointer（`CFG-001`），否则用户不知道该改哪一行。"""
+    """每处问题都要带 JSON Pointer，否则用户不知道该改哪一行。"""
     with pytest.raises(KaryviaError) as caught:
         validate_config(document)
     pointers = [item["pointer"] for item in caught.value.detail["errors"]]
@@ -93,7 +93,7 @@ def test_entry_keys_are_exactly_config_and_secrets() -> None:
 
 
 def test_the_diagnostic_view_keeps_the_reference_literal() -> None:
-    """`/config` 与 `karyvia config show` 看到的是 `${VAR}` 字面量，不是明文（`CFG-003`）。"""
+    """`/config` 与 `karyvia config show` 看到的是 `${VAR}` 字面量，不是明文。"""
     config = validate_config(_plugins(acme={"secrets": {"api_key": "${OPENAI_API_KEY}"}}))
     document = json.dumps(config.to_json(), ensure_ascii=False)
     assert "${OPENAI_API_KEY}" in document

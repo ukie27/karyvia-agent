@@ -1,9 +1,9 @@
-"""配置解析与一次性校验（`CFG-002`：插件只看得见自己那一块）。
+"""配置解析与一次性校验（插件只看得见自己那一块）。
 
 职责：把 `plugins.web.config` 变成两个不可变设置对象，并在 `setup()` 里把能查的错一次查完。
 不负责：读取凭据（`tools.py`，见下）、发请求、决定后端怎么拼包（`backends.py`）。
 
-**形状校验在 `setup()` 做完，不拖到第一次 turn**（内建 `context_basic` 的先例）：一份写错
+**形状校验在 `setup()` 做完，不拖到第一次 turn**（内建 `context_basic` 的既有实现）：一份写错
 的配置应当在 `karyvia plugins list` 里看得见，而不是等到模型第一次调工具时才变成一条工具失败。
 
 **但凭据刻意不在这里取。** `web.fetch` 与 `web.search` 是两条独立的工具能力，而
@@ -39,12 +39,12 @@ __all__ = [
 SECRET_NAME: Final = "api_key"
 
 #: 支持的搜索后端。`custom` 是可配置的通用 JSON 后端——它的存在正是为了**不**再长出一张
-#: 逐家写死的表（`D19` 拒过 `max_tokens_field` slug 表、`D32` 拒过四张版本 gating 表）。
+#: 逐家写死的表。
 PROVIDERS: Final[tuple[str, ...]] = ("duckduckgo", "tavily", "brave", "searxng", "custom")
 
 #: 不需要凭据的后端。默认后端必须在这张表里——外部插件用不上 `runtime/bootstrap.py` 的
 #: `keep` 声明过滤（那张 `_ENABLED_NAMES` 按内建 id 索引），因此 manifest 声明的两条能力
-#: 恒被注册；默认开箱可用，才不会出现「声明了却不可用」（`D20` 明确拒过的那种）。
+#: 恒被注册；默认开箱可用，才不会出现「声明了却不可用」。
 CREDENTIALLESS_PROVIDERS: Final[frozenset[str]] = frozenset({"duckduckgo", "searxng"})
 
 #: 需要 `base_url` 的后端：自托管或完全自定义，没有可以内置的默认端点。
@@ -62,11 +62,11 @@ _DEFAULT_MAX_BYTES: Final = 2_000_000
 _DEFAULT_MAX_RESULT_CHARS: Final = 30_000
 
 #: 契约的 `MAX_TOOL_RESULT_LENGTH` 是硬上限，配置超过它一律拒绝——放行只会让每次调用都在
-#: 构造 `ToolResult` 时才炸，那时错误指向的是 kernel 而不是这行配置（`D20` 的先例）。
+#: 构造 `ToolResult` 时才炸，那时错误指向的是 kernel 而不是这行配置。
 _MAX_RESULT_CHARS_CEILING: Final = 100_000
 
 # 错误消息定义成模块常量而不是写在 `raise` 处：消息是稳定文案，动态部分一律进 `detail`
-# （`builtins/model_openai/settings.py::_BASE_URL_SCHEME` 的先例，`ruff` 的 `TRY003`
+# （`builtins/model_openai/settings.py::_BASE_URL_SCHEME` 的既有实现，`ruff` 的 `TRY003`
 # 也是这么要求的）。
 _NOT_AN_OBJECT: Final = "这个配置项必须是对象。"
 _NOT_A_STRING: Final = "这个配置项必须是字符串。"
@@ -135,7 +135,7 @@ class WebSettings:
 def resolve_settings(config: Mapping[str, JsonValue]) -> WebSettings:
     """解析 `plugins.web.config`。**异常约定**：任何问题一律 `CONFIG_INVALID` 并带键路径。
 
-    manifest 的 `config_schema` 已经在阶段 A 校验过**形状**（类型、未知键、数值下界），
+    manifest 的 `config_schema` 已经在加载前校验 校验过**形状**（类型、未知键、数值下界），
     这里做的是它表达不了的那些：取值受限的枚举给出「你可以写哪几个」、跨字段依赖
     （`searxng` / `custom` 必须给 `base_url`）、以及上界。
     """

@@ -1,42 +1,12 @@
-"""官方插件 `mcp`：把 MCP server 的工具接进实例（开发方案 `D38-B`）。
+"""官方 MCP 插件：把远端 MCP tools 注册为实例工具。
 
-职责：连上配置好的 MCP server，把它们的工具注册成本实例的 `TOOL` 能力，
-并在调用时转发过去。
-不负责：MCP 的 resources / prompts / sampling（见下面「不做的事」）、
-执行 turn、决定什么时候调这些工具。
+职责：连接配置的 MCP server、发现工具、分配稳定的命名空间名称，并转发调用。
+不负责：MCP resources、prompts、sampling、热重载或 Turn 编排。
 
-**当前范围只包含 MCP tools**：
-
-- 旧实现同时桥接 **tools / resources / prompts** 三种远端对象（三个 wrapper 类）。
-  这里只做 tools：`resources` 与 `prompts` 在新层没有对应的能力种类，把它们也伪装成工具
-  会让模型拿到一堆语义不明的调用（`AGENTS.md` 原则 3「机制优先于功能」）。
-- 旧实现有一条 `RUNTIME_CONTROL_MCP_RELOAD` 的热重载通道。这里没有：registry 解析后
-  只读（`NFR-403`）且首版不热更新（技术方案 §10.4），做一条只在自己这一层成立的
-  「重载」等于让 `karyvia capabilities` 印的东西与实际生效的不一致。改配置后重启实例。
-- 旧实现的工具名去重靠 `hashlib` 生成后缀。这里**撞车的各方都不生效**并记进日志，
-  与 `kernel/registry/resolution.py` 对同名冲突的判定一致：选任何一边都是替用户做决定。
-
-**这个插件是 `D38-A` 命名空间声明机制的第一个使用者**：manifest 只声明一个前缀
-（`CapabilityDecl(kind=TOOL, name="mcp", namespace=True)`），远端工具名要连上 server、
-`list_tools()` 之后才可知，而 manifest 是静态的。
-
-**四条如实记着的边界**，写在这里而不是留给用户发现：
-
-- **`side_effect` 恒为 `UNKNOWN`。** MCP 协议不报告副作用，一个写文件的远端工具与一个
-  只读的在线格式上长得一模一样。因此本插件的每一次调用都对编排层说「不知道外部世界变了
-  没有」，`read_only` 恒为 `False`、`risk` 恒为 `MUTATING`。远端的 `readOnlyHint` 是**它
-  自己说的**，而它正是那个不可信的一方。
-- **插件自己拥有 MCP 连接。** stdio 传输需要长驻子进程与管道，HTTP 传输由 `mcp` SDK
-  自己建立；一次性 `ctx.shell` 和带 SSRF 守卫的 `ctx.net` 都不适合这两种连接。
-  真正的边界是「你配置了哪些 server」。
-- **启动路径上多一次往返。** 连接发生在 `setup()` 里（registry 冻结后只读，没有第二个
-  注册时机），因此每台 server 都会给冷启动加上它自己的连接时间。`connect_timeout_ms`
-  是上界，超时即跳过那台 server。
-- **停止预算是每插件 5000 ms**（`plugins.stop_timeout_ms`）。一台赖着不退的 stdio server
-  会让这个插件的停止超时，`StopOutcome.timed_out` 如实标着——那时进程可能还在跑。
-
-**只 import `karyvia.contracts` 与 `karyvia.sdk`**（依赖规则 `R4`）；`mcp` 只在
-`client.py` 里惰性 import。**`MANIFEST` 在模块顶层且导入无副作用**（技术方案 §7.2）。
+manifest 声明 `mcp` 工具命名空间，因为具体工具名只有连接 server 后才能获知。远端工具
+发生命名冲突时，各方都不生效并记录诊断。MCP 不提供可靠的副作用信息，因此工具统一声明
+为 `MUTATING`，结果的 `side_effect` 为 `UNKNOWN`。插件拥有长连接及 stdio 子进程，连接和
+停止均受配置预算约束。
 """
 
 from __future__ import annotations
@@ -132,7 +102,7 @@ _SERVER_SCHEMA: Final[ManifestJsonSchema] = {
     "additionalProperties": False,
 }
 
-#: `plugins.mcp.config` 的形状。阶段 A 用它校验，`settings.py` 再做它表达不了的那些
+#: `plugins.mcp.config` 的形状。加载前校验 用它校验，`settings.py` 再做它表达不了的那些
 #: （按传输分支的必填项、server 名字能不能归一）。
 #: 标注成 `ManifestJsonSchema` 而不是 `contracts.JsonSchema`：契约那个类型进不了
 #: pydantic 模型（会 `RecursionError`），细节见 `sdk/manifest.py::ManifestJsonValue`。
@@ -161,7 +131,7 @@ MANIFEST: Final = PluginManifest(
     sdk_range=">=5.0.0,<6.0.0",
     setup="karyvia_plugin_mcp:setup",
     capabilities=(
-        # **一条命名空间声明**（`D38-A`）：远端工具名要连上 server 才知道，而 manifest
+        # **一条命名空间声明**：远端工具名要连上 server 才知道，而 manifest
         # 是静态的。零注册是合法的——server 全连不上时本插件一条工具都不注册。
         CapabilityDecl(kind=CapabilityKind.TOOL, name=NAMESPACE, namespace=True),
     ),

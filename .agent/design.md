@@ -17,7 +17,7 @@ Tool 注册、Plugin Runtime、基础配置。用户需求能力一律做成插�
 Browser、MCP、Automation、Multi-Agent 都在这一侧。
 
 `kernel/turn/engine.py` 是核心路径，有 ≤400 行的硬上限和 import 白名单，各有测试盯着。
-**内建与插件同等身份**（`BAS-005`）：它们共用一个 `KaryviaAPI` 实现、同一条加载路径、
+**内建与插件同等身份**：它们共用一个 `KaryviaAPI` 实现、同一条加载路径、
 同一套资源与生命周期边界。写内建时不要另开注册通道——`tests/architecture/test_builtin_no_privilege.py`
 的符号扫描就是为此存在的。
 
@@ -55,5 +55,5 @@ Wire payload、持久化记录、第三方 SDK 对象是不可信的动态边界
 默认值、类型与 `extra="forbid"` 的唯一依据。插件的配置块由自己 manifest 的
 `config_schema` 声明。错误处理抛清晰异常，不静默修正坏输入。
 
-能力的覆盖必须在 manifest 里**显式声明**（`EDG-102`）：覆盖关系永不由加载顺序决定，
+能力的覆盖必须在 manifest 里**显式声明**：覆盖关系永不由加载顺序决定，
 判定只在 `kernel/registry/resolution.py` 一处。

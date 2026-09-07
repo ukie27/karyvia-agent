@@ -1,14 +1,14 @@
-"""输入分流的测试（`D13` 验收表第 2、3 行；`KER-006`、`CMD-002`、`CMD-003`）。
+"""输入分流的测试。
 
 三条主线：
 
-- **`CMD-002`**：命令名与别名的冲突必须在**建索引时**（启动期）就抛出来，不能留到调用期
+- ****：命令名与别名的冲突必须在**建索引时**（启动期）就抛出来，不能留到调用期
   按加载顺序择一。
-- **`CMD-003`**：命令 handler 抛任何异常，都要得到可诊断的 `REJECTED` 结果，而且**同一个
+- ****：命令 handler 抛任何异常，都要得到可诊断的 `REJECTED` 结果，而且**同一个
   dispatcher 紧接着还能正常分流下一条消息**——「会话保持可用」的可断言形态。
 - **四态的边界**：只有以前缀开头才尝试解析；进模型的文本只在会进模型的结论上出现。
 
-命令的执行体在 `builtins/commands_core/`（`D22`），这里用最小的假 handler：本文件测的是
+命令的执行体在 `builtins/commands_core/`，这里用最小的假 handler：本文件测的是
 分流，不是任何具体命令。
 """
 
@@ -160,7 +160,7 @@ def test_prefix_is_configurable() -> None:
 
 
 def test_alias_collision_is_caught_at_startup() -> None:
-    """`CMD-002`：registry 的 MULTI_UNIQUE 只保证命令名唯一，别名撞车要在这里拦下。"""
+    """registry 的 MULTI_UNIQUE 只保证命令名唯一，别名撞车要在这里拦下。"""
     status = CommandSpec(name="status", description="状态", aliases=("st",))
     statistics = CommandSpec(name="statistics", description="统计", aliases=("st",))
     registry = CapabilityRegistry()
@@ -383,11 +383,12 @@ async def test_repeated_parameter_absorbs_the_remaining_arguments() -> None:
     assert handler.calls == 1
 
 
-# --------------------------------------------------------------------------- CMD-003
+  # ---------------------------------------------------------------------------
+
 
 
 async def test_handler_exception_becomes_a_diagnosable_rejection() -> None:
-    """`CMD-003`：命令处理失败必须返回可诊断错误，不得让异常逸出。"""
+    """命令处理失败必须返回可诊断错误，不得让异常逸出。"""
     dispatcher = dispatcher_for((HELP, StubHandler(raises=RuntimeError("内部炸了"))))
 
     outcome = await dispatcher.dispatch(message("/help"), CORRELATION, CancelToken())

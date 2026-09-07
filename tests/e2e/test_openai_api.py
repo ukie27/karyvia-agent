@@ -1,6 +1,6 @@
-"""OpenAI 兼容接口的端到端验收（`D31`）。
+"""OpenAI 兼容接口的端到端验收。
 
-职责：验被删掉的 `legacy/api/server.py` 的两条对外承诺在新 Kernel 上仍然成立——
+职责：验证 OpenAI 兼容 API 的两条核心对外承诺——
 `POST /v1/chat/completions`（流式与非流式）与 `GET /v1/models` 能完成一次真实 turn。
 不负责：插件内部形状（插件自己的 `tests/`）、装配链结构（`tests/runtime/`）。
 

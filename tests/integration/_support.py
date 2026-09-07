@@ -9,16 +9,16 @@ Hook / 工具 / Context Provider / 命令索引，再装成 `TurnOrchestrator`�
 Fake（`RecordingToolInvoker` / `RecordingHookDispatcher`），因为它要单独测编排的决定。
 这里恰好相反——`ToolExecutor`、`HookRouter`、`Dispatcher`、`SessionScheduler`、
 `DedupCache`、`EventBus` 全是生产实现，Fake 只出现在**能力边界**上（模型、会话存储、
-工具、Context Provider）。D15 要暴露的正是这条真实装配链上的问题。
+工具、Context Provider）。 要暴露的正是这条真实装配链上的问题。
 
 **能力经真 Host 注册再由 `*_from(registry)` 取回**，而不是直接把列表塞进
-`OrchestratorDeps`：`D14` 定死的四个注册载荷形状（`RegisteredHook` /
+`OrchestratorDeps`： 定死的四个注册载荷形状（`RegisteredHook` /
 `RegisteredContextProvider` / `RegisteredTool` / `RegisteredCommand`）只有走这条路才会被
-真正核对。**`D16` 之后这里用的就是生产 Host（`kernel.plugins.CapabilityHost`）**——
-`D15` 时它还是手写的 `batch.add(...)`，那是权宜；留着两套注册路径就等于让集成测试证明的
+真正核对。**这里使用生产 Host（`kernel.plugins.CapabilityHost`）**——
+ 时它还是手写的 `batch.add(...)`，那是权宜；留着两套注册路径就等于让集成测试证明的
 是一条没人会走的路。模型与会话存储仍直接注入 `OrchestratorDeps`：`kernel/turn/` 至今没有
-`model_from()` / `session_store_from()` 那样的槽位（取回函数本身 `D16` 已补在
-`kernel/plugins/capabilities.py`，接进 deps 是 `D23` 装配根的事）。
+`model_from` / `session_store_from` 那样的槽位（取回函数本身  已补在
+`kernel/plugins/capabilities.py`，接进 deps 是  装配根的事）。
 """
 
 from __future__ import annotations
@@ -269,7 +269,7 @@ def handled(content: str, *fragments: ContextFragment) -> CommandResult:
 
 
 def continued(rewritten: str, *fragments: ContextFragment) -> CommandResult:
-    """一条改写输入后继续进模型的命令（`Disposition.COMMAND_CONTINUE`、`CMD-004`）。"""
+    """一条改写输入后继续进模型的命令（`Disposition.COMMAND_CONTINUE`）。"""
     return CommandResult(
         disposition=Disposition.COMMAND_CONTINUE,
         rewritten_input=rewritten,
@@ -370,8 +370,7 @@ def wire(
         batch.commit()
 
     report = resolve_into(registry)
-    # 冲突就地失败：一个装不起来的实例继续跑下去，后面的断言全部失去意义（`CMD-002`
-    # 的「启动期报错」在真实装配里也是这个位置）。
+    # 冲突就地失败：一个装不起来的实例继续跑下去，后面的断言全部失去意义。
     report.raise_if_failed()
 
     bus = EventBus(INSTANCE)

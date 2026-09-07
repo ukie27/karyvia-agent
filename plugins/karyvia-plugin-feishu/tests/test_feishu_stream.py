@@ -1,4 +1,4 @@
-"""CardKit 流式状态机的验收（`MSG-005`、`EDG-304`，开发方案 `D34`）。
+"""CardKit 流式状态机的验收。
 
 | 验收项 | 测试 |
 | --- | --- |
@@ -93,14 +93,14 @@ class TestHappyPath:
         assert stream.active() == 0
 
     async def test_a_new_turn_gets_a_new_card(self) -> None:
-        """旧卡片原样留着——它自己的终态已经带过 `EDG-304` 标记了。"""
+        """旧卡片原样留着——它自己的终态已经带过  标记了。"""
         stream, cards, _, _ = build()
         await stream.handle(outbound("一轮", state=StreamState.DELTA, turn="t1"))
         await stream.handle(outbound("二轮", state=StreamState.DELTA, turn="t2"))
         assert sum(1 for op, _, _ in cards.calls if op == "create") == 2
 
     async def test_different_conversations_use_different_buffers(self) -> None:
-        """`D33` 的泵按 conversation 扇出，各条 lane 只碰自己那个键，因此不用加锁。"""
+        """ 的泵按 conversation 扇出，各条 lane 只碰自己那个键，因此不用加锁。"""
         stream, _, _, _ = build()
         await stream.handle(outbound("A", state=StreamState.DELTA, conversation="oc_a"))
         await stream.handle(outbound("B", state=StreamState.DELTA, conversation="oc_b"))

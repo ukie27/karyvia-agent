@@ -1,11 +1,11 @@
-"""诊断的三个只读查询：能力、插件、单个 turn（技术方案 §6.8；`PLG-006`、`OBS-002`、`OBS-004`）。
+"""诊断的三个只读查询：能力、插件、单个 turn。
 
 职责：把「谁提供了这项能力」「这个插件现在什么状态」「这个 turn 发生了什么」三个问题
-收敛到一份实现上，供 `karyvia capabilities` / `karyvia plugins`（`D29`）与会话内 `/plugins` 共用。
+收敛到一份实现上，供 `karyvia capabilities` / `karyvia plugins`与会话内 `/plugins` 共用。
 不负责：产生这些数据（能力来自 `kernel/registry`，插件状态来自 `kernel/plugins`
-（`D25`–`D27`），事件来自 `MemoryRingSink`）、修改任何状态、格式化终端输出。
+，事件来自 `MemoryRingSink`）、修改任何状态、格式化终端输出。
 
-`karyvia plugins enable` 与会话内 `/plugins` 是两个刻意分开的 surface（技术方案 §4.2）：
+`karyvia plugins enable` 与会话内 `/plugins` 是两个刻意分开的 surface：
 前者改配置、后者只读查询，但**读的是这一份实现**，不各写一套。
 """
 
@@ -31,7 +31,7 @@ class PluginState(StrEnum):
     """插件的可观测状态。
 
     取值直接对应 `contracts.EventName` 的 plugin 族，**不发明第二套生命周期 taxonomy**：
-    插件的阶段划分是 `D25`/`D27` 的事，`D12` 只负责显示它。多出来的 `DISABLED` 不是阶段
+    插件的阶段划分是 / 的事， 只负责显示它。多出来的 `DISABLED` 不是阶段
     而是配置结论，与 `ResolutionReport.disabled` 同义。
     """
 
@@ -92,21 +92,21 @@ class Diagnostics:
     plugins_source: Callable[[], Sequence[PluginStatus]] = field(default=_no_plugins)
 
     def capabilities(self) -> ResolutionReport:
-        """每项能力最终由内建还是哪个插件提供（`PLG-006`）。"""
+        """每项能力最终由内建还是哪个插件提供。"""
         return self.capabilities_source()
 
     def plugins(self) -> tuple[PluginStatus, ...]:
         """每个插件的状态、版本、已注册能力、失败原因与失败阶段。
 
-        插件运行时（`D25`–`D27`）落地前默认为空元组——空列表与「查询未接线」在这里
+        插件运行时落地前默认为空元组——空列表与「查询未接线」在这里
         没有区别，因为此刻确实一个插件都没有。
         """
         return tuple(self.plugins_source())
 
     def turn(self, turn_id: TurnId) -> tuple[RuntimeEvent, ...]:
-        """该 turn 的事件序列，按 `sequence` 升序（`OBS-002`）。
+        """该 turn 的事件序列，按 `sequence` 升序。
 
-        只查内存环，不回读 JSONL：环是「供 CLI 与诊断查询」的那一个（技术方案 §6.8），
+        只查内存环，不回读 JSONL：环是「供 CLI 与诊断查询」的那一个，
         而回读日志文件会让一个只读查询变成 IO 路径。事件不在环里时返回空元组，
         `dropped_events` 说得出那是因为被挤掉了还是本来就没有。
         """
@@ -114,7 +114,7 @@ class Diagnostics:
 
     @property
     def dropped_events(self) -> int:
-        """内存环因容量上限丢弃的事件数。turn 查不到时先看这个（`NFR-404`）。"""
+        """内存环因容量上限丢弃的事件数。turn 查不到时先看这个。"""
         return self.events.dropped
 
     def to_json(self) -> dict[str, JsonValue]:

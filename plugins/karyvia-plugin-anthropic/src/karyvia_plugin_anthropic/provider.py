@@ -1,9 +1,9 @@
-"""Anthropic 原生 Messages API 的 `ModelProvider` 实现（开发方案 `D32`）。
+"""Anthropic 原生 Messages API 的 `ModelProvider` 实现。
 
 职责：实现 `describe` / `complete` / `stream`，管理 httpx 客户端与取消检查点；
 同时提供插件注册入口 `setup(api)`。
 不负责：线格式翻译（`wire.py` / `decode.py`）、错误分类（`faults.py`）、
-配置校验（`settings.py`）、续写与重试策略（编排层，技术方案 §6.2.2）。
+配置校验（`settings.py`）、续写与重试策略。
 
 四条决定了本模块形状的规则：
 
@@ -12,11 +12,11 @@
   地反复构造 provider 并真的发起请求，没有这个注入口，「测试不依赖真实网络」就只能是
   一句承诺。顺带地，宿主发行版因此不必再依赖 `anthropic`。
 - **凭据只从 `ctx.secret("api_key")` 来。** 明文只在拼认证头的那一行经 `reveal()` 取出，
-  不进配置、不进 `detail`、不进事件（`MOD-002`、`CFG-003`）。
+  不进配置、不进 `detail`、不进事件。
 - **直接用 httpx 而不是 `ctx.net`。** `HttpAccess` 的 SSRF 守卫会拒绝私有网段，而中转与
   本地 relay 正是本插件的交付要点。资源门面是插件可以复用的受约束实现，不是可信插件
   必须经过的授权代理。
-- **流式中途失败必须先 `yield DONE(ERROR)` 再抛**（`protocols.py` 写死、`EDG-304`）。
+- **流式中途失败必须先 `yield DONE(ERROR)` 再抛**（`protocols.py` 写死）。
   `kernel/turn/folding.py` 据此把已收到的文本按 `interrupted=True` 落库，而不是把半截
   输出当成完整答案。
 """
@@ -66,7 +66,7 @@ __all__ = [
 ]
 
 _STREAMING_UNSUPPORTED: Final = (
-    "配置未声明该模型支持流式，本 Provider 不会自行降级为一次性返回（MOD-005）。"
+    "配置未声明该模型支持流式，本 Provider 不会自行降级为一次性返回。"
 )
 _BAD_JSON_BODY: Final = "供应商返回的响应体不是合法 JSON。"
 _STREAM_STALLED: Final = "模型流式响应中断：超过空闲上限没有收到新分片。"
@@ -190,7 +190,7 @@ class AnthropicModelProvider:
     # -------------------------------------------------------------------- 契约方法
 
     def describe(self, model_id: str) -> ModelInfo:
-        """声明该模型的能力与窗口（`MOD-001`）。
+        """声明该模型的能力与窗口。
 
         **异常约定**：`models` 白名单非空且不含该模型时抛 `CAPABILITY_MISSING`。
         **取消语义**：同步方法，不涉及取消；且**不发网络请求**——它在预算推导路径上。
@@ -239,7 +239,7 @@ class AnthropicModelProvider:
 
         **异常约定**：同 `complete()`；**已经 yield 过分片后再失败，必须先 yield 一个
         `DONE(ERROR)` 再抛**，让消费方把已收到的文本按 `interrupted=True` 落库
-        （`EDG-304`）。配置未声明 `streaming` 时抛 `CAPABILITY_MISSING`，不自行降级。
+        。配置未声明 `streaming` 时抛 `CAPABILITY_MISSING`，不自行降级。
         **取消语义**：每读一片前检查 `cancel`；已 yield 的分片由调用方保留。
         """
         info = self._settings.describe(request.model_id)
@@ -357,7 +357,7 @@ def setup(api: KaryviaAPI) -> None:
     """插件注册入口，manifest 的 `setup` 指向它。
 
     配置与凭据都在这里解析一次，不拖到第一次 turn：一份写错的配置应当在
-    `karyvia plugins list` 里就看得见（`D18` 的先例）。
+    `karyvia plugins list` 里就看得见。
     """
     settings = resolve_settings(api.ctx)
     provider = AnthropicModelProvider(settings, credential=read_credential(api.ctx, settings))

@@ -6,7 +6,7 @@
 
 **为什么自己写而不依赖 croniter。** CI 用 `--no-deps` 装插件（`AGENTS.md` 的开发命令段
 写着这是刻意的），依赖 croniter 会让所有涉及表达式的用例在 CI 环境里跑不起来；而 5 字段
-cron 的语法是可穷举的，算法也就是「按位判定 + 逐日推进」。这与 `D32` 拒掉四张按模型名
+cron 的语法是可穷举的，算法也就是「按位判定 + 逐日推进」。这与  拒掉四张按模型名
 gating 的表是同一档判断：能用一段可测试的纯函数表达的东西，不值得换一个依赖。
 
 **支持的语法**：`*`、`n`、`a-b`、`a-b/n`、`*/n`、逗号列表，以及月份与星期的三字母英文名
@@ -60,7 +60,7 @@ _MONTH_NAMES: Final[dict[str, int]] = {
         start=1,
     )
 }
-#: 星期名。`0` 是周日（POSIX cron 的约定），因此 `sun` 排在最前。
+#: 星期名。`0` 是周日（POSIX cron当前约定），因此 `sun` 排在最前。
 _WEEKDAY_NAMES: Final[dict[str, int]] = {
     name: index
     for index, name in enumerate(("sun", "mon", "tue", "wed", "thu", "fri", "sat"))

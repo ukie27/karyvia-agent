@@ -1,18 +1,18 @@
-"""插件清单：把发现出来的候选翻译成已校验的 manifest（技术方案 §7.1–§7.3 阶段 A 前段）。
+"""插件清单：把发现出来的候选翻译成已校验的 manifest。
 
 职责：按 `plugins.enabled` / `plugins.disable` 决定哪些候选值得读，读到的原始数据经
 `sdk.parse_manifest()` 变成 `PluginManifest`，再判定 id 一致、平台匹配与 `sdk_range`
 兼容；产出可直接喂给诊断的 `PluginInventory`。
 不负责：发现候选（`kernel/plugins/discovery.py`）、导入 `setup` 与注册能力
-（`D27`，走 `runtime/wiring.py` 那条既有路径）、依赖拓扑、`config_schema` 逐字段校验、
+（走 `runtime/wiring.py` 那条既有路径）、依赖拓扑、`config_schema` 逐字段校验、
 插件运行上下文的构造。
 
 **这是 `R5` 的落点**，与 `wiring.py` / `introspection.py` 同一条理由：manifest 的类型与
 校验在 `sdk/`，而 `R2` 禁止 `kernel/` import 它，因此「候选 → manifest」的翻译只能发生在
-唯一同时看得见两侧的这一层。`kernel/` 里不出现第二套 manifest 校验（`D06` 的约定）。
+唯一同时看得见两侧的这一层。`kernel/` 里不出现第二套 manifest 校验（约定）。
 
 **启用判定发生在读取之前**（§7.1 的「发现与启用分离」）：未列入 `plugins.enabled` 的候选
-连 manifest 都不读，因此不产生任何导入开销（`NFR-401`、`DST-002`）。可观察的后果是
+连 manifest 都不读，因此不产生任何导入开销。可观察的后果是
 它们的 `version` 是空串——那不是漏填，正是这条设计的证据。
 
 `plugins.disable` 压过 `plugins.enabled`：被禁用的候选不读取 manifest，因此插件代码、
@@ -71,7 +71,7 @@ _SKIP_REASONS: Mapping[SkipReason, str] = {
 
 @dataclass(frozen=True, slots=True)
 class DiscoveredPlugin:
-    """一个已启用且 manifest 校验通过的插件。`D27` 的加载计划就从这些开始。"""
+    """一个已启用且 manifest 校验通过的插件。 的加载计划就从这些开始。"""
 
     candidate: PluginCandidate
     manifest: PluginManifest
@@ -97,7 +97,7 @@ class PluginFailure:
 
 @dataclass(frozen=True, slots=True)
 class PluginInventory:
-    """一次发现 + 阶段 A 前段校验的完整产物。
+    """一次发现 + 加载前校验 前段校验的完整产物。
 
     三段分开而不是塞进一个 union：诊断要同时回答「哪些会被加载」「哪些没被加载、为什么」
     「哪里写错了」，而这三个问题的补救动作完全不同。
@@ -110,8 +110,8 @@ class PluginInventory:
     def statuses(self) -> tuple[PluginStatus, ...]:
         """投影成 `Diagnostics.plugins_source` 要的形状，按 id 排序。
 
-        状态只用 `PluginState` 已有的取值（`D12` 定死「不发明第二套生命周期 taxonomy」）：
-        已校验但尚未加载仍是 `DISCOVERED`——`LOADED` 要等 `D27` 真的跑过 `setup`。
+        状态只用 `PluginState` 已有的取值：
+        已校验但尚未加载仍是 `DISCOVERED`——`LOADED` 要等  真的跑过 `setup`。
         """
         rows: list[PluginStatus] = [
             PluginStatus(
@@ -171,7 +171,7 @@ def _as_manifest(candidate: PluginCandidate, raw: object) -> PluginManifest:
 
     两种形态都接受：entry point 可以交出 `Mapping`，也可以交出插件自己构造好的
     `PluginManifest`。后者已经过 pydantic 校验，原样采纳；前者一律走
-    `parse_manifest()`——那是不可信输入的**唯一**入口（`CMP-001`：失败带字段路径）。
+    `parse_manifest`——那是不可信输入的**唯一**入口（失败带字段路径）。
     """
     if isinstance(raw, PluginManifest):
         return raw

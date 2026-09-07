@@ -1,7 +1,7 @@
-"""会话记录与 turn 账本：一次 turn 产生了什么、其中哪些进历史（技术方案 §10.2 第 11 步）。
+"""会话记录与 turn 账本：一次 turn 产生了什么、其中哪些进历史。
 
 职责：`Transcript` 把一次 turn 的用户输入、assistant 正文与工具结果折成 `SessionMessage`
-序列，并在持久化边界执行 `D07` 基线记下的三条编排决定；`TurnState` 是编排期的可变账本
+序列，并在持久化边界执行  基线记下的三条编排决定；`TurnState` 是编排期的可变账本
 （已产出的文本、待发的出站消息、命令注入的片段）。
 不负责：真的写盘（`SessionStore.append`）、决定终态、发事件——那些在 `orchestrator.py`。
 
@@ -15,7 +15,7 @@
    `tool_result_max_bytes`（engine 的 `folding.py`），但历史是长期资产：一次配置调小
    之后，旧记录仍然按旧上限躺在文件里，重放时会把预算撑爆。
 
-与旧实现的一处差异：assistant 的 `tool_calls` **不进 `SessionMessage`**（契约层没有这个
+assistant 的 `tool_calls` **不进 `SessionMessage`**（契约层没有这个
 字段）。工具往返仍然完整写进历史供 `/session` 与诊断查看，但
 `context_builder.replay_messages()` 重放时跳过 `role=TOOL` 的记录——见那里的说明。
 """
@@ -124,7 +124,7 @@ class Transcript:
         )
 
     def mark_interrupted(self) -> None:
-        """把最后一条 assistant 记录标成中断（`EDG-304`：不得当作完整回答）。"""
+        """把最后一条 assistant 记录标成中断（不得当作完整回答）。"""
         for index in range(len(self._body) - 1, -1, -1):
             record = self._body[index]
             if record.role is Role.ASSISTANT:
@@ -166,11 +166,11 @@ class TurnState:
     pending: list[str] = field(default_factory=list)
     #: 分流之后真正要送进模型的输入（可能来自多条被合并的消息）。
     model_inputs: list[ModelInput] = field(default_factory=list)
-    #: 命令注入的上下文片段（`CMD-004`）。
+    #: 命令注入的上下文片段。
     fragments: list[ContextFragment] = field(default_factory=list)
     #: 已发出的中间帧，终帧不在其中——终帧由 `_finish` 单独产出。
     emitted: list[OutboundMessage] = field(default_factory=list)
-    #: 本轮工具产出的、要随终帧发给用户的附件（`D47`）。按到达顺序，已去重、已封顶。
+    #: 本轮工具产出的、要随终帧发给用户的附件。按到达顺序，已去重、已封顶。
     attachments: list[AttachmentRef] = field(default_factory=list)
     #: 因为撞上 `MAX_ATTACHMENTS` 而没能带上的附件条数。**不是静默丢弃**：调用方要据此
     #: 报一条诊断，否则用户看到的是「有几张图没发出来」而日志里一个字都没有。
@@ -178,7 +178,7 @@ class TurnState:
     #: 模型给出的最终答复（没有 tool_calls 的那一轮）。
     final: str = ""
     ledger: BudgetLedger | None = None
-    #: `True` 表示答案因 `MAX_TOKENS` 停止被截断（`EDG-304`）。由 orchestrator 在
+    #: `True` 表示答案因 `MAX_TOKENS` 停止被截断。由 orchestrator 在
     #: 处理 `TurnCompleted` 事件时赋值，`_finish` 据此把出站消息改为 `CANCELLED` 状态。
     truncated: bool = False
     #: 本轮请求压缩与初始 Session 水位的映射；没有模型输入的命令 Turn 不创建。

@@ -1,10 +1,10 @@
-"""`D23` 生产级 `PluginContext`：配置块、状态目录、凭据、事件桥与两个门面。
+""" 生产级 `PluginContext`：配置块、状态目录、凭据、事件桥与两个门面。
 
 职责：验资源门面、`ctx.secret()` 的两种结局、事件桥
 把同步 bus 接到异步 handler 上的规则、`instance` / `turns` 在就绪之前不可用。
 不负责：验装配根怎么构造它（`test_bootstrap.py`）。
 
-**哨兵贯穿全文**：明文凭据不得出现在任何一条错误、`repr` 或事件序列化里（`MOD-002`）。
+**哨兵贯穿全文**：明文凭据不得出现在任何一条错误、`repr` 或事件序列化里。
 """
 
 from __future__ import annotations
@@ -115,7 +115,7 @@ def test_a_missing_secret_reports_its_config_pointer(tmp_path: Path) -> None:
 
 
 def test_an_unexported_variable_reports_only_its_name(tmp_path: Path) -> None:
-    """`EDG-502`：错误里只有变量名与位置，没有任何值。"""
+    """错误里只有变量名与位置，没有任何值。"""
     ctx = make_ctx(tmp_path, secrets={"api_key": "${NOPE}"}, env={})
     with pytest.raises(KaryviaError) as caught:
         ctx.secret("api_key")
@@ -157,7 +157,7 @@ async def test_only_the_subscribed_event_is_delivered(tmp_path: Path) -> None:
         calls += 1
 
     ctx.events.subscribe(EventName.INSTANCE_READY, handler)
-    # 同一个 handler 重复订阅同一事件视为一次（`EventSubscriber` 的约定）。
+    # 同一个 handler 重复订阅同一事件视为一次（`EventSubscriber`当前约定）。
     ctx.events.subscribe(EventName.INSTANCE_READY, handler)
     ctx.bridge._bus.publish(EventName.INSTANCE_STOPPING)  # noqa: SLF001
     ctx.bridge._bus.publish(EventName.INSTANCE_READY)  # noqa: SLF001
@@ -178,12 +178,12 @@ def test_publishing_without_a_loop_is_counted_not_crashed(tmp_path: Path) -> Non
     assert ctx.bridge.dropped == 1
 
 
-# ---------------------------------------------------------- 同步 handler（`D41`）
+# ---------------------------------------------------------- 同步 handler
 #
-# `sdk.EventHandler` 从 `D41` 起同时接受同步与协程两种形状。补这三条之前，同步 handler
+# `sdk.EventHandler` 当前同时接受同步与协程两种形状。补这三条之前，同步 handler
 # 会先被正常调用、再在一条无人认领的 Task 里 `await None` 抛 `TypeError`——官方插件
 # `feishu`（工具提示）与 `openai-api`（用量统计）注册的都是同步 handler，两处因此一直在
-# 每个事件上多产一条异常 Task。**测试测不到、类型能看见**，与 `D39` 那次同一类。
+# 每个事件上多产一条异常 Task。**测试测不到、类型能看见**，与  那次同一类。
 
 
 async def test_events_reach_a_sync_handler(tmp_path: Path) -> None:

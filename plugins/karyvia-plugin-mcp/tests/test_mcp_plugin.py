@@ -107,7 +107,7 @@ class TestBridgedTool:
         assert result.error.code is ErrorCode.TIMEOUT_TOOL_CALL
 
     async def test_a_transport_error_reports_only_the_exception_type(self) -> None:
-        """第三方 server 的异常文本可能带着它自己的凭据（`D13` 的先例）。"""
+        """第三方 server 的异常文本可能带着它自己的凭据。"""
         session = FakeSession(error=RuntimeError("token=sk-abcdefghijklmnop failed"))
         result = await _call(_bridged(session))
         assert result.error is not None
@@ -275,6 +275,7 @@ class TestRegistration:
         ctx = McpContext(config={"servers": {"files": {"type": "stdio"}}})
         with pytest.raises(KaryviaError) as caught:
             await register(RecordingApi(ctx), ctx, FakeConnector())  # pyright: ignore[reportArgumentType]
+
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
 
@@ -295,6 +296,7 @@ class TestLifecycle:
         ctx = McpContext(config={"servers": {"files": {"type": "stdio", "command": "a"}}})
         try:
             await register(RecordingApi(ctx), ctx, FakeConnector())  # pyright: ignore[reportArgumentType]
+
             await asyncio.sleep(0)
             assert not ctx.spawned[0].done()
         finally:
@@ -317,7 +319,7 @@ class TestLifecycle:
 
 class TestManifest:
     def test_it_declares_exactly_one_namespace(self) -> None:
-        """`D38-A` 机制的第一个使用者：远端工具名要连上 server 才知道。"""
+        """ 机制的第一个使用者：远端工具名要连上 server 才知道。"""
         assert len(MANIFEST.capabilities) == 1
         decl = MANIFEST.capabilities[0]
         assert (decl.kind, decl.name, decl.namespace) == (CapabilityKind.TOOL, NAMESPACE, True)

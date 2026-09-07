@@ -4,13 +4,13 @@
 配置键常量与线格式翻译。
 不负责：实现细节（在 `provider.py` / `wire.py` / `settings.py` / `faults.py`）、声明自己
 （manifest 在 `builtins/registry.py`，那是内建能力唯一的发现来源）、续写与重试策略
-（编排层，技术方案 §6.2.2）。
+。
 
-**选 OpenAI 兼容协议的依据**（技术方案 §15 第 5 项）：覆盖面最广——OpenAI、Azure、本地
-vLLM / Ollama / LM Studio 与多数中转服务都兼容，`BAS-001` 的「配置一份凭据就能用」因此
+**选 OpenAI 兼容协议的依据**：覆盖面最广——OpenAI、Azure、本地
+vLLM / Ollama / LM Studio 与多数中转服务都兼容， 的「配置一份凭据就能用」因此
 对最多用户成立；协议本身简单，工具调用语义稳定。Anthropic 原生等其余 provider 走插件。
 
-**按 `MOD-005` 显式列出不支持项**：默认只声明 `tool_calls` 与 `streaming`。图像/音频输入、
+**按  显式列出不支持项**：默认只声明 `tool_calls` 与 `streaming`。图像/音频输入、
 结构化输出、扩展 thinking 与 prompt caching 都需要本实现没有的线格式支持，因此从
 `capabilities` 里**缺席**——缺席即由 Kernel 报能力缺失，绝不静默降级后假装支持。
 """

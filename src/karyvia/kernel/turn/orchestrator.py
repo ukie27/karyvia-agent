@@ -228,7 +228,7 @@ class TurnOrchestrator:
         if routed is not None:
             return routed
         if not state.model_inputs:
-            # 命令类 turn：不进模型，但事件流与终态一个都不少（`KER-010`）。
+            # 命令类 turn：不进模型，但事件流与终态一个都不少。
             return await finish_turn(deps, state, self._outcome(state))
 
         snapshot = await deps.sessions.load(key)
@@ -449,7 +449,7 @@ class TurnOrchestrator:
         )
 
     def _report(self, state: TurnState, error: KaryviaError) -> None:
-        """非致命失败的统一去向：一条 `plugin.failed`，turn 继续（`NFR-204`）。"""
+        """非致命失败的统一去向：一条 `plugin.failed`，turn 继续。"""
         self._deps.bus.publish(
             EventName.PLUGIN_FAILED, correlation=state.correlation, error=error
         )

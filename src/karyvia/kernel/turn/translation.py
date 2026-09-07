@@ -1,12 +1,12 @@
-"""翻译表：引擎事件 → `EventName` / `TurnOutcome` / `StreamState`（技术方案 §6.6、§10.2）。
+"""翻译表：引擎事件 → `EventName` / `TurnOutcome` / `StreamState`。
 
-职责：把 `D09` 的 9 个引擎事件与 4 个终态映射到 `contracts` 的事件名、出站流式状态与
+职责：把的 9 个引擎事件与 4 个终态映射到 `contracts` 的事件名、出站流式状态与
 `TurnOutcome`，并把逸出的异常折成带码的 `KaryviaError`。
 不负责：发布事件、决定何时翻译、构造出站消息——那些在 `orchestrator.py`；本模块是纯函数
 与常量表，不含 IO。
 
 **单独成模块是因为它必须是唯一的一份**。同一个引擎事件在两处各翻译一次，事件流就会出现
-两套口径，而 `OBS-002` 的按序重放正建立在「一个事件名只对应一件事」之上。表以字面量写在
+两套口径，而的按序重放正建立在「一个事件名只对应一件事」之上。表以字面量写在
 这里、以字面量断言在测试里，改表必须同时改两处。
 """
 
@@ -60,8 +60,8 @@ TOOL_EVENT_NAMES: Final[dict[ToolDisposition, EventName]] = {
     ToolDisposition.UNKNOWN_TOOL: EventName.TOOL_CALL_FAILED,
 }
 
-#: 四个终态各有自己的事件名。`turn.stopped_by_limit` 是 `D12` 为此补入的——用
-#: `turn.completed` 承载会让「模型说完了」与「撞上预算」不可区分（`EDG-304`）。
+#: 四个终态各有自己的事件名。`turn.stopped_by_limit` 是  为此补入的——用
+#: `turn.completed` 承载会让「模型说完了」与「撞上预算」不可区分。
 TERMINAL_EVENT_NAMES: Final[dict[TurnStatus, EventName]] = {
     TurnStatus.COMPLETED: EventName.TURN_COMPLETED,
     TurnStatus.FAILED: EventName.TURN_FAILED,
@@ -162,7 +162,7 @@ def outcome_for_error(
 
     **取消不是失败**：`CancelToken.checkpoint()` 抛出的是 `CANCELLED` 类的 `KaryviaError`，
     把它当成 `FAILED` 会让「用户按了 Ctrl-C」在诊断与 `TurnOutcome` 里长得像「turn 崩了」，
-    而 `EDG-304` 要求四个终态可区分。分类只查 `ErrorCategory`，不认具体错误码——
+    而  要求四个终态可区分。分类只查 `ErrorCategory`，不认具体错误码——
     `CANCEL_REASON_CODES` 是多对一的，reason 由 `_REASON_BY_CODE` 反查。
     """
     karyvia = as_karyvia(error)
@@ -212,7 +212,7 @@ def outcome_without_engine(
 def as_karyvia(error: Exception) -> KaryviaError:
     """把逸出的异常折成带码的错误。
 
-    只留类型名不留消息：第三方实现的异常文本可能带着凭据（`D13` 的 dispatcher 有哨兵
+    只留类型名不留消息：第三方实现的异常文本可能带着凭据（ dispatcher 有哨兵
     测试盯着同一条规则）。
     """
     if isinstance(error, KaryviaError):

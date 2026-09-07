@@ -9,7 +9,7 @@ CI 用 `--no-deps` 装插件，而本模块只在真的要连一个 server 时�
 唯一需要碰它的用例是「没装它时说什么」。
 
 **`mcp` 惰性 import**：一个启用了本插件但一台 server 都没配的实例，不该为它付
-导入开销（`NFR-405`）。
+导入开销。
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ class SdkSession:
     """把 `mcp.ClientSession` 包成本插件的 `McpSession`。
 
     **SDK 对象到这里为止**：`list_tools()` / `call_tool()` 交出去的全是本插件自己的
-    frozen dataclass（`MSG-004` 的同一条精神）。`Any` 只出现在这一层，每一处都带
+    frozen dataclass（同一条精神）。`Any` 只出现在这一层，每一处都带
     `# boundary:`。
     """
 
@@ -156,6 +156,7 @@ def _parts_of(raw: object) -> tuple[Mapping[str, JsonValue], ...]:
     自动成立（认不出的类型会得到一行「有一个 X 类型的部件」）。
     """
     content: Any = getattr(raw, "content", ()) or ()  # boundary: SDK 无类型
+
     parts: list[Mapping[str, JsonValue]] = []
     for part in content:
         dump = getattr(part, "model_dump", None)

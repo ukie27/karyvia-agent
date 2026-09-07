@@ -1,11 +1,11 @@
-"""`shell.exec`：在 workspace 内执行一条 shell 命令（技术方案 §8.2 的第 6 个工具）。
+"""`shell.exec`：在 workspace 内执行一条 shell 命令。
 
 职责：`shell.exec` 的 `ToolSpec` 与 `ToolHandler` 实现——参数校验、cwd 判定、调用
 `process.run_process()`、把产出折成 `ToolResult`。
 不负责：进程与取消宽限期（`process.py`）、argv 构造（`command.py`）、环境变量
 （`environ.py`）、cwd 边界判定（`paths.py`）、注册（`registration.py`）。
 
-**`side_effect` 的三档判定只在这一处**（`EDG-401`、`EDG-407`）：
+**`side_effect` 的三档判定只在这一处**：
 
 | 收场 | `side_effect` | 依据 |
 |---|---|---|
@@ -60,7 +60,7 @@ __all__ = ["EXEC_SPEC", "ShellExecutor", "render_output"]
 
 _EXEC_ARGUMENTS: Final = ("command", "cwd")
 
-#: 截断标记。与 `tools_fs.content` 的那份形状一致（`NFR-605`：两个工具包给模型看到的
+#: 截断标记。与 `tools_fs.content` 的那份形状一致（两个工具包给模型看到的
 #: 截断提示是同一种），但各写一份——两个内建是各自独立的提供方，见 `paths.py` 的理由。
 _TRUNCATION_MARKER: Final = "\n… [truncated: 已显示 {shown}/{total} 字符]"
 
@@ -89,7 +89,7 @@ EXEC_SPEC: Final = ToolSpec(
         "required": ["command"],
         "additionalProperties": False,
     },
-    # 只读为假、风险最高档：一条命令能删掉整个 workspace，而 `TOL-004` 的确认策略要拦的
+    # 只读为假、风险最高档：一条命令能删掉整个 workspace，而的确认策略要拦的
     # 正是这一档。「大多数命令其实只是 ls」不构成降级理由——降级意味着**所有**命令都不
     # 再被确认策略看见。
     read_only=False,
@@ -177,7 +177,7 @@ def render_output(result: ProcessResult) -> str:
 class ShellExecutor:
     """`shell.exec` 的 handler。
 
-    **约定不抛**（`TOL-002`）：逸出的异常会被 Kernel 记成 `side_effect=UNKNOWN`，而这里
+    **约定不抛**：逸出的异常会被 Kernel 记成 `side_effect=UNKNOWN`，而这里
     大多数失败发生在进程启动之前，那时 `NONE` 才是实话。折叠在 `execute()` 一处完成。
     """
 
@@ -206,7 +206,7 @@ class ShellExecutor:
         """执行一次调用。**约定不抛**，见类 docstring。
 
         **取消语义**：入口检查一次，执行期间由 `process.run_process()` 轮询；取消或超时
-        都走「终止信号 → 宽限期 → 强杀」，宽限期用尽时 `side_effect=UNKNOWN`（`EDG-407`）。
+        都走「终止信号 → 宽限期 → 强杀」，宽限期用尽时 `side_effect=UNKNOWN`。
         """
         started = time.perf_counter()
         call_id = invocation.call.call_id
@@ -269,7 +269,7 @@ class ShellExecutor:
         }
 
         if result.grace_expired:
-            # 宽限期用尽被强杀：`UNKNOWN` 的正主（`EDG-407`）。错误码按触发原因分——
+            # 宽限期用尽被强杀：`UNKNOWN` 的正主。错误码按触发原因分——
             # 超时与用户取消的善后动作相同，但诊断要分得开。
             error = KaryviaError(
                 ErrorCode.TIMEOUT_TOOL_CANCEL,
@@ -328,7 +328,7 @@ class ShellExecutor:
 
         **`trust=SYSTEM`**：正文是本层自己写的错误文案，一个字节的子进程输出都没有
         （进程压根没起来）。另外三条结果保持默认的 `UNTRUSTED`——它们带的是 stdout /
-        stderr，那正是「工具结果里的外部内容」最典型的样子（`D42`）。
+        stderr，那正是「工具结果里的外部内容」最典型的样子。
         """
         content, truncated = _truncate(error.user_message, min(limit, MAX_TOOL_RESULT_LENGTH))
         return ToolResult(

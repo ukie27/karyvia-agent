@@ -1,4 +1,4 @@
-"""Turn 终态收口：持久化、事件、Hook 与最终出站消息（技术方案 §10.2）。
+"""Turn 终态收口：持久化、事件、Hook 与最终出站消息。
 
 职责：把已经确定的 `TurnOutcome` 与 `TurnState` 收口为唯一终态事件和 `TurnReceipt`。
 不负责：驱动模型循环、决定终态、处理中间流式分片或编排准入。
@@ -43,7 +43,7 @@ async def finish_turn(
             attachments=state.attachments,
         )
     elif state.pending:
-        # 被打断的半句必须留存并标记为不完整（`KER-007`、`EDG-304`）。
+        # 被打断的半句必须留存并标记为不完整。
         state.transcript.add_assistant(
             "".join(state.pending),
             interrupted=True,
@@ -85,7 +85,7 @@ async def finish_turn(
                         "compactor": deps.turn_compactor.name,
                     },
                 )
-        # `SES-003`：写失败不得伪装成功，即使模型那边已经答完了。
+        # ：写失败不得伪装成功，即使模型那边已经答完了。
         except Exception as error:
             outcome = outcome_without_engine(
                 correlation=state.correlation,
@@ -111,7 +111,7 @@ async def finish_turn(
     content = state.final or "\n\n".join(item for item in state.text if item)
     if not content and outcome.error is not None:
         content = outcome.error.user_message
-    # 截断答案用 `CANCELLED` 让 Channel 侧触发标记（`EDG-304`）；Turn 仍为 COMPLETED。
+    # 截断答案用 `CANCELLED` 让 Channel 侧触发标记；Turn 仍为 COMPLETED。
     terminal_state = (
         StreamState.CANCELLED
         if state.truncated

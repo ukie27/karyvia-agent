@@ -128,8 +128,8 @@ class BridgedTool:
             )
         except Exception as error:  # noqa: BLE001 - 第三方会话什么都可能抛，见下
             # **捕 `Exception` 不捕 `BaseException`**：取消与 Ctrl-C 要放行
-            # （engine 与 dispatcher 的同一条）。`detail` 里只放**类型名不放消息**——
-            # 第三方 server 的异常文本可能带着它自己的凭据（`D13` 的先例）。
+            # （engine 与 dispatcher 采用的相同规则）。`detail` 里只放**类型名不放消息**——
+            # 第三方 server 的异常文本可能带着它自己的凭据。
             return self._failed(
                 invocation,
                 KaryviaError(
@@ -176,7 +176,7 @@ class BridgedTool:
             duration_ms=_elapsed_ms(started),
             # 远端 server 交回来的文本。**它与 `side_effect=UNKNOWN` 是同一条判断**：
             # 我们对那一端一无所知，因此既不敢说它没有副作用，也不敢说它的输出是可信
-            # 指令（`D42`；默认值就是它，写出来是为了让这条判断在代码里可见）。
+            # 指令（默认值就是它，写出来是为了让这条判断在代码里可见）。
             trust=TrustLevel.UNTRUSTED,
         )
 

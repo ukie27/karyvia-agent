@@ -14,7 +14,7 @@
 一个装了二十条提醒的用户宁愿看到实例起不来，也不愿意开机后发现提醒全没了。
 
 **不用 `ctx.fs`**：`sdk.api.FileAccess` 没有 `fsync`、没有原子替换、也没有改名，因此实现
-直接用 `pathlib`——与 `builtins/session_jsonl` 和 `plugins/…-memory` 是同一条先例。
+直接用 `pathlib`——与 `builtins/session_jsonl` 和 `plugins/…-memory` 是相同原则。
 
 **IO 全部经 `asyncio.to_thread`**：保存发生在调度循环与工具调用路径上，在事件循环里同步
 写盘会卡住同一实例的其他 turn。
@@ -170,7 +170,7 @@ class JobStore:
 
 def _failed(message: str, code: ErrorCode, error: OSError) -> KaryviaError:
     """把一个 `OSError` 折成契约错误。**只放异常类型名与 errno**，不放路径——
-    宿主机绝对路径会经错误进到模型可见的文本里（`builtins/tools_fs` 的同一条判定）。"""
+    宿主机绝对路径会经错误进到模型可见的文本里（`builtins/tools_fs` 采用的相同规则判定）。"""
     return KaryviaError(
         code, message, detail={"cause": type(error).__name__, "errno": error.errno or 0}
     )

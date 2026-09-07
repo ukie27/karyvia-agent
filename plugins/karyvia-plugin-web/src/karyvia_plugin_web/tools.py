@@ -7,11 +7,11 @@
 **谁决定了那个 URL**：
 
 - `web.fetch` 的 URL **整个来自模型**，因此走 `ctx.net`——`runtime/access/net.py` 的
-  SSRF 守卫（解析后逐地址判定 + 手动跟随重定向）正是为这种输入存在的（`EDG-406`）。
+  SSRF 守卫（解析后逐地址判定 + 手动跟随重定向）正是为这种输入存在的。
   本插件**不写第四份守卫**（另三份在 `runtime/access/paths.py` 一线之外的那几处）。
 - `web.search` 的端点**来自运维配置**，模型只控制 query。自托管 SearXNG 常在私有网段，
   而 `ctx.net` 会按设计拒掉私有地址；因此这一条直接用 httpx，与内建 `model_openai`
-  要连本地 vLLM / Ollama 是同一条先例。
+  要连本地 vLLM / Ollama 是相同原则。
 
 **`execute()` 约定不抛**，两个类共用 `_Tool` 的那一个出口（`builtins/tools_fs/base.py`
 的同一种做法）。逸出的异常会被 Kernel 记成 `side_effect=UNKNOWN`——而这两个工具都是只读的，
@@ -187,7 +187,7 @@ class WebFetchTool(_Tool):
                 "Accept": "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
             },
             timeout_ms=settings.timeout_ms,
-            # `D42` 之前这里没有上界，`max_bytes` 只在下面切一刀——对着一个几百 MB 的
+            #此前这里没有上界，`max_bytes` 只在下面切一刀——对着一个几百 MB 的
             # URL 会先把它整个读进内存。上界现在落在**读取**上，到量即断开。
             max_bytes=settings.max_bytes,
         )

@@ -1,4 +1,4 @@
-"""`docs/plugin-development.md` 的防漂移测试（`D30` 验收的「另加」一条）。
+"""`docs/plugin-development.md` 的防漂移测试。
 
 职责：把入门文档里的每一个代码块真的执行一遍（Python 执行、JSON 与 TOML 解析），
 并核对文档声称的几件事与实现一致。

@@ -1,4 +1,4 @@
-"""消息契约测试（`D03`，需求 §10.2、§10.3、`MSG-004`、`MSG-006`、`EDG-205`、`EDG-304`）。
+"""消息契约测试。
 
 重点是 §10.2 的三条校验规则与 `OutboundMessage` 的寻址自洽——后者是「Channel 不查缓存
 即可投递」这个承诺唯一的保障。
@@ -123,7 +123,7 @@ def test_media_type_must_be_mime_shaped(media_type: str) -> None:
 
 
 def test_metadata_rejects_sdk_objects() -> None:
-    """`MSG-004`：原始 SDK 对象不得越过 Channel 边界。"""
+    """原始 SDK 对象不得越过 Channel 边界。"""
     with pytest.raises(KaryviaError):
         inbound(metadata={"telegram": object()})
 
@@ -135,7 +135,8 @@ def test_metadata_is_frozen_snapshot() -> None:
     assert message.metadata["telegram"] == {"chat_id": 1}
 
 
-# ------------------------------------------------------------------ EDG-205 大小
+  # ------------------------------------------------------------------  大小
+
 
 
 def test_oversized_text_is_rejected() -> None:
@@ -169,7 +170,8 @@ def test_session_key_requires_explicit_scope() -> None:
     assert inbound().session_key("proj-a").scope == "proj-a"
 
 
-# ------------------------------------------------------------------ §10.3 / MSG-006
+  # ------------------------------------------------------------------ §10.3 /
+
 
 
 def test_outbound_addressing_must_match_session_key() -> None:
@@ -180,7 +182,7 @@ def test_outbound_addressing_must_match_session_key() -> None:
 
 
 def test_outbound_carries_full_addressing() -> None:
-    """`MSG-006`：Channel 不查任何缓存即可投递。"""
+    """Channel 不查任何缓存即可投递。"""
     message = outbound()
     assert (message.channel_id, message.conversation_id, message.turn_id) == (
         "cli",
@@ -200,7 +202,7 @@ def test_outbound_carries_full_addressing() -> None:
     ],
 )
 def test_only_final_is_a_complete_answer(state: StreamState, complete: bool) -> None:
-    """`EDG-304`：取消与失败不得被渲染为完整答案。"""
+    """取消与失败不得被渲染为完整答案。"""
     assert outbound(stream_state=state).is_complete_answer is complete
 
 

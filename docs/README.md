@@ -3,7 +3,7 @@
 本目录只放**当前实现**的用户文档、持久化契约和开发规范。
 已经完成的阶段计划与迁移说明不再作为活跃文档；精确过程由 Git 保留。
 
-新层的**用户**文档（安装、配置字段、CLI 参考、部署）在 `D46` 补齐，见下表。它们与代码
+新层的**用户**文档（安装、配置字段、CLI 参考、部署）在  补齐，见下表。它们与代码
 之间有守卫：`tests/e2e/test_user_docs.py` 把配置字段表与 `SECTION_SPECS`、CLI 子命令清单
 与 `runtime/cli/main.py` 的派发分支、插件安装清单与磁盘上的发行包各比对一次。
 
@@ -20,7 +20,6 @@
 | 查层次、主链路与代码所有权 | [`project/architecture-map.md`](./project/architecture-map.md) |
 | 查某类改动需要修改哪些位置 | [`project/change-guide.md`](./project/change-guide.md) |
 | 判断稳定边界与未来设计闸门 | [`project/evolution-boundaries.md`](./project/evolution-boundaries.md) |
-| 回顾 D00–D52 里程碑 | [`project/history.md`](./project/history.md) |
 | 参考项目的阅读规范 | [`references/README.md`](./references/README.md) |
 | 写一个插件 | [`plugin-development.md`](./plugin-development.md) |
 | 理解插件信任边界 | [`plugin-development.md`](./plugin-development.md#6-资源服务与信任边界) |
@@ -28,7 +27,7 @@
 
 三篇能力文档各自的性质：
 
-- [`session-storage.md`](./session-storage.md) 是**已发布的兼容契约**（`SES-006`），
+- [`session-storage.md`](./session-storage.md) 是**已发布的兼容契约**，
   外部实现按它写；改 `builtins/session_jsonl/codec.py` 的字段就得改它。
 - [`plugin-development.md`](./plugin-development.md) 的代码块由
   `tests/e2e/test_plugin_docs.py` **直接执行**，因此不会漂移。
@@ -46,11 +45,9 @@
 - 法律归属只记在 `LICENSE` 或当前产物确实需要的第三方声明中。
 - 一条能力以插件形态落地时，在同一个 PR 里写它的文档；**不要**先留一篇描述
   「将来会怎样」的占位文档。
-- 所有权边界移进或移出 Kernel 时更新架构说明（当前在
-  [`project/architecture-map.md`](./project/architecture-map.md) 与
-  [`project/technical-design.md`](./project/technical-design.md)）。
-- 活跃入口只描述当前事实和长期规则。阶段流水账压缩到
-  [`project/history.md`](./project/history.md)，精确过程交给 Git，不再复制进 `AGENTS.md`。
+- 所有权边界移进或移出 Kernel 时更新
+  [`project/architecture-map.md`](./project/architecture-map.md)。
+- 活跃入口只描述当前事实和长期规则；阶段流水账与精确过程交给 Git。
 - 新的公开接缝或持久化语义要同步更新
   [`project/evolution-boundaries.md`](./project/evolution-boundaries.md)；常见改动位置发生变化时
   更新 [`project/change-guide.md`](./project/change-guide.md)。

@@ -1,4 +1,4 @@
-"""需求 §16.2 的八条 Plugin Runtime 里程碑，逐条一个分节（`D30` ★）。
+"""Plugin Runtime 的八条端到端验收，逐条一个分节。
 
 职责：验「插件体系可用」这件事在**真实安装的外部插件**上成立——`examples/plugins/` 下的
 两个包经 entry point 被发现、被加载、参与真实 turn、覆盖内建能力、被禁用后按配置消失。
@@ -6,14 +6,14 @@
 （`tests/runtime/`）、单元级断言（`tests/kernel/`）。
 
 **这里唯一的替身是传输层**（`conftest.recorder`），与 `test_out_of_box.py` 同一条理由：
-里程碑说的是「装上一个插件之后」，用 Fake 能力验它等于验了一台不存在的机器。因此这套
+这里验证真实安装插件后的发现与装配，用 Fake 能力会绕过被测路径。因此这套
 用例**要求两个示例插件已经由全局管理器安装**：
 
     karyvia plugins install --no-deps examples/plugins/karyvia-plugin-echo-tool
     karyvia plugins install --no-deps examples/plugins/karyvia-plugin-session-memory
 
 没装时第一条用例会以一句明确的话失败，而不是安静地少验几件事。启动只读全局安装目录，
-不会把环境里恰好存在的 Python 包误当成已安装插件。
+不会把环境里恰好存在 Python 包误当成已安装插件。
 """
 
 from __future__ import annotations
@@ -105,7 +105,7 @@ def test_both_example_plugins_are_installed_as_entry_points() -> None:
 
 
 def test_installing_is_not_enabling(instance_dir: Path) -> None:
-    """`DST-002`：装上不等于启用。没写进 `plugins.enabled` 的候选连 manifest 都不读，
+    """装上不等于启用。没写进 `plugins.enabled` 的候选连 manifest 都不读，
     可观察的证据就是它的 `version` 是空串。"""
     write_config(instance_dir, {})
 
@@ -163,7 +163,7 @@ def test_a_plugin_tool_takes_part_in_a_real_turn(
     """§16.2 第 2 条。工具由插件注册、被模型调用、结果回到模型、答案印给用户。
 
     前缀取自 `plugins.echo-tool.config`——顺带证明 `ctx.config` 那一块真的交到了插件手上
-    （`CFG-002`），而不是插件拿到了一份空配置照样「能跑」。
+    ，而不是插件拿到了一份空配置照样「能跑」。
     """
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
     write_config(
@@ -181,7 +181,7 @@ def test_a_plugin_tool_takes_part_in_a_real_turn(
     second = json.loads(recorder.requests[1].content)
     tool_messages = [item for item in second["messages"] if item.get("role") == "tool"]
     assert len(tool_messages) == 1
-    # 正文包在不可信数据块里（`D42`）：示例插件没有显式表态，因此走默认的 `UNTRUSTED`。
+    # 正文包在不可信数据块里：示例插件没有显式表态，因此走默认的 `UNTRUSTED`。
     # 这一条端到端地证明了包裹发生在**真实的线格式上**，而不只是 `fold_tool_result` 的
     # 单元测试里。
     assert ">> 你好" in tool_messages[0]["content"]
@@ -192,7 +192,7 @@ def test_a_plugin_tool_takes_part_in_a_real_turn(
 def test_the_plugin_tool_shows_up_in_capabilities(
     instance_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`NFR-502`：能力表里每一条都带提供方标识，插件的那条写着 `plugin:echo-tool`。"""
+    """能力表里每一条都带提供方标识，插件的那条写着 `plugin:echo-tool`。"""
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
     write_config(instance_dir, {"enabled": [ECHO_PLUGIN]})
 
@@ -224,7 +224,7 @@ def test_a_plugin_overrides_the_builtin_session_store(
 def test_the_override_relation_is_printed_with_both_providers(
     instance_dir: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """§16.2 第 3 条的另一半、技术方案 §8.3 第 4 条：**不静默替换**。
+    """**覆盖不能静默发生**。
 
     被覆盖的那一方仍然可见，只是不生效——用户要能一眼看出自己的会话历史换了后端。
     """
@@ -299,7 +299,7 @@ def test_a_bad_plugin_config_is_reported_and_the_instance_still_starts(
 ) -> None:
     """第一类：**配置错误**。`prefix` 声明为 string，给一个整数。
 
-    插件写错配置时实例仍要起得来（`PLG-004`），那个插件被丢掉并留下一条带 JSON
+    插件写错配置时实例仍要起得来，那个插件被丢掉并留下一条带 JSON
     Pointer 的记录。
     """
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
@@ -352,7 +352,7 @@ def _directory_plugin(root: Path, plugin_id: str, manifest: dict[str, object]) -
 def test_an_incompatible_sdk_range_is_refused_with_its_own_code(
     instance_dir: Path, recorder: Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """第二类：**SDK 不兼容**（`SDK-005`）。不带病加载，错误码与配置错误分得开。"""
+    """第二类：**SDK 不兼容**。不带病加载，错误码与配置错误分得开。"""
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
     _directory_plugin(
         instance_dir / "external",
@@ -378,10 +378,10 @@ def test_an_incompatible_sdk_range_is_refused_with_its_own_code(
 def test_a_setup_that_cannot_be_loaded_is_reported_per_provider(
     instance_dir: Path, recorder: Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """第三类：**运行失败**。manifest 过了阶段 A，`setup` 却跑不起来。
+    """第三类：**运行失败**。manifest 过了加载前校验，`setup` 却跑不起来。
 
     与前两类的区别是它发生在**加载阶段**，因此结论在 `Wiring.outcomes` 里按提供方列出，
-    而不是在阶段 A 的清单里——`karyvia capabilities` 把这一段单独印成「加载失败的提供方」。
+    而不是在加载前校验 的清单里——`karyvia capabilities` 把这一段单独印成「加载失败的提供方」。
     """
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
     _directory_plugin(
@@ -424,7 +424,7 @@ def test_both_session_stores_run_the_same_contract_suite() -> None:
     """§16.2 第 7 条：内建默认实现与同类插件通过**同一套** `SessionStoreContract`。
 
     断言的是「两个测试类的基类是同一个」而不是「两边都有测试」——后者用两套各自宽松的
-    断言也能满足，而那恰恰是契约测试要防的事（`NFR-702`）。
+    断言也能满足，而那恰恰是契约测试要防的事。
     """
     import importlib.util
 

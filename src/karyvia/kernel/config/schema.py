@@ -1,4 +1,4 @@
-"""配置 schema 与校验（技术方案 §6.7、`CFG-001`、`EDG-501`）。
+"""配置 schema 与校验。
 
 职责：用一张声明式字段表定义**有哪些配置字段**、它们的默认值与所属小节，校验合并后的
 JSON，并把每处问题连同 JSON Pointer 位置一起报出来；`TurnSection.to_limits()` 把 turn
@@ -6,17 +6,16 @@ JSON，并把每处问题连同 JSON Pointer 位置一起报出来；`TurnSectio
 不负责：逐字段的类型校验积木（`fields.py`）、读取任何来源（`sources.py`）、分层合并
 （`merge.py`）、决定 workspace 的最终绝对路径（`loader.py`）。
 
-**不用 pydantic，手写校验。** 技术方案 §6.7 的字面表述是「代码中的 Pydantic default」，
-这里取其意不取其形：规范性的两条（`extra="forbid"`、JSON Pointer 位置）都照做，实现方式
-另选。三个理由，按分量排序：
+**不用 pydantic，手写校验。** 本模块仍实现未知字段拒绝和 JSON Pointer
+错误位置，但避免在配置冷路径引入重型依赖。三个理由，按分量排序：
 
-1. `CFG-005` 要求每个生效值可追溯来源，这就要求默认值层**物化成一份 dict**（`defaults()`）
+1.  要求每个生效值可追溯来源，这就要求默认值层**物化成一份 dict**（`defaults`）
    才能和其它层一样带上来源。默认值一旦是 dict，合并与来源追踪就已经全在 `merge.py` 里
    自己写了，pydantic 剩下的贡献只是校验十几个字段的类型。
 2. pydantic 的 `ValidationError.loc` 是元组，仍要自己转成 RFC 6901；而 `sdk/manifest.py`
    的 `_format_location` 产出点分路径且**不能 import**（`R2`）。
 3. 实测 `import pydantic` 约 90 ms、连带把 `kernel.config` 的导入推到 300 ms 以上，而
-   `NFR-405` 给整个冷启动的预算就是 300 ms。配置加载在启动第 2 步、永远在路径上
+    给整个冷启动的预算就是 300 ms。配置加载在启动第 2 步、永远在路径上
    （`sdk/manifest.py` 只在真的要发现插件时才付这笔钱）。
    `test_loading_config_does_not_import_pydantic` 是这条约束的可执行形态。
 
@@ -208,7 +207,7 @@ from .sections import (  # noqa: E402 - 见上面那段注释，位置刻意在�
 def defaults() -> dict[str, JsonValue]:
     """把默认值物化成一层原始 JSON。
 
-    `CFG-005` 的来源追踪要求默认值和其它层同形：只有这样「这个值取自默认值」才是一个
+     的来源追踪要求默认值和其它层同形：只有这样「这个值取自默认值」才是一个
     可以回答的问题，而不是「查不到来源」的兜底解释。
     """
     return {
@@ -237,8 +236,7 @@ def _validate_section(
         return {}
 
     values: dict[str, JsonValue] = {}
-    # `plugins` 小节里的未知键**不是**未知字段，而是插件 id（技术方案 §6.7 的
-    # `plugins.<plugin_id>.config`）。它们的形状由 `plugin_blocks.py` 校验，
+    # `plugins` 小节里的未知键**不是**未知字段，而是插件 id。它们的形状由 `plugin_blocks.py` 校验，
     # 因此这里不能一并报成 `CONFIG_UNKNOWN_FIELD`。
     if name != blocks.PLUGINS_SECTION:
         for key in raw:
@@ -266,7 +264,7 @@ def validate_config(data: Mapping[str, JsonValue]) -> KaryviaConfig:
 
     逐条抛出会让用户改一个键、重启、再看到下一个错误。因此先把全部问题收集起来，
     再用第一处的错误码抛出，完整清单挂在 `detail["errors"]`——单个未知字段因此仍然得到
-    `CONFIG_UNKNOWN_FIELD`（`CFG-001`），而不是一个笼统的「配置无效」。
+    `CONFIG_UNKNOWN_FIELD`，而不是一个笼统的「配置无效」。
 
     **异常约定**：任何一处问题即抛 `KaryviaError`，`detail["errors"]` 的每项含
     `pointer` / `code` / `reason`；绝不含配置值本身。
@@ -275,7 +273,7 @@ def validate_config(data: Mapping[str, JsonValue]) -> KaryviaConfig:
 
     for key in data:
         if key in IGNORED_TOP_LEVEL_KEYS:
-            # `$schema` 是给编辑器的，不是配置字段。放行它是 `D24` 的显式决定：
+            # `$schema` 是给编辑器的，不是配置字段。放行它是的显式决定：
             # 生成的初始配置引用一份派生 schema，若这里报未知字段，刚生成的文件下一次
             # 启动就会失败——那是最糟的首次体验。
             continue

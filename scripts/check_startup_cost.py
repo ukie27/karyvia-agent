@@ -1,4 +1,4 @@
-"""记录 `karyvia` 的启动开销指标（技术方案 §12.4 第 6 步、`NFR-405`）。
+"""记录 `karyvia` 的启动开销指标。
 
 常驻脚本。测量三件事：
 
@@ -10,7 +10,7 @@
 第四项是最有价值的：`karyvia/__init__.py` 承诺「零依赖、零副作用」，一旦有人
 在包根加了便利导入，清单会立刻变长，而耗时可能还看不出来。
 
-`startup_ms` **只告警不失败**（`NFR-405` 的原文：「超出阈值 20% 触发告警而非直接失败」）。
+`startup_ms` **只告警不失败**（原文：「超出阈值 20% 触发告警而非直接失败」）。
 CI 机器的抖动足以让一个 300 ms 的门禁天天误报，而误报的门禁最后一定会被关掉。它拆成
 import 与 bootstrap 两段报出来，「该优化哪一段」因此查得到。
 
@@ -36,7 +36,7 @@ _ROOT = Path(__file__).resolve().parent.parent
 IMPORT_BUDGET_MS = 150.0
 VERSION_BUDGET_MS = 2000.0
 
-#: `NFR-405` 的目标：无插件冷启动到可接受输入 ≤ 300 ms（不含解释器启动）。
+#: 的目标：无插件冷启动到可接受输入 ≤ 300 ms（不含解释器启动）。
 #: **它是告警线不是门禁线**，见模块 docstring。
 STARTUP_BUDGET_MS = 300.0
 
@@ -146,7 +146,7 @@ def measure_version() -> float:
 
 
 def measure_startup() -> dict[str, float]:
-    """在干净子进程里测量冷启动到可接受输入（`NFR-405`）。"""
+    """在干净子进程里测量冷启动到可接受输入。"""
     raw = json.loads(_run_python(_MEASURE_STARTUP))
     return {
         "startup_import_ms": round(float(raw["startup_import_ms"]), 2),
@@ -173,7 +173,7 @@ def collect() -> dict[str, object]:
 
 
 def warnings_for(data: dict[str, object]) -> list[str]:
-    """返回**告警**（不影响退出码）。`NFR-405` 的 20% 容差在这里，不在 `check()` 里。"""
+    """返回**告警**（不影响退出码）。 的 20% 容差在这里，不在 `check` 里。"""
     startup_ms = float(data["startup_ms"])  # type: ignore[arg-type]
     threshold = STARTUP_BUDGET_MS * (1 + STARTUP_WARN_RATIO)
     if startup_ms <= threshold:

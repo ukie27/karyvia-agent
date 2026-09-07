@@ -1,6 +1,6 @@
-"""去重 LRU 的测试（`D13` 验收表「重复投递同一 `message_id` 不触发第二次工具执行」）。
+"""去重 LRU 的测试。
 
-主线是 `EDG-201`：同一 `(channel_id, message_id)` 的重投必须被识别并拿到上一次的
+主线是 ：同一 `(channel_id, message_id)` 的重投必须被识别并拿到上一次的
 `turn_id`。容量与 TTL 是它的两条边界——去重表必须有界，否则它自己就是一个内存泄漏。
 
 TTL 全程用注入的假时钟，不用 `sleep`：真实等待 10 分钟不可能，等 0.1 秒又只是在赌调度。
@@ -45,7 +45,7 @@ def test_first_delivery_is_remembered_and_not_a_hit() -> None:
 
 
 def test_redelivery_hits_and_reports_the_previous_turn() -> None:
-    """`EDG-201` 的核心：重投拿到的是**上一次**的 turn，调用方据此跳过执行。"""
+    """ 的核心：重投拿到的是**上一次**的 turn，调用方据此跳过执行。"""
     cache = DedupCache()
     cache.remember("telegram", "42", turn("t1"))
 
@@ -158,6 +158,6 @@ def test_non_positive_bounds_are_rejected(capacity: int, ttl_ms: int) -> None:
 
 
 def test_defaults_match_the_documented_budget() -> None:
-    """技术方案 §6.5 写死的「4096 条 / 10 分钟」。"""
+    """默认去重窗口是 4096 条 / 10 分钟。"""
     assert DEFAULT_DEDUP_CAPACITY == 4096
     assert DEFAULT_DEDUP_TTL_MS == 600_000

@@ -1,4 +1,4 @@
-"""出站渲染的验收（`MSG-003`、`EDG-304`，开发方案 `D34`）。
+"""出站渲染的验收。
 
 | 验收项 | 测试 |
 | --- | --- |
@@ -118,7 +118,7 @@ class TestTerminalMarkers:
         assert TERMINAL_MARKERS[StreamState.FAILED] == "[本轮失败]"
 
     def test_the_marker_shares_the_body_with_the_partial_answer(self) -> None:
-        """`EDG-304`：分开发会让半截答案孤零零留在上面看起来像完整回答。"""
+        """分开发会让半截答案孤零零留在上面看起来像完整回答。"""
         body = compose_body("半句", (), StreamState.CANCELLED)
         assert "半句" in body
         assert body.endswith("[已中断：以上是中断前已产生的内容]")

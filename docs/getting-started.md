@@ -35,7 +35,7 @@ karyvia --help
 karyvia init
 ```
 
-它在实例目录里建两个文件，**已经存在的 `config.json` 一个字节都不会动**：
+它在实例目录里建两个文件，**已经存在 `config.json` 一个字节都不会动**：
 
 ```text
 ~/.karyvia/instances/default/
@@ -126,7 +126,7 @@ karyvia run -p "用一句话介绍你自己"
 karyvia plugins install plugins/karyvia-plugin-web
 ```
 
-全局安装**不等于实例启用**（`DST-002`：安装 ≠ 启用）。没有写进 `plugins.enabled` 的候选
+全局安装**不等于实例启用**（安装 ≠ 启用）。没有写进 `plugins.enabled` 的候选
 连 manifest 都不会被读——这既是安全边界，也是启动开销的边界：
 
 ```bash

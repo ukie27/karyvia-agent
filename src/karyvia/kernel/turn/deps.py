@@ -1,9 +1,9 @@
-"""Engine 依赖面：`EngineDeps` 与两个 kernel-local 调度 Protocol（技术方案 §6.2、§6.6）。
+"""Engine 依赖面：`EngineDeps` 与两个 kernel-local 调度 Protocol。
 
 职责：声明 engine 与外界交互的**唯一**通道——`EngineDeps` 四个槽，`ToolInvoker` 与
 `HookDispatcher` 的方法签名、异常约定与取消语义，以及 engine 负责分发的 4 个 `HookName`。
 不负责：提供任何实现、决定 Hook 顺序与超时、查 registry、等待不可取消的工具——
-实现在 `D14` 的装配侧与 `D16` 的 Host；本模块只有签名与常量，不含 IO。
+实现在的装配侧与 Host；本模块只有签名与常量，不含 IO。
 
 **为什么这两个 Protocol 在 kernel 而不是 contracts**：`contracts/protocols.py` 的 9 个是
 **单能力**契约（一个工具、一个 Hook handler），是插件要实现的形状；这里的两个是**批量调度器**
@@ -54,8 +54,8 @@ __all__ = [
 #: `outcome`（而 `TurnOutcome` 需要两个带时区的时间戳，engine 没有时钟），全部归 orchestrator。
 #: 这条分工有对照测试盯着。
 #:
-#: ⚠️ `BEFORE_MODEL_REQUEST` 由 engine **每轮**分发，而技术方案 §10.2 第 9 步把它画在进 engine
-#: 之前：第一轮两者重合，第 2..N 轮的请求只有 engine 造得出来。`D14` 不得在调用 engine 前
+#: ⚠️ `BEFORE_MODEL_REQUEST` 由 engine **每轮**分发。第 2..N 轮的请求只有 engine
+#: 造得出来，因此编排层不得在调用 engine 前
 #: 再分发一次，否则第一轮触发两遍、插件的累积式改写被叠加两次。
 ENGINE_HOOKS: Final[frozenset[HookName]] = frozenset(
     {
@@ -69,9 +69,9 @@ ENGINE_HOOKS: Final[frozenset[HookName]] = frozenset(
 
 @runtime_checkable
 class ToolInvoker(Protocol):
-    """把一次 `ToolCall` 变成 `ToolResult` 的执行面（技术方案 §6.2 的 `tools` 槽）。
+    """把一次 `ToolCall` 变成 `ToolResult` 的执行面。
 
-    实现方负责 schema 校验、调用预算校验与真正的执行（`KER-004`）。engine 只负责调度
+    实现方负责 schema 校验、调用预算校验与真正的执行。engine 只负责调度
     顺序、超时数值与结果截断——它不认识 JSON Schema。
     """
 
@@ -97,7 +97,7 @@ class ToolInvoker(Protocol):
         `ToolResult(ok=False, error=...)`。逸出的异常 engine 会兜成
         `side_effect=UNKNOWN`，但那样就丢掉了执行侧本来能给出的副作用判断。
         **取消语义**：`cancel` 是本次调用专属的子令牌（`CancelToken.child()`）。宽限期等待与
-        孤儿任务登记（`EDG-407`、`EDG-104`）在本实现内完成：engine 里没有「实例」这个概念，
+        孤儿任务登记在本实现内完成：engine 里没有「实例」这个概念，
         孤儿任务表不可能在那一层，因此 engine 不再加第二层超时。
         """
         ...
@@ -105,7 +105,7 @@ class ToolInvoker(Protocol):
 
 @runtime_checkable
 class HookDispatcher(Protocol):
-    """一次 Hook 分发的归并结果（技术方案 §6.6）。"""
+    """一次 Hook 分发的归并结果。"""
 
     async def dispatch(self, context: HookContext) -> HookOutcome:
         """分发一个 Hook，返回**已归并**的处置。
@@ -123,7 +123,7 @@ class HookDispatcher(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class EngineDeps:
-    """engine 与外界交互的全部通道，恰好四个槽（技术方案 §6.2）。
+    """engine 与外界交互的全部通道，恰好四个槽。
 
     「只通过 `deps` 与外界交互」这条不变量是可检查的：`engine.py` 的模块级 import 清单里
     不出现 `os` / `pathlib` / `socket`，有测试盯着。多加一个槽就要多问一遍「这个东西为什么

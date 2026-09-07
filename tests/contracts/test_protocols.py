@@ -1,7 +1,7 @@
-"""能力接口测试（`D04`，技术方案 §5.1、需求 `SDK-001`、`NFR-104`）。
+"""能力接口测试。
 
 三件事：每个 Protocol 有一个最小 Fake 通过结构检查；方法数快照锁住公开表面
-（`NFR-104`：新增接口必须显式改快照，等于强制走评审）；`protocols.py` 里没有实现。
+（新增接口必须显式改快照，等于强制走评审）；`protocols.py` 里没有实现。
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ from karyvia.contracts import (
 )
 from karyvia.contracts.tool import SideEffect
 
-#: 公开表面快照：Protocol -> 成员名集合。新增或删除方法必须同步改这里（`NFR-104`）。
+#: 公开表面快照：Protocol -> 成员名集合。新增或删除方法必须同步改这里。
 #: `CancelSignal` / `InstanceView` / `TurnControl` 单列在 `SUPPORT_PROTOCOLS`：它们是
 #: 支撑类型（取消语义、实例只读视图、turn 控制面），**不是可注册能力**——
 #: `CAPABILITY_PROTOCOLS` 必须恒为 10，与 `CapabilityKind` 的 10 个取值一一对应。
@@ -104,7 +104,7 @@ def _members(protocol: type) -> frozenset[str]:
 
 
 def test_capability_protocol_count_is_ten() -> None:
-    """`SDK-001` 的扩展类型数；它与 `sdk.KaryviaAPI` 的注册方法一一对应。
+    """ 的扩展类型数；它与 `sdk.KaryviaAPI` 的注册方法一一对应。
 
     可注册能力与 `CapabilityKind` 保持一一对应。
     """
@@ -121,7 +121,7 @@ def test_protocol_surface_matches_snapshot(protocol: type, expected: frozenset[s
 
 
 def test_total_capability_members_is_twenty_two() -> None:
-    """整体规模也进快照：接口数量受控是 `NFR-104` 的原话。"""
+    """整体规模也进快照：接口数量受控是的原话。"""
     assert sum(len(names) for names in CAPABILITY_PROTOCOLS.values()) == 22
 
 
@@ -161,7 +161,7 @@ def _is_ellipsis(stmt: ast.stmt) -> bool:
 
 
 def test_every_method_documents_exceptions_and_cancellation() -> None:
-    """`D04` 的要点：每个方法都要写明异常约定与取消语义。"""
+    """ 的要点：每个方法都要写明异常约定与取消语义。"""
     missing: list[str] = []
     for protocol in ALL_PROTOCOLS:
         for name in sorted(_members(protocol)):
@@ -363,7 +363,7 @@ FAKES: Final[list[tuple[type, object]]] = [
     ("protocol", "fake"), FAKES, ids=[protocol.__name__ for protocol, _ in FAKES]
 )
 def test_minimal_fake_satisfies_the_protocol(protocol: type, fake: object) -> None:
-    """结构化子类型：Fake 没有继承任何宿主基类，照样满足接口（`PLG-002`）。"""
+    """结构化子类型：Fake 没有继承任何宿主基类，照样满足接口。"""
     assert isinstance(fake, protocol)
     assert not isinstance(object(), protocol)
 

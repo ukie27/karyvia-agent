@@ -2,7 +2,7 @@
 
 `testpaths` 一次收集整个 `plugins/`，而 pytest 按模块名去重：两个插件各有一个
 `_fakes.py` 时，先导入的会顶掉后一个，另一棵测试树整体 `ImportError`。
-**单独跑各自目录看不出来，跑全量才炸**（`D34` 就是这么发现的）。
+**单独跑各自目录看不出来，跑全量才炸**。
 
 职责：一个实现 `sdk.api.HttpAccess` 的出网替身、一个把它接上去的 `PluginContext`、
 以及构造 `ToolInvocation` 的小工厂。
@@ -44,7 +44,7 @@ class RecordedRequest:
         self.headers = dict(headers or {})
         self.body = body
         self.timeout_ms = timeout_ms
-        #: `D42` 起 `web.fetch` 必须把字节上界交给门面，而不是自己读完再切。
+        #: 起 `web.fetch` 必须把字节上界交给门面，而不是自己读完再切。
         self.max_bytes = max_bytes
 
 
@@ -88,7 +88,7 @@ class StubNet:
             return response
         # **替身必须照做**：真门面在 `max_bytes` 处停止读取并标 `truncated`
         # （`runtime/access/net.py`）。不照做的话，「上界交给了门面」这件事在用例里
-        # 就看不出效果——`web.fetch` 从 `D42` 起不再自己切第二刀。
+        # 就看不出效果——`web.fetch` 当前不再自己切第二刀。
         return replace(response, body=response.body[:max_bytes], truncated=True)
 
 

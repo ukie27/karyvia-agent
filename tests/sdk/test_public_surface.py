@@ -1,4 +1,4 @@
-"""SDK 公开表面的快照测试（技术方案 §7.5、§7.6、`NFR-103`、`NFR-104`）。
+"""SDK 公开表面的快照测试。
 
 `sdk.__all__` 是**规范性清单**：不在其中的名字不提供兼容承诺。这里对它做字面量快照，
 手动增删一个导出就会失败，从而强制走评审——这正是 §12.3 点名的三个架构测试之一。
@@ -31,7 +31,7 @@ SDK_PUBLIC_NAMES: Final[tuple[str, ...]] = (
     "HttpAccess",
     "HttpResponse",
     "KaryviaAPI",
-    # `D41` 新增：manifest 的 `config_schema` 所用的 JSON Schema 类型。它**必须**在这张
+    #  新增：manifest 的 `config_schema` 所用的 JSON Schema 类型。它**必须**在这张
     # 表里——`contracts.JsonSchema` 进不了 pydantic 模型（见 `sdk/manifest.py`），
     # 而插件写 `CONFIG_SCHEMA` 时需要一个有兼容承诺的名字可标注。
     "ManifestJsonSchema",
@@ -73,9 +73,9 @@ SDK_TESTING_PUBLIC_NAMES: Final[tuple[str, ...]] = (
     "tool_call_response",
 )
 
-#: 10 个注册方法与 `CapabilityKind` 的 10 个取值一一对应（技术方案 §7.5）。
+#: 10 个注册方法与 `CapabilityKind` 的 10 个取值一一对应。
 #: 用字面量写死而不是从实现反推：从实现反推的测试只能证明代码没改，
-#: 证明不了它和技术方案一致。
+#: 证明不了公开契约保持稳定。
 REGISTRATION_METHODS: Final[dict[CapabilityKind, str]] = {
     CapabilityKind.TOOL: "register_tool",
     CapabilityKind.COMMAND: "register_command",
@@ -96,7 +96,7 @@ API_PROTOCOLS: Final[dict[type, frozenset[str]]] = {
         {"plugin_id", "config", "state_dir", "logger", "events", "on_start", "add_cleanup",
          "spawn_task", "fs", "net", "shell", "secret", "instance", "turns"}
     ),
-    # `D42` 补上二进制读写：否则需要二进制的插件无法复用 Workspace 路径与错误语义。
+    #  补上二进制读写：否则需要二进制的插件无法复用 Workspace 路径与错误语义。
     FileAccess: frozenset(
         {"read_text", "write_text", "read_bytes", "write_bytes", "list_dir"}
     ),
@@ -161,7 +161,7 @@ def test_contract_types_are_not_re_exported() -> None:
 
 
 def test_registration_method_count_is_ten() -> None:
-    """`SDK-001`：注册方法恰好 10 个，与 `CapabilityKind` 一一对应。"""
+    """注册方法恰好 10 个，与 `CapabilityKind` 一一对应。"""
     assert len(REGISTRATION_METHODS) == 10
     assert set(REGISTRATION_METHODS) == set(CapabilityKind)
     assert set(REGISTRATION_METHODS) == set(CAPABILITY_ARITY)
@@ -172,7 +172,7 @@ def test_karyvia_api_surface_is_exactly_ctx_plus_ten_methods() -> None:
 
 
 def test_register_cli_entry_exists() -> None:
-    """CLI 入口可被插件覆盖（`BAS-010`），因此它必须有注册路径。"""
+    """CLI 入口可被插件覆盖，因此它必须有注册路径。"""
     assert hasattr(KaryviaAPI, "register_cli_entry")
 
 
@@ -207,7 +207,7 @@ def test_every_api_method_documents_its_exception_contract() -> None:
         "PluginContext.fs",
         "PluginContext.net",
         "PluginContext.shell",
-        # `D22`：只读诊断视图与 turn 控制面也必须列入只读属性快照。
+        # ：只读诊断视图与 turn 控制面也必须列入只读属性快照。
         "PluginContext.instance",
         "PluginContext.turns",
     }
@@ -223,7 +223,7 @@ def test_every_api_method_documents_its_exception_contract() -> None:
 def test_api_module_contains_no_implementation() -> None:
     """`api.py` 只有签名：函数体一律是 docstring + `...`，**没有例外**。
 
-    `SecretStr` 在 `D11` 迁到 `contracts/errors.py` 之后，本模块剩下的两个纯数据类型
+    `SecretStr` 在  迁到 `contracts/errors.py` 之后，本模块剩下的两个纯数据类型
     （`HttpResponse` / `ShellResult`）都没有方法，因此白名单是空集——`allowed` 里再出现
     名字，就说明有实现漏进了这一层。
     """
@@ -261,7 +261,7 @@ def _is_ellipsis(stmt: ast.stmt) -> bool:
 
 
 def test_importing_sdk_does_not_pull_in_the_testing_kit() -> None:
-    """夹具只在测试期需要；包根导入它等于让每个插件启动都付这份开销（`NFR-401`）。"""
+    """夹具只在测试期需要；包根导入它等于让每个插件启动都付这份开销。"""
     probe = (
         "import sys; import karyvia.sdk; "
         "print('karyvia.sdk.testing' in sys.modules)"

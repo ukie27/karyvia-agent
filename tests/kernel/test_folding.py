@@ -1,4 +1,4 @@
-"""流折叠与工具结果折叠的单元测试（`D09`：`folding.py`）。
+"""流折叠与工具结果折叠的单元测试（`folding.py`）。
 
 分片级的异常形态在这里逐个钉住——`DONE(ERROR)`、缺 DONE、重复 call_id、空 TEXT——
 因为它们是「模型供应商不守规矩」的入口，engine 的其余部分都建立在「折叠结果一定合法」
@@ -102,7 +102,7 @@ def test_done_error_becomes_retryable_provider_error() -> None:
     error = excinfo.value
     assert error.code is ErrorCode.EXTERNAL_MODEL_PROVIDER
     assert error.retryable is True
-    # 已折叠的字符数进 detail：`D14` 的续写要知道「断在哪」不是零产出。
+    # 已折叠的字符数进 detail： 的续写要知道「断在哪」不是零产出。
     assert error.detail["folded_chars"] == 2
 
 
@@ -205,7 +205,7 @@ def test_fold_tool_result_leaves_short_content_alone() -> None:
     assert message.content == folded.as_model_text(source=call.name)
 
 
-# ------------------------------------------------- 不可信包裹（`D42`）
+# ------------------------------------------------- 不可信包裹
 
 
 def test_an_untrusted_result_is_wrapped_with_the_tool_name_as_source() -> None:
@@ -330,7 +330,7 @@ def test_escaped_result_keeps_karyvia_error_code() -> None:
     assert result.side_effect is SideEffect.UNKNOWN
 
 
-# ------------------------------------------- `provider_blocks`：本轮内的原样回传（`D45`）
+# ------------------------------------------- `provider_blocks`：本轮内的原样回传
 
 
 def _opaque(kind: str = "thinking", **payload: object) -> OpaqueBlock:
@@ -354,7 +354,7 @@ def test_opaque_chunks_are_accumulated_in_arrival_order() -> None:
 
 
 def test_assistant_message_carries_the_blocks_into_the_next_round() -> None:
-    """这是整条路径的支点。`D45` 之前 Anthropic 的 thinking 块在这一步被丢掉，
+    """这是整条路径的支点。 之前 Anthropic 的 thinking 块在这一步被丢掉，
     于是 thinking 与工具调用不能同时用。"""
     blocks = (_opaque(signature="sig"),)
     response = ModelResponse(
@@ -368,7 +368,7 @@ def test_assistant_message_carries_the_blocks_into_the_next_round() -> None:
 
 
 def test_a_stream_without_opaque_chunks_produces_no_blocks() -> None:
-    """绝大多数 Provider 一个 opaque 块都不产。它们的响应必须与 `D45` 之前逐字相同。"""
+    """绝大多数 Provider 一个 opaque 块都不产。它们的响应必须与此前逐字相同。"""
     folder = StreamFolder("m")
     folder.push(ModelChunk(kind=ChunkKind.TEXT, text="好"))
     folder.push(ModelChunk(kind=ChunkKind.DONE, stop_reason=StopReason.END_TURN))

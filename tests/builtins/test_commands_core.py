@@ -1,24 +1,24 @@
-"""内建命令集 `commands_core` 的验收（开发方案 `D22`）。
+"""内建命令集 `commands_core`当前行为。
 
 | 验收项 | 测试 |
 | --- | --- |
 | 6 个命令各有测试 | `TestHelp` … `TestCancel` |
 | `/capabilities` 无插件时列出全部内建能力及提供方（§16.1 第 2 条） | `TestCapabilities` |
 | `/config` 输出哨兵扫描无泄漏 | `TestConfigRedaction` |
-| 命令失败返回可诊断错误且会话可用（`CMD-003`） | `TestFailureIsDiagnostic` |
-| 声明的名称/参数/说明/操作员限制可被 registry 统一列出（`CMD-001`） | `TestRegistration` |
-| 单命令禁用后 `/help` 与 registry 同步消失（`TOL-006`） | `TestSingleCommandDisable` |
+| 命令失败返回可诊断错误且会话可用 | `TestFailureIsDiagnostic` |
+| 声明的名称/参数/说明/操作员限制可被 registry 统一列出 | `TestRegistration` |
+| 单命令禁用后 `/help` 与 registry 同步消失 | `TestSingleCommandDisable` |
 
 三条写这些用例时的取舍：
 
 - **全部经真实 dispatcher 调用，而不是直接 `await handler.handle(...)`**。`operator_only`
-  与参数个数由 dispatcher 前置校验（`D13`），命令自己不抄——那意味着「`/config` 只有管理员
+  与参数个数由 dispatcher 前置校验，命令自己不抄——那意味着「`/config` 只有管理员
   能敲」这条只有走真实分流路径才验得到。直接调 handler 会让这些用例在校验被误删时照样通过。
 - **装配走真实 `wire_capabilities` + `build_command_index`**，与
-  `test_tools_fs.py::TestSingleToolDisable` 同一套做法：`D22` 新加的 `ctx.instance` /
+  `test_tools_fs.py::TestSingleToolDisable` 同一套做法： 新加的 `ctx.instance` /
   `ctx.turns` 是否真的到得了 handler，只有整条链跑一遍才算数。
 - **哨兵是真的**（`sk-` + ≥16 字符，匹配 `errors.py::_SECRET_VALUE_PATTERNS`）：
-  与 `D19` 同一条做法。断言它不出现在输出、`repr` 与序列化里。
+  与  同一条做法。断言它不出现在输出、`repr` 与序列化里。
 """
 
 from __future__ import annotations
@@ -168,7 +168,7 @@ class TestHelp:
             assert f"/{name}" in content
 
     async def test_shows_the_four_declared_facets(self) -> None:
-        """`CMD-001` 点名的四样：名称、参数形式、说明、权限需求。
+        """ 点名的四样：名称、参数形式、说明、权限需求。
 
         只印名字和说明，用户就只能靠敲一次来发现自己没权限。
         """
@@ -195,9 +195,9 @@ class TestConfigRedaction:
         assert "gpt-4o" in outcome.result.content  # type: ignore[attr-defined]
 
     async def test_secret_sentinel_never_reaches_the_output(self) -> None:
-        """哨兵扫描（`D22` 验收）。
+        """哨兵扫描。
 
-        `D11` 的结构性保证是配置树里只有 `${VAR}` 字面量，因此正常路径上根本没有明文。
+         的结构性保证是配置树里只有 `${VAR}` 字面量，因此正常路径上根本没有明文。
         这条用例把明文**硬塞进**文档，验证 `redact()` + `scrub()` 那道纵深防御真的在。
         """
         view = make_view(config_document={"model": {"api_key": SECRET, "note": f"用 {SECRET}"}})
@@ -210,7 +210,7 @@ class TestConfigRedaction:
     async def test_is_operator_only(self) -> None:
         """`/config` 是「实例怎么装的」，不该由随便谁在群聊里敲出来。
 
-        判定由 dispatcher 前置做（`D13`），命令自己不抄——因此这条必须走真实分流路径。
+        判定由 dispatcher 前置做，命令自己不抄——因此这条必须走真实分流路径。
         """
         dispatcher, _ = await wire()
         outcome = await run(dispatcher, "/config", operator=False)
@@ -243,7 +243,7 @@ class TestSession:
         assert "记录数：0" in outcome.result.content  # type: ignore[attr-defined]
 
     async def test_uses_the_session_key_of_this_message(self) -> None:
-        """实例级的「当前会话」在多 session 并发下没有定义（`KER-008`）。"""
+        """实例级的「当前会话」在多 session 并发下没有定义。"""
         dispatcher, _ = await wire()
         outcome = await run(dispatcher, "/session")
         assert make_snapshot().session_key.storage_id() in outcome.result.content  # type: ignore[attr-defined]
@@ -266,7 +266,7 @@ class TestSession:
 
 class TestPlugins:
     async def test_no_plugins_is_a_statement_not_a_blank(self) -> None:
-        """`EDG-101`：零插件是可用形态，用户该看到一句确认。"""
+        """零插件是可用形态，用户该看到一句确认。"""
         dispatcher, _ = await wire()
         outcome = await run(dispatcher, "/plugins")
         assert "没有加载任何外部插件" in outcome.result.content  # type: ignore[attr-defined]
@@ -286,7 +286,7 @@ class TestPlugins:
         assert "activated" in content and "model:openai" in content
 
     async def test_reports_the_failure_and_its_phase(self) -> None:
-        """一个加载失败的插件必须说得出「哪一步失败的」（`PLG-006`）。"""
+        """一个加载失败的插件必须说得出「哪一步失败的」。"""
         view = make_view(
             plugins=[{
                 "plugin_id": "broken",
@@ -309,7 +309,7 @@ class TestPlugins:
 
 class TestCapabilities:
     async def test_lists_every_capability_with_its_provider(self) -> None:
-        """§16.1 第 2 条：无插件时列出全部内建能力及提供方（`PLG-006`）。"""
+        """§16.1 第 2 条：无插件时列出全部内建能力及提供方。"""
         dispatcher, _ = await wire()
         content = (await run(dispatcher, "/capabilities")).result.content  # type: ignore[attr-defined]
         assert "command:help" in content
@@ -375,7 +375,7 @@ class TestCancel:
 
 class TestFailureIsDiagnostic:
     async def test_handler_failure_does_not_break_the_session(self) -> None:
-        """`CMD-003`：命令失败后，同一个 dispatcher 紧接着还能正常分流。"""
+        """命令失败后，同一个 dispatcher 紧接着还能正常分流。"""
         dispatcher, _ = await wire()
         bad = await run(dispatcher, "/cancel nope")
         assert bad.disposition is Disposition.REJECTED  # type: ignore[attr-defined]
@@ -385,7 +385,7 @@ class TestFailureIsDiagnostic:
         assert plain.disposition is Disposition.MODEL_TURN  # type: ignore[attr-defined]
 
     async def test_unexpected_exception_is_folded_without_leaking_its_message(self) -> None:
-        """折出来的错误**只放类型名不放异常消息**——自由文本可能带着凭据（`D13` 的先例）。"""
+        """折出来的错误**只放类型名不放异常消息**——自由文本可能带着凭据。"""
         class Exploding(FakeInstanceView):
             def commands(self) -> tuple[object, ...]:  # type: ignore[override]
                 raise RuntimeError(f"泄漏了 {SECRET}")
@@ -426,7 +426,7 @@ class TestRegistration:
         assert COMMANDS_CORE in BUILTIN_MANIFESTS
 
     async def test_registers_through_the_ordinary_builtin_path(self) -> None:
-        """`BAS-005`：普通 manifest + `setup(api)`，没有内建专用注册通道。"""
+        """普通 manifest + `setup(api)`，没有内建专用注册通道。"""
         dispatcher, _ = await wire()
         for name in COMMAND_NAMES:
             outcome = await run(dispatcher, f"/{name}")
@@ -442,7 +442,7 @@ class TestRegistration:
 
 class TestSingleCommandDisable:
     async def test_disabled_command_disappears_from_registry_and_help(self) -> None:
-        """`TOL-006`：可见列表与可执行集合同源。"""
+        """可见列表与可执行集合同源。"""
         dispatcher, _ = await wire({CONFIG_DISABLE_KEY: ["config"]})
         assert (await run(dispatcher, "/config")).disposition is Disposition.REJECTED  # type: ignore[attr-defined]
         content = (await run(dispatcher, "/help")).result.content  # type: ignore[attr-defined]
@@ -527,7 +527,7 @@ class TestTruncation:
         assert truncate("hi", 100) == "hi"
 
     def test_result_never_exceeds_the_limit(self) -> None:
-        """截断标记**算在上限内**（`D20` 的做法）：先按最坏情况算能留多少，再渲染标记。"""
+        """截断标记**算在上限内**（做法）：先按最坏情况算能留多少，再渲染标记。"""
         for limit in (60, 120, 500):
             assert len(truncate("x" * 5000, limit)) <= limit
 

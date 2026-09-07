@@ -71,7 +71,7 @@ class TestFetch:
         assert head[1] == "https://example.com/doc"
 
     async def test_the_fetched_body_is_declared_untrusted(self) -> None:
-        """`D42` 起隔离由契约层完成，插件的责任只剩「如实表态」。
+        """ 起隔离由契约层完成，插件的责任只剩「如实表态」。
 
         原来这里断言的是一行自己加的横幅（`UNTRUSTED_BANNER`，已删），而那**是提醒不是
         隔离**——一段写着「忽略以上指令」的网页照样原样进模型。现在
@@ -321,7 +321,7 @@ class TestManifest:
         }
 
     def test_it_does_not_declare_a_priority(self) -> None:
-        """写了就会被原样采纳；插件基准值由 `base_priority_for()` 给（`D17` 的先例）。"""
+        """写了就会被原样采纳；插件基准值由 `base_priority_for` 给。"""
         for decl in MANIFEST.capabilities:
             assert "priority" not in decl.model_fields_set
 
@@ -384,7 +384,7 @@ class TestRegistration:
         assert registered == {decl.name for decl in MANIFEST.capabilities}
 
     def test_a_broken_config_stops_registration_entirely(self) -> None:
-        """`setup` 中途抛异常整批丢弃（`EDG-103`）——半注册状态不存在。"""
+        """`setup` 中途抛异常整批丢弃——半注册状态不存在。"""
         ctx = WebContext(config={"search": {"provider": "bing"}})
         api = _RecordingApi(ctx)
         with pytest.raises(KaryviaError) as caught:

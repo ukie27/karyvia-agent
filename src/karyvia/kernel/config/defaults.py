@@ -1,4 +1,4 @@
-"""配置默认值里那些**镜像自别处**的字面量（技术方案 §6.7）。
+"""配置默认值里那些**镜像自别处**的字面量。
 
 职责：把 turn 六项预算、routing 六项、hooks/context 三项超时、插件停止预算与模型请求
 重试四项的默认值集中成一处常量，供 `schema.SECTION_SPECS` 引用。
@@ -11,7 +11,7 @@
 
 **为什么不 import 那些模块**：`kernel.turn` / `kernel.routing` / `kernel.plugins` 的
 `__init__` 会把 engine、调度器、registry 与 asyncio 一起拖上配置路径，而 `karyvia config show`
-与诊断只需要十几个整数（`NFR-405` 给整个冷启动的预算是 300 ms）。抄一份字面量 + 一条
+与诊断只需要十几个整数。抄一份字面量 + 一条
 对照测试，是这条约束下唯一诚实的做法——两处不一致时测试会响，而不是用户的实例会。
 
 默认值单独成模块，使字段表保持聚焦，也避免 `schema.py` 因纯常量接近 Kernel 的 500 行
@@ -73,7 +73,7 @@ DEFAULT_CHANNEL_CONCURRENCY: Final = 64
 #: `session_concurrency` 的合法取值，与 `routing.ConcurrencyPolicy` 的三个取值同名。
 SESSION_CONCURRENCY_CHOICES: Final = ("queue", "merge", "reject")
 
-#: Hook 与 Context Provider 的三项超时（技术方案 §6.6、§10.2 第 7 步 b）。**与
+#: Hook 与 Context Provider 的三项超时。**与
 #: `kernel/turn/hooks.py` 与 `context_builder.py` 的同名 `DEFAULT_*` 必须逐一相等**，
 #: 由 `test_orchestration_defaults_match_the_turn_package` 盯着。
 DEFAULT_OBSERVER_TIMEOUT_MS: Final = 2_000
@@ -82,15 +82,15 @@ DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS: Final = 3_000
 DEFAULT_TURN_COMPACTOR: Final = "basic"
 DEFAULT_TURN_COMPACTOR_TIMEOUT_MS: Final = 120_000
 
-#: 单个插件的停止预算（`EDG-104`）。**与 `kernel/plugins/lifecycle.py` 的
+#: 单个插件的停止预算。**与 `kernel/plugins/lifecycle.py` 的
 #: `DEFAULT_STOP_TIMEOUT_MS` 必须相等**，由
 #: `test_the_stop_budget_default_matches_the_config_schema` 盯着。
 DEFAULT_PLUGIN_STOP_TIMEOUT_MS: Final = 5_000
 
-#: 长期记忆的召回四项（`MEM-003`）。**与 `kernel/turn/memory.py` 的同名 `DEFAULT_*`
+#: 长期记忆的召回四项。**与 `kernel/turn/memory.py` 的同名 `DEFAULT_*`
 #: 必须逐一相等**，由 `test_memory_defaults_match_the_turn_package` 盯着。理由与上面那三个
 #: 超时完全相同：`kernel/config/` 不得 module-level import `kernel.turn`（那会把 engine 与
-#: asyncio 拖上配置路径，`NFR-405` 的冷启动预算 300 ms）。
+#: asyncio 拖上配置路径，既定冷启动预算 300 ms）。
 DEFAULT_MEMORY_RECALL_LIMIT: Final = 5
 DEFAULT_MEMORY_RECALL_TIMEOUT_MS: Final = 3_000
 DEFAULT_MEMORY_FRAGMENT_PRIORITY: Final = 100
@@ -100,7 +100,7 @@ DEFAULT_MEMORY_ON_FAILURE: Final = "degrade"
 #: 同源同序。
 MEMORY_ON_FAILURE_CHOICES: Final = ("degrade", "fail")
 
-#: 模型请求重试四项（`MOD-003`）。**与 `kernel/turn/retry.py` 的同名 `DEFAULT_*`
+#: 模型请求重试四项。**与 `kernel/turn/retry.py` 的同名 `DEFAULT_*`
 #: 必须逐一相等**，由 `test_retry_defaults_match_the_turn_package` 盯着。
 #:
 #: `DEFAULT_RETRY_MAX_ATTEMPTS` 是**总尝试次数含第一次**，因此 `1` 就是「不重试」——

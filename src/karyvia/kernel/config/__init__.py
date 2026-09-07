@@ -1,11 +1,11 @@
-"""实例布局、配置加载与实例锁（技术方案 §6.7、§10.1 步骤 1–2、§11）。
+"""实例布局、配置加载与实例锁。
 
 职责：re-export 本包各模块的公开表面，使调用方只需 `from karyvia.kernel.config
 import ...` 一条导入路径；`load_config()` 是这里的主入口。
 不负责：获取实例锁（`InstanceLock` 由 `runtime/bootstrap.py` 在生命周期里持有）、
-读写实例目录里除 `config.json` 之外的任何文件、加载插件（`D25`）。
+读写实例目录里除 `config.json` 之外的任何文件、加载插件。
 
-**本包一个字节都不写**（`EDG-501`）。`D24` 的 `scaffold.py` / `json_schema.py` 也不例外：
+**本包一个字节都不写**。 的 `scaffold.py` / `json_schema.py` 也不例外：
 它们只**渲染**首次运行的配置与那份派生 JSON Schema，落盘在 `runtime/first_run.py`。
 
 模块间依赖是单向的：`layout` / `process` / `merge` 互不相识，`lock` 只用 `process`，
@@ -13,8 +13,8 @@ import ...` 一条导入路径；`load_config()` 是这里的主入口。
 `loader` 编排全部。配置的四层优先级只在 `sources.collect_layers()` 的返回顺序里定义一次。
 
 `secrets` 刻意不接进 `load_config()`：`SecretStr` 不是 `JsonValue`，塞进合并后的文档会让
-`validate_config()` 无从校验；`${VAR}` 在加载路径上就是一个普通字符串。接线在 `D19`
-（provider 凭据）与 `D26`（`ctx.secret()`）。
+`validate_config` 无从校验；`${VAR}` 在加载路径上就是一个普通字符串。凭据解析与
+`ctx.secret` 接线由 Runtime 负责。
 """
 
 from __future__ import annotations

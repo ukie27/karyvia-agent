@@ -1,4 +1,4 @@
-"""`normalize_metadata()` 的上限与归一化测试（`D03`，需求 §10.2 校验规则、`MSG-004`）。
+"""`normalize_metadata` 的上限与归一化测试。
 
 四项上限各有一个超限用例；「非 JSON 值必须报错而不是被静默转换」是本模块最重要的
 性质——它是 Channel 归一化没做完时唯一的报警器。
@@ -87,7 +87,7 @@ def test_depth_at_limit_is_accepted() -> None:
     ],
 )
 def test_non_json_values_are_rejected(label: str, payload: dict[object, object]) -> None:
-    """静默 `str()` 会让问题推迟到持久化层才炸，因此这里直接失败（`MSG-004`）。"""
+    """静默 `str` 会让问题推迟到持久化层才炸，因此这里直接失败。"""
     with pytest.raises(KaryviaError) as exc:
         normalize_metadata(payload)  # pyright: ignore[reportArgumentType]
     assert exc.value.code is ErrorCode.INPUT_MALFORMED, label

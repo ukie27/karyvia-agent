@@ -1,10 +1,10 @@
-"""登记、事务性批次与冻结的测试（`D06` 验收表第 7、8 行 + 注册表机制）。
+"""登记、事务性批次与冻结的测试。
 
-`EDG-103`「批次中途抛异常，registry 无残留」与「冻结后写入抛 `KERNEL_INTERNAL`」是本文件
+「批次中途抛异常，registry 无残留」与「冻结后写入抛 `KERNEL_INTERNAL`」是本文件
 的两条主线；其余用例覆盖批次状态机、查找契约与索引正确性。
 
 冲突语义（同名重复、覆盖、arity）全部在 `test_resolution.py`——注册表本身不判冲突，
-这个分工正是 `EDG-102`「覆盖永不由加载顺序决定」的落地方式。
+这个分工正是 「覆盖永不由加载顺序决定」的落地方式。
 """
 
 from __future__ import annotations
@@ -62,7 +62,7 @@ def test_staged_registrations_are_invisible_until_commit() -> None:
 
 
 def test_rollback_leaves_no_residue() -> None:
-    """`D06` 验收表第 7 行：回滚后 registry 状态与批次开始前一致。"""
+    """ 验收表第 7 行：回滚后 registry 状态与批次开始前一致。"""
     registry = CapabilityRegistry()
     with registry.batch(Builtin()) as first:
         first.add(CapabilityKind.TOOL, "fs.read", "impl")
@@ -78,7 +78,7 @@ def test_rollback_leaves_no_residue() -> None:
 
 
 def test_exception_inside_batch_rolls_back_and_propagates() -> None:
-    """`EDG-103`：`setup(api)` 中途抛异常时不得留下半注册状态，且异常不被吞掉。"""
+    """`setup(api)` 中途抛异常时不得留下半注册状态，且异常不被吞掉。"""
     registry = CapabilityRegistry()
     sentinel = RuntimeError("setup 失败")
 
@@ -159,7 +159,7 @@ def test_duplicate_slot_within_one_batch_is_rejected() -> None:
 
 
 def test_batch_fills_provider_from_itself() -> None:
-    """`add()` 没有 provider 参数：插件不能以别人的名义注册能力（`PLG-006`）。"""
+    """`add` 没有 provider 参数：插件不能以别人的名义注册能力。"""
     registry = CapabilityRegistry()
     with registry.batch(ACME) as batch:
         registration = batch.add(CapabilityKind.TOOL, "fs.read", "impl")
@@ -172,7 +172,7 @@ def test_batch_fills_provider_from_itself() -> None:
 
 
 def test_write_after_freeze_raises_kernel_internal() -> None:
-    """`D06` 验收表第 8 行：冻结后写入抛 `KERNEL_INTERNAL` 类错误。"""
+    """ 验收表第 8 行：冻结后写入抛 `KERNEL_INTERNAL` 类错误。"""
     registry = frozen_registry()
 
     with pytest.raises(KaryviaError) as excinfo:

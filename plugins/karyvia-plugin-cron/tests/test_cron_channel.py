@@ -105,7 +105,7 @@ async def test_the_sender_is_not_an_operator(tmp_path: Path) -> None:
 
 
 async def test_metadata_carries_the_job_under_a_namespace(tmp_path: Path) -> None:
-    """`MSG-002`：平台私有字段只能落在命名空间键下。"""
+    """平台私有字段只能落在命名空间键下。"""
     scheduler, clock, _ = build(tmp_path)
     await scheduler.load()
     job = await scheduler.add(make_job(every_seconds=60, name="构建检查"))
@@ -453,7 +453,7 @@ async def test_mutations_wake_the_loop(tmp_path: Path) -> None:
 
 async def test_a_corrupt_table_degrades_instead_of_raising(tmp_path: Path) -> None:
     """`AgentInstance.start()` 里的 `await channel.start()` 没有 try/except，
-    在那里抛异常会连 CLI 一起带走（`BAS-009`）。"""
+    在那里抛异常会连 CLI 一起带走。"""
     (tmp_path / JOBS_FILE).write_text("{ not json", encoding="utf-8")
     scheduler, _, _ = build(tmp_path)
 
@@ -508,7 +508,7 @@ async def test_channel_id_is_stable(tmp_path: Path) -> None:
 
 
 async def test_deliver_is_a_no_op_and_never_raises(tmp_path: Path) -> None:
-    """到期任务的出站回的是**原** Channel，不会回到这里。**不抛**（`EDG-204`）。"""
+    """到期任务的出站回的是**原** Channel，不会回到这里。**不抛**。"""
     from karyvia.contracts import OutboundMessage, SessionKey, StreamState, TurnId
 
     scheduler, _, _ = build(tmp_path)

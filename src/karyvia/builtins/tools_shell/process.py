@@ -1,11 +1,11 @@
-"""进程执行与取消宽限期：终止信号 → 宽限期 → 仍不退出标 `UNKNOWN`（`EDG-407`）。
+"""进程执行与取消宽限期：终止信号 → 宽限期 → 仍不退出标 `UNKNOWN`。
 
 职责：用 `asyncio.create_subprocess_{exec,shell}` 启动进程、并发抽干两个管道、在超时或
 取消时按「终止信号 → 宽限期 → 强杀」三步收场，交回退出码、输出与「宽限期是否用尽」。
 不负责：校验命令（`command.py`）、构造环境变量（`environ.py`）、校验 cwd（`paths.py`）、
 截断输出与折成 `ToolResult`（`executor.py`）。
 
-**取消宽限期的全部逻辑在这里**（`EDG-407`、技术方案 §8.3）。四条不变量：
+**取消宽限期的全部逻辑在这里**。四条不变量：
 
 1. **必须在 `timeout_ms + grace_ms` 内返回**。这是 `kernel/turn/invoker.py` 那条
    「`invoke` 必须在 `timeout_ms + grace` 内返回」在本工具内部的兑现——它在外面还有一层
@@ -25,11 +25,11 @@
 等进程退出，而宽限期用尽时进程可能还要跑一年。因此这里自己开两个抽干任务，任何时刻都能
 拿到「到目前为止的输出」，包括被强杀的那一刻。
 
-**输出按 UTF-8 宽松解码并归一换行符**（`errors="replace"`、`NFR-605`）。不强制子进程的
+**输出按 UTF-8 宽松解码并归一换行符**（`errors="replace"`）。不强制子进程的
 输出编码——那会盖掉运维在 `pass_env` 里点名转发的 `LC_ALL`。宽松解码意味着一个输出了
 非法 UTF-8 的程序不会让整次调用失败，而损坏本身是可见的（`�`），与 `tools_fs.decode_text`
-是同一条语义（`EDG-205`）。`\r\n` 与孤立 `\r` 一律归一成 `\n`，让同一份命令在两个平台上
-给模型看到的是同一段文本（`NFR-605`）。
+是同一条语义。`\r\n` 与孤立 `\r` 一律归一成 `\n`，让同一份命令在两个平台上
+给模型看到的是同一段文本。
 
 **Windows 走 `create_subprocess_shell`，POSIX 走 `exec`**——理由与注意事项见 `command.py`
 的模块 docstring。代价是 Windows 的 shell 配置项不生效，那是刻意的：`cmd.exe` 与
@@ -59,7 +59,7 @@ __all__ = [
     "run_process",
 ]
 
-#: 取消宽限期：送出终止信号后再给进程多少时间收尾（`EDG-407`）。与 `kernel/turn/cancel.py`
+#: 取消宽限期：送出终止信号后再给进程多少时间收尾。与 `kernel/turn/cancel.py`
 #: 的 `DEFAULT_TOOL_CANCEL_GRACE_MS` 取同一个值（2000 ms），但两处各写一份——`R4` 禁止
 #: `builtins/` import `kernel/`，而这个常量没有进 `contracts/`。有一条对照测试钉住。
 DEFAULT_GRACE_MS: Final = 2_000
@@ -79,7 +79,7 @@ class ProcessOutcome:
     #: 收到终止信号后在宽限期内退出。它有机会收尾了，但做没做完不知道——仍按 `OCCURRED`。
     TERMINATED: Final = "terminated"
 
-    #: 宽限期用尽被强杀。`UNKNOWN` 的正主（`EDG-407`）。
+    #: 宽限期用尽被强杀。`UNKNOWN` 的正主。
     GRACE_EXPIRED: Final = "grace_expired"
 
 
@@ -347,8 +347,8 @@ async def _collect(drains: tuple[asyncio.Future[bytes], ...]) -> tuple[str, str]
 def _decode(data: bytes) -> str:
     """按 UTF-8 宽松解码并归一换行符。
 
-    坏字节变成 `�`，不让整次调用失败（`EDG-205`）。`\r\n` 与孤立 `\r` 一律归一成 `\n`
-    （`NFR-605`），让同一份命令在两个平台上给模型看到的是同一段文本。
+    坏字节变成 `�`，不让整次调用失败。`\r\n` 与孤立 `\r` 一律归一成 `\n`
+    ，让同一份命令在两个平台上给模型看到的是同一段文本。
     """
     text = data.decode("utf-8", errors="replace")
     return text.replace("\r\n", "\n").replace("\r", "\n")

@@ -3,13 +3,13 @@
 职责：用 `CommandIndex`、`Diagnostics`、配置文档与 `SessionStore` 装出一个 `InstanceView`，
 用 `TurnOrchestrator` 装出一个 `TurnControl`。
 不负责：产生这些数据（在 `kernel/`）、渲染输出（`builtins/commands_core/render.py`）、
-构造 `PluginContext` 本身（`D26`）。
+构造 `PluginContext` 本身。
 
 **这里是 `R5` 的落点**，理由与 `wiring.py` 完全相同：门面的类型在 `contracts/`，实现要读
 `kernel/registry` 与 `kernel/observability` 的东西，而 `R4` 禁止 `builtins/` 够到它们、
 `R2` 禁止 `kernel/` 反向依赖。全项目只有 `runtime/` 同时看得见两边。
 
-**一致性同样靠类型标注静态证明**（`wiring.py` 的先例）：`build_instance_view()` 与
+**一致性同样靠类型标注静态证明**（`wiring.py` 的既有实现）：`build_instance_view()` 与
 `build_turn_control()` 的返回类型就写成 `InstanceView` / `TurnControl`，basedpyright 严格
 模式下它一旦不成立就当场报错。测试验不了这件事（`pyproject.toml` 把 `**/tests` 排除在
 类型检查之外），`isinstance` 也验不了（`runtime_checkable` 只查属性存在性）。
@@ -64,7 +64,7 @@ class KernelInstanceView:
     def config_document(self) -> Mapping[str, JsonValue]:
         """完整配置文档。
 
-        明文凭据结构性地不在这里：`D11` 定死配置树自始至终持有 `${VAR}` 字面量，解析出的
+        明文凭据结构性地不在这里： 定死配置树自始至终持有 `${VAR}` 字面量，解析出的
         明文只在 `SecretMap` 里，而 `LoadedConfig.to_json()` 序列化的就是那棵树。
         """
         return self.config_source()
@@ -82,7 +82,7 @@ class KernelInstanceView:
 class KernelTurnControl:
     """`TurnControl` 的生产实现。
 
-    **`TurnOrchestrator.cancel()` 是 §10.3 的唯一入口**（`D14` 定死），这里只是把它转发到
+    **`TurnOrchestrator.cancel` 是 §10.3 的唯一入口**，这里只是把它转发到
     插件够得着的位置——不另建一张令牌表。
     """
 

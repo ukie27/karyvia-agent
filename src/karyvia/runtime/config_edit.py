@@ -1,4 +1,4 @@
-"""改写 `config.json` 里的一个字符串列表（`D29`，技术方案 §10.4）。
+"""改写 `config.json` 里的一个字符串列表。
 
 职责：把 `karyvia plugins enable / disable / uninstall` 的意图落到磁盘上——读 `config.json`
 **那一层**、增删 `plugins.enabled` / `plugins.disable` 里的一项、原子替换写回。
@@ -7,16 +7,16 @@
 
 **这是全项目第二个、也是唯一一个「修改既有 `config.json`」的地方**。与 `first_run.py`
 的分工是硬的：那边只用 `O_CREAT|O_EXCL` 建新文件、既有文件一个字节都不动；这边只在文件
-**已经存在**时改其中一个列表。`kernel/config/` 仍然一个字节都不写（`EDG-501`）。
+**已经存在**时改其中一个列表。`kernel/config/` 仍然一个字节都不写。
 
 三条约束让「改用户的配置」不至于毁掉别的东西：
 
 - **只读写 `config.json` 那一层**，不是 `LoadedConfig` 那棵合并树。写回合并结果会把
   四十多个默认值、`KARYVIA_CFG_*` 与 `--set` 的临时覆盖一并物化进文件，
-  `karyvia config show --origins` 从此答不出「我改过什么」（`D24`「模板只放用户真的要改的
+  `karyvia config show --origins` 从此答不出「我改过什么」（「模板只放用户真的要改的
   键」是同一条理由）。
 - **从不解析 secret**，因此写回时没有别的东西可写：文件里原本是什么 `${VAR}` 字面量，
-  写回去还是什么（`CFG-003` 的结构性保证）。`D11` 的 `prepare_for_write()` 是给「解析过
+  写回去还是什么（结构性保证）。 的 `prepare_for_write` 是给「解析过
   之后又要落盘」准备的闸门，这条路上解析从未发生，用不上它。
 - **原子替换**：同目录临时文件 → `fsync` → `os.replace`。中途失败时原文件一个字节没动，
   与 `session_jsonl` 的整批原子性、`first_run._write_derived` 是同一种做法。

@@ -1,4 +1,4 @@
-"""入站归一化：飞书事件 → 契约 `InboundMessage`（`MSG-004`、`MSG-002`，开发方案 `D34`）。
+"""入站归一化：飞书事件 → 契约 `InboundMessage`。
 
 职责：门控顺序、去重、`conversation_id` 合成、附件引用、metadata 命名空间。
 不负责：接触 SDK（`gateway.py` 已经把事件拍成了 `RawInbound`）、正文抽取（`content.py`）、
@@ -10,9 +10,9 @@
                                   ↑ 在去重之前     ↑ 在任何副作用之前
 
 - **@ 门控在去重之前**：群里没 @ 我的消息不该占用去重表的 1000 个名额——一个热闹的群几
-  分钟就能把表冲干净，此后 WS 的重投会真的变成第二次副作用（`EDG-201`）。
+  分钟就能把表冲干净，此后 WS 的重投会真的变成第二次副作用。
 - **白名单在任何副作用之前**：反应 ack 在群里所有人都看得见，它就是副作用。
-- **去重表上限 1000、FIFO 淘汰**：飞书的 WS 会重投。这是 `EDG-201` 在 Channel 侧的第一道
+- **去重表上限 1000、FIFO 淘汰**：飞书的 WS 会重投。这是  在 Channel 侧的第一道
   防线，kernel 的 `DedupCache` 是第二道——**两道都要**，因为第一道决定要不要打反应。
 
 **bot 消息一律丢弃**：飞书的 bot 互相收发要在开放平台另配权限，默认拿不到；放行它们只会
@@ -145,7 +145,7 @@ class InboundGate:
     """归一化需要的全部配置 + 去重表。由 `settings.py` 构造。
 
     **它有状态**（去重表），因此每条 Channel 持有**一个**实例并复用——每次新建会让去重
-    表恒为空，`EDG-201` 的第一道防线随之失效。
+    表恒为空， 的第一道防线随之失效。
     """
 
     instance_id: InstanceId
@@ -218,7 +218,7 @@ def _body(raw: RawInbound) -> tuple[str, tuple[AttachmentRef, ...]]:
 
 
 def _metadata(raw: RawInbound, *, topic_isolated: bool) -> Mapping[str, JsonValue]:
-    """平台私有字段只进 `metadata["feishu"]`（`MSG-002`）。值必须可 JSON 化。"""
+    """平台私有字段只进 `metadata["feishu"]`。值必须可 JSON 化。"""
     payload: dict[str, JsonValue] = {
         "chat_id": raw.chat_id,
         "chat_type": raw.chat_type,

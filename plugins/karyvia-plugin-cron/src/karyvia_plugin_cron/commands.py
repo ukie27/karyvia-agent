@@ -66,7 +66,7 @@ def cron_spec() -> CommandSpec:
     """`/cron` 的声明。
 
     尾参声明 `repeated=True`：`/cron list all` 是两个参数，不声明的话 dispatcher 会按
-    「参数过多」把它拒掉（`plugins/…-memory` 踩过的同一条）。
+    「参数过多」把它拒掉；memory 插件也遵循相同规则。
     """
     return CommandSpec(
         name=COMMAND_NAME,
@@ -92,10 +92,10 @@ class CronCommand:
         self._scheduler = scheduler
 
     async def handle(self, invocation: CommandInvocation, cancel: CancelSignal) -> CommandResult:
-        """**约定不抛**（`CMD-003`）：一切失败折成 `REJECTED`，会话保持可用。
+        """**约定不抛**：一切失败折成 `REJECTED`，会话保持可用。
 
         **取消语义**：入口检查一次。每个子命令都是一次内存查询或一次写盘，在这之后再插
-        检查点只会得到一串必然为假的判断（`builtins/commands_core` 的同一条判定）。
+        检查点只会得到一串必然为假的判断（`builtins/commands_core` 采用的相同规则判定）。
         """
         try:
             cancel.raise_if_requested()
@@ -177,7 +177,7 @@ class CronCommand:
         job = self._require(key, rest)
         await self._scheduler.run_now(job.job_id)
         # 说「已排到最近一次」而不是「已运行」：这条命令只把到期时刻挪到现在，真正的
-        # 派发由调度循环做，而它要等本条命令所在的 turn 让出事件循环。
+        # 派发由调度循环做，而它要等本条命令所在 turn 让出事件循环。
         return _handled(f"[{job.job_id}] {job.name}：已排到最近一次运行。")
 
     async def _remove(self, key: SessionKey, rest: Sequence[str]) -> CommandResult:
@@ -199,7 +199,7 @@ class CronCommand:
         """取出本会话里的一条任务。
 
         **「不存在」与「是别人的」给同一个回答**：分开说等于把别的会话排了哪些任务告诉
-        这里的人（`tools.py` 的同一条判定）。
+        这里的人（`tools.py` 采用的相同规则判定）。
         """
         if not rest or not rest[0].strip():
             raise KaryviaError(ErrorCode.INPUT_MALFORMED, _MISSING_ARGUMENT)

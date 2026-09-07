@@ -8,7 +8,7 @@
 因此一个带对的属性的普通对象就够。这条正是「只有两个模块接触 SDK」换来的东西——
 不装 `lark-oapi` 也能把归一化与流式逐条钉住。
 
-**不放在 `conftest.py`**：那个文件的职责是零网络闸门那条 autouse 夹具（`D32`/`D33` 的先例）。
+**不放在 `conftest.py`**：那个文件的职责是零网络闸门那条 autouse 夹具（/ 的既有实现）。
 测试目录不是包，pytest 的 prepend 导入模式会把它加进 `sys.path`，因此 `import _feishu_fakes`
 成立。
 

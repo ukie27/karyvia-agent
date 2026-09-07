@@ -1,4 +1,4 @@
-"""需求 §16.1 的五条开箱可用里程碑，逐条一个分节（`D24` ★）。
+"""开箱可用的五条端到端验收，逐条一个分节。
 
 职责：验「装好之后只配一个凭据就能用」这件事在**真实内建清单**上成立，并覆盖首次运行、
 缺凭据、可中断、禁用内建四条边界。
@@ -6,8 +6,8 @@
 （`tests/runtime/`）、线格式细节（`tests/builtins/test_model_openai.py`）。
 
 **这里唯一的替身是传输层**（`conftest.recorder`）。模型供应商、会话存储、上下文组装、
-文件工具、命令、CLI 入口与装配根全部是生产实现——里程碑说的是「全新环境」，用 Fake 能力
-验它等于验了一台不存在的机器。
+文件工具、命令、CLI 入口与装配根全部是生产实现。测试的是全新环境，
+因此不能用 Fake 能力替代这些边界。
 """
 
 from __future__ import annotations
@@ -159,7 +159,7 @@ def test_capabilities_lists_every_builtin_with_its_provider(
 def test_a_missing_credential_points_at_the_file_and_the_field(
     instance_dir: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """§16.1 第 3 条、`BAS-006`、`EDG-502`。
+    """§16.1 第 3 条、。
 
     「可操作」的可断言形态是三样都在：**哪个文件**、**哪个字段**、**哪个环境变量**。
     """
@@ -240,7 +240,7 @@ async def _cancel_then_continue(
 
 
 def _message(instance: AgentInstance, text: str, *, message_id: str) -> InboundMessage:
-    """构造一条与 CLI 完全同形的入站消息（`MSG-007`：没有绕过契约的旁路）。"""
+    """构造一条与 CLI 完全同形的入站消息（没有绕过契约的旁路）。"""
     return InboundMessage(
         message_id=message_id,
         instance_id=instance.instance_id,
@@ -265,10 +265,10 @@ async def _wait_for_a_live_turn(instance: AgentInstance) -> None:
 # ------------------------------------------------------ ⑤ 禁用全部可禁用内建后 CLI 仍可用
 
 
-#: 可禁用的内建。`session-jsonl`（会话存储）、`context-basic`（`CTX-006` 的兜底）、
+#: 可禁用的内建。`session-jsonl`（会话存储）、`context-basic`（兜底）、
 #: `context-compact-basic`（Turn 内请求压缩）与 `model-openai` 是必需能力的唯一
 #: 提供方，禁用它们等于要一个不能正常回答的实例；
-#: `cli-entry` 由 `EDG-108` 显式拒绝，见下一条用例。
+#: `cli-entry` 由  显式拒绝，见下一条用例。
 DISABLEABLE = ("tools-fs", "tools-file", "tools-shell", "commands-core")
 
 
@@ -304,7 +304,7 @@ def test_the_cli_still_works_with_every_disableable_builtin_turned_off(
 def test_disabling_the_cli_entry_is_refused_with_a_reason(
     instance_dir: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`EDG-108`：静默忽略会让用户以为自己关掉了 CLI，照办则让实例没有任何入口。"""
+    """静默忽略会让用户以为自己关掉了 CLI，照办则让实例没有任何入口。"""
     monkeypatch.setenv(MODEL_API_KEY_ENV, SENTINEL_KEY)
     _write_config(
         instance_dir,
@@ -326,7 +326,7 @@ def test_disabling_the_cli_entry_is_refused_with_a_reason(
 def test_every_single_tool_and_command_can_be_turned_off(
     instance_dir: Path, recorder: Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`TOL-006` 的另一半：逐个关掉工具与命令（而不是整份提供方）后实例照样起得来。
+    """ 的另一半：逐个关掉工具与命令（而不是整份提供方）后实例照样起得来。
 
     这条与上一条不同——它走的是 `wire_capabilities(keep=...)` 那条声明过滤路径，
     忘了传 `keep` 时这里会以 `PLUGIN_LOAD_FAILED` 失败。

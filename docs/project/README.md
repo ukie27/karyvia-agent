@@ -1,7 +1,6 @@
 # Karyvia 当前状态与接手入口
 
-> 这里描述当前事实，不记录逐 PR 流水账；历史摘要见
-> [`history.md`](./history.md)，精确变化以 Git 为准。
+> 这里描述当前事实，不记录逐 PR 流水账；精确变化以 Git 为准。
 
 ## 结论
 
@@ -76,7 +75,7 @@ MCP Server 适配、Cron 调度、OpenAI API 兼容服务。内建能力也只�
 
 下面这些“锁死”是有意的兼容承诺，不是架构缺陷：
 
-- `SessionKey.storage_id()` 与 Session JSONL 持久化格式；
+- `SessionKey.storage_id` 与 Session JSONL 持久化格式；
 - 集中式错误码、错误分类和构造时脱敏；
 - 能力冲突/覆盖的确定性语义与事务注册；
 - 配置优先级和 Secret 引用不落明文；
@@ -114,7 +113,7 @@ Turn。未来若 Multi-Agent、Workflow 或 Automation 真的需要它，应设�
 
 当前 SessionKey 足以隔离现有会话，但不能自然表达“同一人在多个 Channel/Conversation
 之间共享哪些记忆”。未来应先定义稳定的主体身份映射和 `MemoryScopeKey`/请求对象，再扩展
-Memory 能力；不能改写已经持久化的 `SessionKey.storage_id()`。
+Memory 能力；不能改写已经持久化的 `SessionKey.storage_id`。
 
 ### 多模态输入与输出
 
@@ -165,7 +164,6 @@ mkdir -p .pytest-tmp
 2. [`evolution-boundaries.md`](./evolution-boundaries.md)：哪些能加、哪些必须迁移。
 3. [`change-guide.md`](./change-guide.md)：动手时的检查清单。
 4. [`../../AGENTS.md`](../../AGENTS.md)：仓库执行规则。
-5. 目标模块的 docstring、相邻测试和正式技术方案对应章节。
+5. 目标模块的 docstring、相邻测试和相关架构约束。
 
-详细阶段历史不再作为理解当前架构的前置条件，需要追溯时再读
-[`history.md`](./history.md) 或 Git。
+详细阶段历史不作为理解当前架构的前置条件，需要追溯时查看 Git。

@@ -1,4 +1,4 @@
-"""模型契约测试（`D03`，需求 §10.6、`MOD-001`、`MOD-005`、`EDG-303`–`EDG-305`）。
+"""模型契约测试。
 
 `provider_metadata` 拒收非 JSON 值是本文件的重点：这是「Provider 私有响应对象不得直接
 越过 Provider 边界」在类型层唯一的强制点。
@@ -64,11 +64,12 @@ def test_instances_are_frozen() -> None:
         response().content = "x"
 
 
-# ------------------------------------------------------------------ ModelInfo / MOD-001
+  # ------------------------------------------------------------------ ModelInfo /
+
 
 
 def test_capabilities_absent_means_unsupported() -> None:
-    """`MOD-005`：不具备的能力必须缺席集合，不允许静默降级。"""
+    """不具备的能力必须缺席集合，不允许静默降级。"""
     info = ModelInfo("m", "fake", frozenset({ModelCapability.TOOL_CALLS}))
     assert info.supports(ModelCapability.TOOL_CALLS)
     assert not info.supports(ModelCapability.STREAMING)
@@ -158,7 +159,7 @@ def test_request_rejects_duplicate_tool_names() -> None:
 
 
 def test_request_carries_correlation() -> None:
-    """`KER-010`：请求、响应、工具调用与事件挂在同一个 turn_id 上。"""
+    """请求、响应、工具调用与事件挂在同一个 turn_id 上。"""
     assert request().correlation.turn_id == "t-1"
 
 
@@ -172,7 +173,7 @@ def test_tool_calls_stop_reason_requires_calls() -> None:
 
 
 def test_duplicate_call_ids_are_rejected() -> None:
-    """`EDG-303`：重复 Tool Call 必须受控终止，而不是让执行器按 id 覆盖结果。"""
+    """重复 Tool Call 必须受控终止，而不是让执行器按 id 覆盖结果。"""
     calls = (ToolCall("c-1", "fs.read"), ToolCall("c-1", "fs.list"))
     with pytest.raises(KaryviaError) as exc:
         response(stop_reason=StopReason.TOOL_CALLS, tool_calls=calls)
@@ -264,7 +265,7 @@ def test_chunk_without_its_payload_is_rejected(kind: ChunkKind) -> None:
     assert exc.value.code is ErrorCode.KERNEL_INVARIANT_VIOLATED
 
 
-# ------------------------------------------------ `OpaqueBlock`：`EDG-305` 的受控例外（`D45`）
+# ------------------------------------------------ `OpaqueBlock`： 的受控例外
 
 
 def block(provider: str = "anthropic", kind: str = "thinking", **payload: object) -> OpaqueBlock:
@@ -272,7 +273,7 @@ def block(provider: str = "anthropic", kind: str = "thinking", **payload: object
 
 
 def test_an_opaque_block_still_refuses_sdk_objects() -> None:
-    """它是 `EDG-305` 的**受控**例外：受控的部分就是「仍然只能是归一化 JSON」。
+    """它是的**受控**例外：受控的部分就是「仍然只能是归一化 JSON」。
 
     放宽这一条，一个 SDK 对象就能顺着 assistant 消息一路回放，而切换 Provider 之后没人
     认识它——那正是 `provider_metadata` 那条强制要防的事。

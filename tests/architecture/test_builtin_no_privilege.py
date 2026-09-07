@@ -1,4 +1,4 @@
-"""内建能力不享受特权的 AST 断言（`BAS-005`、`SDK-007`，技术方案 §8.3、§14）。
+"""内建能力不享受特权的 AST 断言。
 
 职责：对真实源码树断言 `builtins/` 与外部插件受同一套约束——不 import `karyvia.kernel.*`、
 不持有自己的注册通道；声明为只读的内建连持久化的语法途径都没有。并用注入违规样例证明
@@ -6,14 +6,14 @@
 不负责：判定逻辑本身（见 `_boundaries.py`），也不导入被测模块。
 
 **为什么这条要单独立一个文件**：`R4` 已经禁止 `builtins/` import `kernel/`，
-`test_import_boundaries.py` 也已覆盖。但 `BAS-005` 说的是一件更具体、也更容易悄悄破掉的
+`test_import_boundaries.py` 也已覆盖。但  说的是一件更具体、也更容易悄悄破掉的
 事——**内建没有插件拿不到的注册路径**。一个只 import `sdk/` 的 `builtins/` 模块仍然可以
 自己造 `RegistrationBatch`（那是 `kernel.registry` 的东西，`R4` 会拦），或者更隐蔽地，
 在 `builtins/` 里写一套「内建专用」的注册辅助函数绕开 Host。第二类不违反任何依赖规则，
 只能靠本文件的符号扫描拦下来。
 
-`D17` 起 `BUILTIN_MANIFESTS` 不再为空，「每一项都是普通 manifest」那条因此真的在跑；
-每加一个内建能力都会被重新检查一遍（`D18`–`D22`）。
+ 起 `BUILTIN_MANIFESTS` 不再为空，「每一项都是普通 manifest」那条因此真的在跑；
+每加一个内建能力都会被重新检查一遍。
 """
 
 from __future__ import annotations
@@ -40,9 +40,9 @@ _KERNEL_ONLY_SYMBOLS = frozenset(
     {"RegistrationBatch", "CapabilityRegistry", "CapabilityHost", "resolve_into"}
 )
 
-#: 声明为**只读**的内建包（相对 `builtins/` 的目录名）。`D18` 的 `context_basic` 是第一个：
-#: 技术方案 §14 把「Context Provider 只读不写」列为职责划分风险项——一个顺手把检索结果
-#: 存下来的 Provider 会让「谁拥有持久化」这件事重新变得说不清（`BAS-005`）。
+#: 声明为**只读**的内建包（相对 `builtins/` 的目录名）。
+#: Context Provider 只读不写；一个顺手把检索结果
+#: 存下来的 Provider 会让「谁拥有持久化」这件事重新变得说不清。
 #:
 #: 判据是模块**根本没有 IO 的语法途径**，而不是「看起来没写盘」：不 import 这些模块，
 #: 也不出现裸 `open`。`session_jsonl` 那样确实要写盘的内建不在这张表里，它如实声明
@@ -81,7 +81,7 @@ def _builtin_modules() -> list[Path]:
 
 
 def test_builtins_do_not_import_kernel() -> None:
-    """`BAS-005` 的第一层：内建只能经 `sdk/` 说话，与外部插件同型。"""
+    """ 的第一层：内建只能经 `sdk/` 说话，与外部插件同型。"""
     violations = [
         violation
         for violation in collect_violations(src_dir=SRC_DIR, repo_root=REPO_ROOT)
@@ -93,7 +93,7 @@ def test_builtins_do_not_import_kernel() -> None:
 
 
 def test_no_builtin_module_names_a_kernel_registration_symbol() -> None:
-    """`SDK-007`：不存在内建专用注册路径。
+    """不存在内建专用注册路径。
 
     比依赖规则更严一档——`builtins/` 不该**提到**这些名字，哪怕只是在类型注解或字符串
     以外的地方引用。真要注册能力，唯一的路是 `setup(api)` 拿到的那个 Host。
@@ -147,7 +147,7 @@ def _io_offenders(path: Path) -> list[str]:
 
 @pytest.mark.parametrize("package", sorted(_READ_ONLY_BUILTIN_PACKAGES))
 def test_read_only_builtins_have_no_syntactic_route_to_persistence(package: str) -> None:
-    """只读内建不得持久化任何东西（技术方案 §14、`CTX-006` 的前提）。
+    """只读内建不得持久化任何东西。
 
     断言的是「没有途径」而不是「没有写」：一个 Provider 只要 import 了 `pathlib`，
     「它到底存不存东西」就变成了每次评审都要重看一遍的问题。

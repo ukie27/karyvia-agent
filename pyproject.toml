@@ -21,14 +21,13 @@ license-files = [
 ]
 
 dependencies = [
-    # 宿主的第三方依赖到此为止。`D35` 删掉 `legacy/` 之后，剩下的每一条都能指到一个
-    # 具体的 import 点；**能力所需的包由那个能力自己的发行包声明**（`D32` 摘掉
-    # `anthropic`、`D34` 摘掉 `lark-oapi` 的同一条理由）。
+    # 宿主的第三方依赖到此为止。每一条依赖都必须能指到一个
+    # 具体的 import 点；**能力所需的包由那个能力自己的发行包声明**。
     # 因此将来的 Memory / 扩展 Tool / Cron 插件即使需要 croniter 这类包，也不回到这里。
     "pydantic>=2.12.0,<3.0.0",      # sdk/manifest.py：PluginManifest
     "httpx>=0.28.0,<1.0.0",         # builtins/model_openai/、runtime/access/net
     # kernel/turn/invoker.py 与 kernel/plugins/loader.py：JSON Schema 校验
-    # （技术方案 §10.2 第 10 步）。两处都惰性 import，但 Kernel 直接用它，必须显式声明。
+    # 两处都惰性 import，但 Kernel 直接用它，必须显式声明。
     "jsonschema>=4.23.0,<5.0.0",
     "packaging>=24.0",              # sdk/manifest.py、sdk/version.py：SDK 版本区间
 ]
@@ -54,7 +53,7 @@ karyvia = "karyvia.runtime.cli.main:app"
 
 # Primary plugin discovery source (technical design 7.1). Official and
 # third-party plugins register in the same group and share one load path.
-# Empty until the plugin runtime lands in D25-D30.
+# Empty until the plugin runtime lands in -.
 [project.entry-points."karyvia.plugins"]
 
 [build-system]
@@ -85,27 +84,27 @@ line-length = 100
 target-version = "py311"
 
 [tool.ruff.lint]
-# 基线规则集（全仓库）。`D35` 删掉 `legacy/` 之后没有豁免层了：scripts/ 与测试树的
-# 豁免针对的是夹具与断言辅助，不是历史代码（技术方案 §12.1）。
+# 基线规则集（全仓库）。scripts/ 与测试树的
+# 豁免针对的是夹具与断言辅助，不是历史代码。
 # 沿用既有约定：不引入 `ruff format`。
 select = ["E", "F", "I", "N", "W", "C901", "PLR0915", "TRY", "ASYNC"]
 ignore = ["E501"]
 
 [tool.ruff.lint.mccabe]
-# 圈复杂度 ≤ 12（技术方案 §12.1）。
+# 圈复杂度 ≤ 12。
 max-complexity = 12
 
 [tool.ruff.lint.per-file-ignores]
 # 一次性/运维脚本与测试：可读性阈值针对产品代码，不针对夹具与断言辅助。
-# 插件是独立发行包，它们的测试树不在顶层 `tests/` 下，但适用同一条理由（`D33`）。
+# 插件是独立发行包，它们的测试树不在顶层 `tests/` 下，但适用同一条理由。
 "scripts/**/*.py" = ["C901", "PLR0915", "TRY", "ASYNC"]
 "tests/**/*.py" = ["C901", "PLR0915", "TRY", "ASYNC"]
 "plugins/*/tests/**/*.py" = ["C901", "PLR0915", "TRY", "ASYNC"]
 "examples/plugins/*/tests/**/*.py" = ["C901", "PLR0915", "TRY", "ASYNC"]
 
 [tool.basedpyright]
-# `D41` 起插件也在检查范围内。它们是独立发行包，但契约不一致（签名、Protocol 形状）
-# 只有类型检查看得见——`D39` 的 `handle(invocation, cancel)` 与 `D41` 的
+#当前插件也在检查范围内。它们是独立发行包，但契约不一致（签名、Protocol 形状）
+# 只有类型检查看得见—— 的 `handle(invocation, cancel)` 与的
 # `EventHandler` 同步/协程都是测试全绿而实际会炸。两条 include 由
 # `tests/architecture/test_type_check_scope.py` 钉住。
 venvPath = "."
@@ -127,7 +126,7 @@ pythonVersion = "3.11"
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 # examples/plugins/ 各自带 tests/：示例插件是完整独立发行包，它们的契约测试
-# 与本仓库一起跑（D30）。它们要求那两个包已 editable 装进环境。
+# 与本仓库一起跑。它们要求那两个包已 editable 装进环境。
 testpaths = ["tests", "examples/plugins", "plugins"]
 
 [tool.coverage.run]

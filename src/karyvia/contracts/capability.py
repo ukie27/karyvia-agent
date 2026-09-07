@@ -1,4 +1,4 @@
-"""能力契约：能力标识、arity 表与 Hook 表面（技术方案 §6.1、§6.6、需求 §9.3）。
+"""能力契约：能力标识、arity 表与 Hook 表面。
 
 职责：定义 `CapabilityKind` 的 10 个取值与每个 kind 的 arity 常量表、结构化的
 `ProviderId`（`Builtin` | `Plugin`）与 `CapabilityRef`，以及冻结的 9 个 `HookName`、
@@ -9,8 +9,8 @@
 三件必须由本模块（而不是各注册点）统一持有的东西：
 
 - **arity 表**决定全部冲突语义。它是数据不是文档，`CAPABILITY_ARITY` 缺一个 kind
-  就构造不出对应的判定，注册器也就没有「按加载顺序择一」的可乘之机（`EDG-102`）。
-- **`ProviderId` 是联合类型而不是裸字符串**（`SDK-002`）。"builtin" 与某个恰好叫
+  就构造不出对应的判定，注册器也就没有「按加载顺序择一」的可乘之机。
+- **`ProviderId` 是联合类型而不是裸字符串**。"builtin" 与某个恰好叫
   builtin 的插件在字符串世界里无法区分，在类型世界里连写错的机会都没有。
 - **覆盖目标的编解码**（`CapabilityRef.target` / `parse_capability_target`）。Manifest
   声明与 Registry 覆盖解析必须复用同一份实现，两处各写一套
@@ -73,10 +73,10 @@ _PLUGIN_TOKEN: Final = "plugin"
 
 
 class CapabilityKind(StrEnum):
-    """可注册的能力种类，恰好 10 个（技术方案 §6.1、`SDK-001`）。
+    """可注册的能力种类，恰好 10 个。
 
     与 `sdk.KaryviaAPI` 的 10 个注册方法一一对应：新增 kind 等于新增注册方法，
-    属于公开表面变化，须按 `NFR-104` 论证。
+    属于公开表面变化，须按  论证。
     """
 
     TOOL = "tool"
@@ -97,7 +97,7 @@ class CapabilityKind(StrEnum):
 
 
 class CapabilityArity(StrEnum):
-    """一个 kind 内允许存在多少个实现，决定冲突语义（技术方案 §6.1）。"""
+    """一个 kind 内允许存在多少个实现，决定冲突语义。"""
 
     MULTI = "multi"
     """可同名并存，全部生效，按 `(priority, provider)` 排序。"""
@@ -141,7 +141,7 @@ class Builtin:
 
 @dataclass(frozen=True, slots=True)
 class Plugin:
-    """插件提供方，由 manifest 中的稳定 `plugin_id` 标识（`PLG-001`）。"""
+    """插件提供方，由 manifest 中的稳定 `plugin_id` 标识。"""
 
     plugin_id: PluginId
 
@@ -158,7 +158,7 @@ class Plugin:
         return f"{_PLUGIN_TOKEN}{_TARGET_SEPARATOR}{self.plugin_id}"
 
 
-#: 能力提供方（`SDK-002`）。用联合类型而不是裸字符串：一个恰好叫 "builtin" 的插件
+#: 能力提供方。用联合类型而不是裸字符串：一个恰好叫 "builtin" 的插件
 #: 在字符串世界里能冒充内建，在类型世界里连表达这件事的方式都没有。
 ProviderId: TypeAlias = Builtin | Plugin
 
@@ -189,7 +189,7 @@ def parse_capability_target(text: str) -> tuple[ProviderId, str]:
     """解析 manifest 的 `overrides` 目标：`"builtin:fs.read"` / `"plugin:<id>:<name>"`。
 
     返回 `(提供方, 能力名)`。kind 不在目标串里——它由声明该覆盖的 `CapabilityDecl`
-    自己带（技术方案 §7.2），重复编码只会多出一处可以对不上的信息。
+    自己带，重复编码只会多出一处可以对不上的信息。
     """
     provider_text, separator, name = text.rpartition(_TARGET_SEPARATOR)
     if not separator or not provider_text or not name:
@@ -210,10 +210,10 @@ def parse_capability_target(text: str) -> tuple[ProviderId, str]:
 
 @dataclass(frozen=True, slots=True)
 class CapabilityRef:
-    """一个能力的完整标识（技术方案 §6.1、`SDK-002`）。
+    """一个能力的完整标识。
 
     `name` 在 kind 内定位能力，`provider` 说明由谁提供，`version` 用于诊断与兼容展示
-    （`PLG-006`：报告必须标明每项能力由内建还是插件提供）。四个字段合起来才唯一——
+    （报告必须标明每项能力由内建还是插件提供）。四个字段合起来才唯一——
     同名不同 provider 正是「覆盖」与「shadowed」要表达的关系。
     """
 
@@ -252,7 +252,7 @@ class CapabilityRef:
 
 
 class HookKind(StrEnum):
-    """扩展点的两种语义（技术方案 §6.6）。混在一个机制里会让失败隔离规则无法自洽。"""
+    """扩展点的两种语义。混在一个机制里会让失败隔离规则无法自洽。"""
 
     OBSERVER = "observer"
     """只读。并发执行、整体超时，异常与超时只记 `PLUGIN_FAILURE`，不影响 turn。"""
@@ -262,7 +262,7 @@ class HookKind(StrEnum):
 
 
 class HookName(StrEnum):
-    """冻结的 9 个 Hook（技术方案 §6.6）。新增须按 `NFR-104` 论证。"""
+    """冻结的 9 个 Hook。新增须按  论证。"""
 
     INSTANCE_READY = "instance_ready"
     INSTANCE_SHUTDOWN = "instance_shutdown"
@@ -280,7 +280,7 @@ class HookName(StrEnum):
         return HOOK_KINDS[self]
 
 
-#: Hook 到其语义的唯一映射（技术方案 §6.6 表格）。
+#: Hook 到其语义的唯一映射。
 HOOK_KINDS: Final[Mapping[HookName, HookKind]] = MappingProxyType(
     {
         HookName.INSTANCE_READY: HookKind.OBSERVER,
@@ -318,7 +318,7 @@ class HookContext:
     """交给 handler 的只读上下文。
 
     用「一个类型 + 若干可选强类型槽 + 必填表」而不是 9 个专用类型：Hook 集合已经冻结，
-    专用类型只会让 `HookHandler` 变成 9 个 Protocol，与 `NFR-104` 正面冲突；而用
+    专用类型只会让 `HookHandler` 变成 9 个 Protocol，与  正面冲突；而用
     `Mapping[str, JsonValue]` 装载荷则会把 `ModelRequest` 这类结构化对象拍平成字典，
     handler 想改写请求就只能自己拼回去。
 
@@ -362,7 +362,7 @@ class HookContext:
 
 
 class HookAction(StrEnum):
-    """拦截器的处置方式（技术方案 §6.6 的「返回语义」列）。"""
+    """拦截器的处置方式。"""
 
     CONTINUE = "continue"
     """无意见，流水线原样继续。Observer 只能返回它或 `None`。"""

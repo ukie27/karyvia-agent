@@ -199,7 +199,7 @@ async def test_subcommands_need_a_job_id(tmp_path: Path, subcommand: str) -> Non
 async def test_subcommands_refuse_another_sessions_job(
     tmp_path: Path, subcommand: str
 ) -> None:
-    """「不存在」与「是别人的」给同一个回答（`tools.py` 的同一条判定）。"""
+    """「不存在」与「是别人的」给同一个回答（`tools.py` 采用的相同规则判定）。"""
     scheduler, command, _ = await build(tmp_path)
     other = await scheduler.add(make_job(key=OTHER_KEY))
 
@@ -285,7 +285,7 @@ async def test_an_unexpected_error_carries_only_the_type_name(tmp_path: Path) ->
 
 
 async def test_handle_never_raises_for_any_subcommand(tmp_path: Path) -> None:
-    """`CMD-003`：一切失败折成 `REJECTED`，会话保持可用。"""
+    """一切失败折成 `REJECTED`，会话保持可用。"""
     _, command, _ = await build(tmp_path)
     for args in (
         [],

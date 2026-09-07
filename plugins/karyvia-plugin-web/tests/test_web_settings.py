@@ -1,6 +1,6 @@
 """`settings.py` 的用例：默认值、跨字段依赖、上界、以及被拒的写法。
 
-manifest 的 `config_schema` 在阶段 A 校验形状，这里校验它表达不了的那些。两处都通过
+manifest 的 `config_schema` 在加载前校验 校验形状，这里校验它表达不了的那些。两处都通过
 才叫「配置错了会响」。
 """
 
@@ -27,7 +27,7 @@ def _fails(config: dict[str, JsonValue]) -> KaryviaError:
 
 class TestDefaults:
     def test_an_empty_block_is_valid(self) -> None:
-        """装上插件不配任何东西就能用——`BAS-001` 在这一层的形态。"""
+        """装上插件不配任何东西就能用—— 在这一层的形态。"""
         settings = resolve_settings({})
         assert settings.search.provider == DEFAULT_PROVIDER
         assert settings.search.max_results == DEFAULT_MAX_RESULTS
@@ -50,8 +50,8 @@ class TestDefaults:
 
 class TestValidation:
     def test_an_unknown_provider_lists_the_choices(self) -> None:
-        """取值受限的字段必须在报错时说「你可以写哪几个」（`D13` 给 `FieldSpec` 加
-        `choices` 的同一条理由）。"""
+        """取值受限的字段必须在报错时说「你可以写哪几个」（ 给 `FieldSpec` 加
+        `choices` 基于相同理由）。"""
         error = _fails({"search": {"provider": "bing"}})
         assert error.detail["choices"] == list(PROVIDERS)
         assert error.detail["key"] == "plugins.web.config.search.provider"
@@ -63,7 +63,7 @@ class TestValidation:
 
     def test_max_result_chars_has_a_ceiling(self) -> None:
         """放行只会让每次调用都在构造 `ToolResult` 时才炸，那时错误指向 kernel 而不是
-        这行配置（`D20` 的先例）。"""
+        这行配置。"""
         error = _fails({"fetch": {"max_result_chars": 10_000_000}})
         assert error.detail["key"] == "plugins.web.config.fetch.max_result_chars"
 

@@ -2,7 +2,7 @@
 
 职责：在 Karyvia home 中安装、更新和卸载插件；列出当前实例状态；把启用 / 禁用写进
 实例 ``config.json``；在显式确认后删除实例插件状态。
-不负责：发现与阶段 A 判定（`runtime/inspect.py` → `inventory.py` / `plugin_plan.py`）、
+不负责：发现与加载前校验 判定（`runtime/inspect.py` → `inventory.py` / `plugin_plan.py`）、
 改配置的文件操作（`runtime/config_edit.py`）。
 
 安装、更新、卸载是全局操作，不接受实例参数，并要求全部实例停止。启用、禁用和状态清理
@@ -156,7 +156,7 @@ def _list(options: Options, args: Sequence[str]) -> int:
     sys.stdout.write(f"实例目录：{inspection.loaded.layout.root}\n")
     statuses = inspection.statuses
     if not statuses:
-        # 「没有插件」是 `EDG-101` 要求的可用形态，说一句确认比印一张空表清楚。
+        # 「没有插件」是  要求的可用形态，说一句确认比印一张空表清楚。
         sys.stdout.write("\n没有发现任何外部插件（内建能力见 karyvia capabilities）。\n")
         return 0
     sys.stdout.write(f"\n已发现插件（{len(statuses)}）：\n")
@@ -168,7 +168,7 @@ def _list(options: Options, args: Sequence[str]) -> int:
 def _render(status: PluginStatus) -> str:
     """一条插件记录。
 
-    `reason` 直接印 `inventory._SKIP_REASONS` 那张表里的原话——`D25` 定死跳过原因的文案
+    `reason` 直接印 `inventory._SKIP_REASONS` 那张表里的原话—— 定死跳过原因的文案
     只有一份，CLI 侧再写一份会让「为什么没加载」有两种说法。
     """
     version = f"  {status.version}" if status.version else ""
@@ -343,7 +343,7 @@ def _disable(layout: InstanceLayout, args: Sequence[str]) -> int:
     """写入 `plugins.disable`。**不动 `enabled`**——那样 `enable` 才是它的逆操作。
 
     对内建同样有效（`plugins.disable` 是按提供方禁用）。唯一被拒的是 CLI 入口，
-    那条判定在装配根（`EDG-108`），启动时才报——这里不抄一遍，否则两份判定会分叉。
+    那条判定在装配根，启动时才报——这里不抄一遍，否则两份判定会分叉。
     """
     plugin_id = _plugin_id(args, "karyvia plugins disable <插件 id>")
     document = read_document(layout.config_path)
@@ -363,7 +363,7 @@ def _disable(layout: InstanceLayout, args: Sequence[str]) -> int:
 def _purge(layout: InstanceLayout, args: Sequence[str]) -> int:
     """删除插件的状态目录。**没有 `--confirm` 就只打印，不删任何东西。**
 
-    路径与体积在确认之前打印（`EDG-505`）：一句「确定吗」不足以让用户知道自己将要失去
+    路径与体积在确认之前打印：一句「确定吗」不足以让用户知道自己将要失去
     什么，而这是本命令唯一不可撤销的动作。
     """
     plugin_id = _plugin_id(args, "karyvia plugins purge <插件 id> --confirm", flags=["--confirm"])
@@ -409,7 +409,7 @@ def _measure(root: Path) -> tuple[int, int]:
 
 
 def _human(size: int) -> str:
-    """人读的体积。`EDG-505` 要的是「打印体积」，而 `13421772 字节` 不是给人读的。"""
+    """人读的体积。 要的是「打印体积」，而 `13421772 字节` 不是给人读的。"""
     value = float(size)
     for unit in ("B", "KiB", "MiB", "GiB"):
         if value < 1024 or unit == "GiB":

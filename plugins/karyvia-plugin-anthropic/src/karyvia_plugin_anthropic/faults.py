@@ -1,4 +1,4 @@
-"""Anthropic 的 HTTP 状态码、错误体与 httpx 异常到 `KaryviaError` 的映射（`MOD-003`）。
+"""Anthropic 的 HTTP 状态码、错误体与 httpx 异常到 `KaryviaError` 的映射。
 
 职责：把「限流、超时、认证失败、过载」几类外部故障折成可分类、`retryable` 标注如实的
 `KaryviaError`；解析退避提示。
@@ -8,7 +8,7 @@
 三条判定：
 
 - **`detail` 不放 `error.message`。** 那段自由文本会回显用户的 prompt，也可能带着被原样
-  echo 回来的凭据。只放状态码、`error.type`、退避提示与 `request_id`——先例是 `D13` 的
+  echo 回来的凭据。只放状态码、`error.type`、退避提示与 `request_id`——先例是的
   「命令 handler 异常只留类型名不留消息」。`redact()` 是最后一道防线，不是把明文放进去
   的理由。
 - **429 按 `error.type` 分两类，不按状态码。** 撞上限速等一会儿就好，欠费重试一万次也不会

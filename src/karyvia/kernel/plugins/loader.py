@@ -1,4 +1,4 @@
-"""阶段 A 的三项机制：依赖拓扑、配置校验与状态版本（技术方案 §7.3 阶段 A 的 A4/A5/A7）。
+"""加载前校验 的三项机制：依赖拓扑、配置校验与状态版本。
 
 职责：把一组 `(id, dependencies)` 排成一份确定的加载顺序并指出缺失与环路；
 把一份配置块对着一份 JSON Schema 校验成带字段路径的错误；把一个插件声明的
@@ -7,11 +7,11 @@
 发现候选（`discovery.py`）、跑 `setup` 与事务性注册（`builtin_loader.py`），或判断最终
 能力集合是否足以运行实例（那是 Runtime 装配根的职责）。
 
-**本模块与 `builtin_loader.py` 的分工就是阶段 A 与阶段 B**：前者只看声明、一个插件模块
-都不导入（§7.3 的「不导入插件实现」是阶段 A 的定义性约束），后者才 import `setup`。
+**本模块与 `builtin_loader.py` 的分工就是加载前校验 与注册阶段**：前者只看声明、一个插件模块
+都不导入（§7.3 的「不导入插件实现」是加载前校验 的定义性约束），后者才 import `setup`。
 把两者写成一个文件会让「校验期没有导入」退化成一条要人遵守的纪律。
 
-**加载顺序不是覆盖顺序**（`EDG-102`）：拓扑序只保证「被依赖者先 `setup`」，谁覆盖谁永远
+**加载顺序不是覆盖顺序**：拓扑序只保证「被依赖者先 `setup`」，谁覆盖谁永远
 只由 manifest 的 `overrides` 与 `kernel/registry/resolution.py` 决定。同层内按 id 字典序
 定序，只为让诊断与测试可复现。
 """
@@ -38,7 +38,7 @@ __all__ = [
 ]
 
 #: 插件状态目录里记录 `state_version` 的那个文件。名字带前导点且以 `karyvia` 起头：
-#: 那个目录归插件所有（`EDG-505`），宿主往里放东西必须一眼可辨认出不是插件自己写的。
+#: 那个目录归插件所有，宿主往里放东西必须一眼可辨认出不是插件自己写的。
 STATE_FILE: Final = ".karyvia-state.json"
 
 #: 状态标记文件里的键。
@@ -84,7 +84,7 @@ class PlanNode:
 
 @dataclass(frozen=True, slots=True)
 class PlanFailure:
-    """一个插件在阶段 A 就落榜的原因。"""
+    """一个插件在加载前校验 就落榜的原因。"""
 
     plugin_id: str
     error: KaryviaError
@@ -92,7 +92,7 @@ class PlanFailure:
 
 @dataclass(frozen=True, slots=True)
 class LoadPlan:
-    """阶段 A 的产物：有序加载计划 + 失败清单（§7.3 的字面表述）。
+    """加载前校验 的产物：有序加载计划 + 失败清单（§7.3 的字面表述）。
 
     两段都保留而不是让失败者从 `order` 里静默消失：`/plugins` 要回答的是「谁没被加载、
     为什么」，而那正是一次「我明明启用了它」的排查所需要的全部信息。
@@ -108,7 +108,7 @@ def plan_load_order(
     provided: Iterable[str] = (),
     excluded: Iterable[str] = (),
 ) -> LoadPlan:
-    """把节点排成拓扑序（`A4`，`PLG-003`）。
+    """把节点排成依赖拓扑序。
 
     `provided` 是「已经在场、不参与排序」的 id：内建提供方就是这样进来的——一个插件依赖
     `tools-fs` 是合法的，而内建在外部插件之前就已经注册完了。
@@ -121,12 +121,12 @@ def plan_load_order(
     三种落榜各有各的诊断：
 
     - **依赖缺失**：`dependencies` 里的 id 既不在本批、也不在 `provided` 里。
-    - **依赖成环**：错误里带整条环路（`PLG-003` 明确要求「指出环路」）。
+    - **依赖成环**：错误里带整条环路。
     - **级联**：依赖的插件自己落榜了。仍然加载它等于让 `setup()` 在一个说好会存在的能力
       不存在的前提下跑，那种失败发生在插件代码里，比在这里说清楚难查得多。
 
     **同层内按 id 字典序**，因此同一份配置每次得到同一个顺序。加载顺序永不决定覆盖
-    （`EDG-102`）——定序只为可复现。
+    ——定序只为可复现。
 
     **异常约定**：不抛。落榜也是结论，与 `build_inventory()` 的「一次报全」同构。
     """
@@ -268,7 +268,7 @@ def validate_plugin_config(
     plugin_id: str,
     pointer: str,
 ) -> KaryviaError | None:
-    """按 manifest 的 `config_schema` 校验一个插件的配置块（`A5`，`CMP-001`）。
+    """按 manifest 的 `config_schema` 校验一个插件的配置块。
 
     没有 schema 就没有可校验的东西——`None` 时直接放行，而不是「未声明即禁止一切键」：
     `config_schema` 是可选字段，把它当成隐含的空对象会让所有没写它的插件配置全部报错。
@@ -277,12 +277,12 @@ def validate_plugin_config(
     问题的路径拼在它后面——用户要的是「去 `config.json` 的哪一行改」，
     而不是一个相对于插件私有 schema 的路径。
 
-    **异常约定**：不抛，返回 `KaryviaError | None`。失败是阶段 A 的一条记录而不是一次崩溃，
-    插件配置写错时实例仍要能起来（`PLG-004`）。
+    **异常约定**：不抛，返回 `KaryviaError | None`。失败是加载前校验 的一条记录而不是一次崩溃，
+    插件配置写错时实例仍要能起来。
 
     **`jsonschema` 惰性 import**：这是全项目第二个接触点（另一处是
     `kernel/turn/invoker._compile`），两处都惰性——`import kernel.plugins` 出现在
-    `karyvia plugins` 这类只读路径上，而 `jsonschema` 的导入是几十毫秒（`NFR-405`）。
+    `karyvia plugins` 这类只读路径上，而 `jsonschema` 的导入是几十毫秒。
     """
     if not schema:
         return None
@@ -324,7 +324,7 @@ def _compile(schema: Mapping[str, JsonValue], *, plugin_id: str) -> _Validator |
     （声明的问题）而不是 `CONFIG_INVALID`（用户配置的问题）——两者的补救动作不同。
 
     `cast` 有运行时检查支撑（`callable(getattr(...))`），这是 `AGENTS.md` 原则 6 对 `cast`
-    的要求：`jsonschema` 没有 `py.typed`，收口必须在这一处完成。
+   当前约束：`jsonschema` 没有 `py.typed`，收口必须在这一处完成。
     """
     import jsonschema.validators as js  # boundary: 无类型标注的第三方库，形状在本函数内收口
 
@@ -353,7 +353,7 @@ def _compile(schema: Mapping[str, JsonValue], *, plugin_id: str) -> _Validator |
 def check_state_version(
     state_dir: Path, declared: int, *, plugin_id: str
 ) -> KaryviaError | None:
-    """比对声明的 `state_version` 与状态目录里记着的那个（`A7`，`EDG-503`）。
+    """比对声明的 `state_version` 与状态目录里记着的版本。
 
     三种情形：
 
@@ -364,7 +364,7 @@ def check_state_version(
 
     **版本不一致一律拒绝加载，升与降都是**：迁移函数是 P2 的能力（§10.5），在它存在之前
     「让插件带着为另一个版本写的状态跑起来」与「静默改写版本号」都在拿用户数据赌一把，
-    而 `EDG-503` 要的恰好是「升级失败时保住旧状态」。补救动作是显式的：清掉状态目录，
+    而  要的恰好是「升级失败时保住旧状态」。补救动作是显式的：清掉状态目录，
     或把插件换回原来的版本。
 
     **异常约定**：不抛。标记文件读不动、不是 JSON、版本不是整数，一律折成失败返回——

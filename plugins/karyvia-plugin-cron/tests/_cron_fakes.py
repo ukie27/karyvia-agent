@@ -2,7 +2,7 @@
 
 `testpaths` 一次收集整个 `plugins/`，而 pytest 按模块名去重：两个插件各有一个
 `_fakes.py` 时，先导入的会顶掉后一个，另一棵测试树整体 `ImportError`。
-**单独跑各自目录看不出来，跑全量才炸**（`D34` 就是这么发现的）。
+**单独跑各自目录看不出来，跑全量才炸**。
 
 职责：一个带 `state_dir` 的 `PluginContext`、可控时钟与 `sleep`、一个手写的 DST 时区，
 以及构造 `ToolInvocation` / `CommandInvocation` 的小工厂。

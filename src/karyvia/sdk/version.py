@@ -1,4 +1,4 @@
-"""SDK 版本与兼容判定（技术方案 §7.6，需求 `SDK-005`、`CMP-001`）。
+"""SDK 版本与兼容判定。
 
 职责：导出 `SDK_VERSION`，并按 PEP 440 判定插件声明的 `sdk_range` 是否兼容当前 SDK。
 不负责：决定不兼容插件的处置方式，也不负责主程序版本；SDK 与发行包独立演进。
@@ -29,7 +29,7 @@ _CURRENT: Final = Version(SDK_VERSION)
 def parse_sdk_range(sdk_range: str) -> SpecifierSet:
     """把 `sdk_range` 解析为 PEP 440 specifier 集合。
 
-    形状非法抛 `PLUGIN_MANIFEST_UNSUPPORTED` 并带上原始串——`CMP-001` 要求缺失或非法的
+    形状非法抛 `PLUGIN_MANIFEST_UNSUPPORTED` 并带上原始串—— 要求缺失或非法的
     兼容字段直接判定为校验失败并指出位置，不做兜底猜测（比如「解析不了就当全兼容」，
     那正好让最该被拦下的插件通过）。
     """
@@ -44,7 +44,7 @@ def parse_sdk_range(sdk_range: str) -> SpecifierSet:
 
 
 def is_compatible(sdk_range: str, *, sdk_version: str = SDK_VERSION) -> bool:
-    """当前 SDK 是否落在插件声明的兼容范围内（`SDK-005`）。
+    """当前 SDK 是否落在插件声明的兼容范围内。
 
     `prereleases=True`：预发布版本必须能被 `>=1.0,<2.0` 这类范围接纳，否则用
     `1.1.0rc1` 跑一遍插件矩阵就得先改所有插件的 manifest。注意这不改变 PEP 440 的排序

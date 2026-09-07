@@ -1,4 +1,4 @@
-"""工具实现的公共骨架：参数读取、失败折叠与 `ToolResult` 构造（`TOL-002`、`EDG-401`）。
+"""工具实现的公共骨架：参数读取、失败折叠与 `ToolResult` 构造。
 
 职责：`FsTool` 基类（把 `execute()` 的「约定不抛」一次性做对）、一组参数读取器、
 以及 `ToolResult` 的两个构造口。
@@ -134,12 +134,12 @@ def success(
     truncated: bool = False,
     trust: TrustLevel = TrustLevel.UNTRUSTED,
 ) -> ToolResult:
-    """构造一个成功结果，顺带把 `content` 收进上限（`TOL-003`）。
+    """构造一个成功结果，顺带把 `content` 收进上限。
 
     `truncated` 是**或**上去的：调用方可能已经在更早的地方截过一次（`fs.read` 的
     `max_read_bytes`、`fs.grep` 的匹配数封顶），那一次也算截断。
 
-    **`trust` 由调用方给，默认不可信**（`D42`）。四个读类工具交出的是磁盘上的内容——
+    **`trust` 由调用方给，默认不可信**。四个读类工具交出的是磁盘上的内容——
     文件正文、匹配行、目录里的名字——那些一个字都不是本工具写的。只有 `fs.write` 的
     回执是自己的话，它显式传 `SYSTEM`。
     """

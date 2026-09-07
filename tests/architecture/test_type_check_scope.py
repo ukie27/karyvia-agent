@@ -1,14 +1,14 @@
-"""插件必须在 basedpyright 的检查范围内（`D41`）。
+"""插件必须在 basedpyright 的检查范围内。
 
 职责：断言 `pyproject.toml` 的 `[tool.basedpyright]` 真的覆盖 `plugins/` 与
 `examples/plugins/`，且它排除的那几个模块**恰好**是「import 了 CI 里不存在的平台 SDK」
 的那几个。
 不负责：类型检查本身（那是 CI 的 `basedpyright` 步骤）。
 
-**为什么插件必须进检查范围。** `D39` 的 `memory` 插件把 `CommandHandler.handle` 写成了
+**为什么插件必须进检查范围。**的 `memory` 插件把 `CommandHandler.handle` 写成了
 单参数，49 个命令用例全绿——它们直接用一个实参调 `handle()`，测的是「我自己写的那个签名」
 而不是「kernel 会怎么调」；`isinstance` 对 `runtime_checkable` Protocol 又只查属性存在性。
-`D41` 把插件纳入检查后，同一类问题当场又抓到一个：`sdk.EventHandler` 声明的是
+ 把插件纳入检查后，同一类问题当场又抓到一个：`sdk.EventHandler` 声明的是
 `Awaitable[None]`，而 `feishu` 与 `openai-api` 注册的都是同步 handler，桥接层于是每来一个
 事件就多产一条 `await None` 的异常 Task。**两次都是「测试测不到、类型能看见」。**
 
@@ -19,7 +19,7 @@
 
 排除是**按模块**而不是按插件的，这正好落在各 Channel 插件早就划好的那条线上：
 「只有 `gateway.py` / `client.py` 一两个模块 import SDK，其余全是纯函数」
-（`D33` 定的形状）。所以这条守卫同时钉住了那条线——**谁在第二个模块里 import 了平台
+。所以这条守卫同时钉住了那条线——**谁在第二个模块里 import 了平台
 SDK，谁就会让这里失败**，而那正是需要有人看一眼的时刻。
 """
 
@@ -90,7 +90,7 @@ def test_plugins_are_inside_the_type_check_scope() -> None:
         assert required in entries, (
             f"basedpyright 的 include 里没有 {required!r}，插件不在类型检查范围内。\n"
             "当前 include：" + ", ".join(sorted(entries)) + "\n"
-            "插件不被检查时，签名与契约的不一致只能靠人眼发现——D39 与 D41 各漏过一次。"
+            "插件不被检查时，签名与契约的不一致只能靠人眼发现—— 与  各漏过一次。"
         )
 
 
@@ -107,7 +107,7 @@ def test_type_check_excludes_exactly_the_sdk_boundary_modules() -> None:
         + "\n".join(f"  {path}" for path in missing)
         + "\n\n两种可能，处理方式相反：\n"
         "  1. 这个 import 本该待在既有的 SDK 边界模块里（gateway.py / client.py），"
-        "那就把它挪回去——每个插件只有一两个模块碰 SDK 是 D33 定下的形状。\n"
+        "那就把它挪回去——每个插件只有一两个模块碰 SDK 是  定下的形状。\n"
         "  2. 确实需要新开一个边界模块，那就把它加进 pyproject 的 exclude，"
         "并在插件 README 里说明多了一处 SDK 接触点。"
     )
@@ -117,7 +117,7 @@ def test_type_check_excludes_exactly_the_sdk_boundary_modules() -> None:
         "以下模块被排除在类型检查之外，但它们已经不 import 任何 CI 缺席的 SDK：\n"
         + "\n".join(f"  {path}" for path in stale)
         + "\n\n把它们从 pyproject 的 exclude 里删掉——白白少检查一个模块，"
-        "而这正是 D41 要堵的那个口子。"
+        "而这正是  要堵的那个口子。"
     )
 
 

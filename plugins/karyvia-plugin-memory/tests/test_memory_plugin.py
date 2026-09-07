@@ -42,7 +42,7 @@ def test_manifest_survives_a_real_parse() -> None:
 
 
 def test_the_entry_point_name_equals_the_manifest_id() -> None:
-    """对不上即失败（`D25`）：静默以 manifest 为准会让 `plugins.enabled` 指不到东西。"""
+    """对不上即失败：静默以 manifest 为准会让 `plugins.enabled` 指不到东西。"""
     text = (_PACKAGE.parents[1] / "pyproject.toml").read_text(encoding="utf-8")
     assert f'\n{MANIFEST.id} = "karyvia_plugin_memory:MANIFEST"' in text
 
@@ -58,7 +58,7 @@ def test_the_manifest_declares_exactly_six_capabilities() -> None:
 
 
 def test_the_manifest_does_not_set_a_priority() -> None:
-    """写了就会被原样采纳，而插件基准是 100——`D16` 记过这条坑。"""
+    """写了就会被原样采纳，而插件基准是 100—— 记过这条坑。"""
     for decl in MANIFEST.capabilities:
         assert "priority" not in decl.model_fields_set
 
@@ -217,7 +217,7 @@ def test_this_guard_would_notice_a_new_import(tmp_path: Path) -> None:
 
 
 def test_importing_the_package_has_no_side_effects() -> None:
-    """发现阶段只 import 本模块取 `MANIFEST`，此时不该发生任何 IO（技术方案 §7.2）。"""
+    """发现阶段只 import 本模块取 `MANIFEST`，此时不该发生任何 IO。"""
     import subprocess
     import sys
 
@@ -247,7 +247,7 @@ def test_no_module_exceeds_the_file_size_limit() -> None:
 
 
 def test_every_module_has_a_responsibility_docstring() -> None:
-    """「职责 / 不负责」两行是本仓库对新模块的硬要求（技术方案 §4.6）。"""
+    """「职责 / 不负责」两行是本仓库对新模块的硬要求。"""
     for path in _module_paths():
         docstring = ast.get_docstring(ast.parse(path.read_text(encoding="utf-8"))) or ""
         assert "职责：" in docstring, path.name

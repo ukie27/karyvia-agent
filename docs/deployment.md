@@ -127,7 +127,7 @@ journalctl -u karyvia -f
 ```
 
 **`SIGTERM` 就是干净停止**：`karyvia serve` 收到中断后先请求取消在跑的 turn（已产生的内容
-因此落库）、再走完 `stop()`。默认的 `TimeoutStopSec` 足够——收尾只有取消任务与关文件。
+因此落库）、再走完 `stop`。默认的 `TimeoutStopSec` 足够——收尾只有取消任务与关文件。
 
 ## 日志与可观测性
 

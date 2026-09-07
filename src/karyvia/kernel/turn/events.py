@@ -1,4 +1,4 @@
-"""Turn 事件：engine 产出的 9 个不可变事件与「异常属于哪个终态」的唯一映射（技术方案 §6.2）。
+"""Turn 事件：engine 产出的 9 个不可变事件与「异常属于哪个终态」的唯一映射。
 
 职责：定义 `run_turn()` 事件流的全部事件类型、`TurnEvent` / `TerminalEvent` 两个封闭联合，
 以及把逸出异常翻译成终态事件的 `terminal_from_error()`。
@@ -12,10 +12,9 @@
 忘了处理，是类型检查期报错而不是线上少发一条消息。契约层的 `ModelChunk` 选了 kind + 可选载荷
 的形态，因为它的 5 种载荷同构且小；engine 事件的载荷是 5 种完全不同的契约对象，不同构。
 
-**为什么放 kernel 而不是 contracts**：三条各自独立的理由。其一，`tests/contracts/
-test_field_traceability.py` 要求每个契约类型对上需求 §10 的某一节，而这些事件是 §6.2 那次
-两层拆分的产物，是实现结构而不是需求资产。其二，进 `contracts.__all__` 就会被字面量快照
-变成永久公开表面（`NFR-104`），等于承诺 engine 的循环结构今后不变；插件观察 turn 的正规路径
+**为什么放 kernel 而不是 contracts**：这些事件只描述 Engine 的内部循环结构，
+不是跨层契约。进 `contracts.__all__` 就会被字面量快照
+变成永久公开表面，等于承诺 engine 的循环结构今后不变；插件观察 turn 的正规路径
 是 `RuntimeEvent` 与 9 个 Hook。其三，`TurnCancelled.checkpoint` 与 `TurnStoppedByLimit.breach`
 引用的是 kernel 的 `Checkpoint` 与 `LimitBreach`，搬进零依赖的 contracts 就得把那两个也搬，
 而它们是 Kernel 机制，不是跨层契约。
@@ -80,7 +79,7 @@ class ToolDisposition(StrEnum):
     """模型报了一个不在本次请求 `tools` 里的名字，未执行（`side_effect=NONE`）。"""
 
     SKIPPED = "skipped"
-    """取消发生时尚未轮到执行，未执行（`side_effect=NONE`，技术方案 §6.4 检查点 5）。"""
+    """取消发生时尚未轮到执行，未执行。"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,7 +140,7 @@ class ToolCallCompleted:
 class TurnCompleted:
     """终态：模型给出了不带工具调用的回答（`TurnStatus.COMPLETED`）。
 
-    `truncated=True` 表示模型因 `MAX_TOKENS` 停止、答案被截断（`EDG-304`）。
+    `truncated=True` 表示模型因 `MAX_TOKENS` 停止、答案被截断。
     此时出站消息的 `stream_state` 会被 orchestrator 改为 `CANCELLED` 以触发标记。
     """
 
@@ -156,7 +155,7 @@ class TurnFailed:
     """终态：`TurnStatus.FAILED`。
 
     engine 自身不向上抛异常——没有正常事件序列的中断会让 orchestrator 无从善后
-    （技术方案 §6.2 的 engine 不变量第二条）。工具失败**不**走这里：那是回给模型的
+    。工具失败**不**走这里：那是回给模型的
     一条 tool 消息，turn 继续。
     """
 
@@ -170,8 +169,7 @@ class TurnCancelled:
     """终态：`TurnStatus.CANCELLED`。
 
     `checkpoint` 指出停在 6 个命名检查点的哪一个（`raise_if_requested()` 而非
-    `checkpoint()` 抛出时为 `None`），orchestrator 据此决定善后动作——技术方案 §6.4
-    的表格是逐检查点写的。
+    `checkpoint` 抛出时为 `None`），orchestrator 据此选择对应的善后动作。
     """
 
     reason: CancelReason
@@ -182,12 +180,12 @@ class TurnCancelled:
 
 @dataclass(frozen=True, slots=True)
 class TurnStoppedByLimit:
-    """终态：`TurnStatus.STOPPED_BY_LIMIT`（`KER-005`：正常终止并返回可诊断结果）。
+    """终态：`TurnStatus.STOPPED_BY_LIMIT`（正常终止并返回可诊断结果）。
 
     `breach.describe()` 就是那份「可诊断说明」，可直接进 `OutboundMessage`。
 
     Orchestrator 将它翻译成独立的 `turn.stopped_by_limit`，不能用 `turn.completed` 承载；
-    观察者必须能区分模型自然结束和预算中止（`EDG-304`）。
+    观察者必须能区分模型自然结束和预算中止。
 
     `turn_timeout_ms` 越界**不**产生本事件：它的 `terminal_status` 是 `CANCELLED`
     （见 `limits.LIMIT_OUTCOMES`），走 `TurnCancelled(reason=TIMEOUT)`。

@@ -1,4 +1,4 @@
-"""`karyvia serve` 的命令层行为（`D31`）。
+"""`karyvia serve` 的命令层行为。
 
 职责：验参数解析、首次运行分支与「没有任何 Channel 时的退出码」。
 不负责：HTTP 协议与真实 turn（`tests/e2e/test_openai_api.py`）。

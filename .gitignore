@@ -102,6 +102,6 @@ bridge/node_modules/
 .pytest-tmp/
 .pytest-tmp-local/
 
-# 类型检查的临时输出（D41 排查用）
+# 类型检查的临时输出
 bp.json
 bp.err

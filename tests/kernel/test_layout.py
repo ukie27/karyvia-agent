@@ -1,4 +1,4 @@
-"""实例目录布局的测试（`D10` 验收：路径推导、目录结构、`ensure()` 幂等）。
+"""实例目录布局的测试。
 
 | 验收项 | 测试 |
 | --- | --- |
@@ -167,7 +167,7 @@ class TestEnsure:
             assert path.is_dir()
 
     def test_writes_no_files(self, tmp_path: Path) -> None:
-        """`ensure()` 只建目录。生成 `config.json` 是 `D24` 的 `karyvia init`，不是加载路径。"""
+        """`ensure` 只建目录。生成 `config.json` 是 `karyvia init`，不是加载路径。"""
         layout = InstanceLayout.resolve(instance_dir=tmp_path / "inst", env={})
         layout.ensure()
         assert not layout.config_path.exists()

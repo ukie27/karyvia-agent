@@ -1,4 +1,4 @@
-"""`kernel/config/secrets.py` 的行为测试（`D11`：`CFG-003`、`EDG-502`）。
+"""`kernel/config/secrets.py` 的行为测试。
 
 覆盖四类验收点：`SecretStr` 的全部输出路径都不泄漏（哨兵扫描）、`${VAR}` 的扫描与解析
 （含 JSON Pointer 位置与转义）、缺失变量只报变量名、写回往返保留 `${VAR}` 字面量。
@@ -182,8 +182,11 @@ def test_scan_does_not_read_the_environment() -> None:
         ("${A}-${B}-${A}", ("A", "B")),  # 重复只算一次，顺序按首次出现
         ("no refs here", ()),
         ("${}", ()),  # 空名不是引用
+
         ("${a b}", ()),  # 含空格不是引用
+
         ("$NM_TEST_KEY", ()),  # 无花括号不是引用
+
     ],
 )
 def test_secret_ref_names(text: str, expected: tuple[str, ...]) -> None:
@@ -254,7 +257,7 @@ def test_resolve_text_returns_plain_string_when_there_is_no_ref() -> None:
     assert resolve_text("${NM_TEST_KEY}", env=ENV) == SecretStr(SENTINEL)
 
 
-# ----------------------------------------------------------------- 缺失变量（EDG-502）
+# ----------------------------------------------------------------- 缺失变量
 
 
 def test_missing_variable_reports_the_name_only() -> None:
@@ -317,7 +320,7 @@ def test_resolve_text_missing_variable_records_the_given_pointer() -> None:
     ]
 
 
-# ------------------------------------------------------------- 写回（CFG-003）
+# ------------------------------------------------------------- 写回
 
 
 def test_write_back_round_trip_preserves_the_literal() -> None:

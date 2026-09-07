@@ -1,44 +1,12 @@
-"""官方插件 `memory`：跨 Session 的长期记忆（开发方案 `D39`，需求 §9.8 `MEM-001`–`MEM-005`）。
+"""官方 Memory 插件：提供跨 Session 的结构化长期记忆。
 
-职责：一份 manifest 声明四类能力——存储本体（`MEMORY`）、每轮自动召回
-（`CONTEXT`）、模型显式记/查/删（三条 `TOOL`）、给人用的入口（`COMMAND`）。
-不负责：决定什么时候召回（`kernel/turn/`）、把片段拼进模型消息
-（`kernel/turn/context_builder.py`）、决定记什么（模型与用户）。
+职责：注册记忆存储、自动召回 Context、模型工具和用户命令。
+不负责：决定应记住什么、组装最终模型消息、定时模型整理或 Git 版本存储。
 
-**当前实现只管理结构化的单条记忆**：
-
-- 旧实现是 `MemoryStore` + `Consolidator` + `Dream` + `GitStore` 四层，1221 行缠在一个
-  文件里，且直接读写 `SOUL.md` / `USER.md` / `memory/MEMORY.md` 三份固定的 Markdown。
-  **这里只做「一条一条的记忆」**：固定文件名那套是 Agent 人格与用户画像，属于
-  `builtins/context_basic` 的运维指令那一档，不是长期记忆机制。
-- **Dream（定时让 LLM 读历史、增量改写长期记忆）本轮不做。** 它需要两样今天没有的东西：
-  「插件能发起一次模型调用」——`PluginContext` 没有这条通道；以及定时触发——那是 `D40`。
-  写在这里而不是留给用户发现。
-- **GitStore（记忆变更的版本历史）也不做。** 它要求把记忆存成 Git 仓库里的文本文件，
-  而那会把「记忆的存储形态」钉死成一种具体后端，正是 `MEM-001` 要避免的。
-- 旧实现没有范围概念（全部记忆是一份 workspace 级的文件）。这里按 `FragmentScope` 分区，
-  `MEM-002` 因此在存储层就成立而不是靠约定。
-
-**三条如实记着的边界**，写在这里而不是留给用户发现：
-
-- **`D44` 起 kernel 会消费 `CapabilityKind.MEMORY`，但默认不开。** 装配根按
-  `memory.provider` 挑一条 `MEMORY` 能力交给组装器（`kernel/turn/memory.py`）；不写那个键
-  就没有 kernel 侧召回，而那是默认。因此**默认配置下**记忆进到上下文仍然只靠本插件自己的
-  `CONTEXT` Provider。
-  **两边同时开会让同一条记忆在一轮里出现两次**：kernel 侧只召回 `agent` 范围，而本插件的
-  `enabled_scopes` 默认已经包含 `agent`。要用 kernel 侧召回（例如为了让 `karyvia config` 里
-  那几个旋钮生效）就把 `enabled_scopes` 去掉 `agent`，或者干脆不写 `memory.provider`。
-  两条路径**都是对的**，只是不该同时开——这条如实写在这里与 README 里，不留给用户发现。
-- **契约的 `MemoryProvider` 三个方法都不带 `SessionKey`**，因此经那条接口只能读写 `agent`
-  范围（`store.ContractMemoryProvider`）。`D44` 把这一点从「目前这么理解」升成了契约上的
-  **决定**（见 `contracts/protocols.py::MemoryProvider`）：会话级与工作区级归
-  `ContextProvider`。插件自己的四条通路都拿得到 key，不受此限。
-- **`FragmentScope.USER` 不支持**：召回路径拿不到发送者身份，按会话存会让群聊里其他人
-  读到它。详见 `partition.py`。
-
-**只 import `karyvia.contracts` 与 `karyvia.sdk`**（依赖规则 `R4`），
-**一个第三方依赖都不引入**。**`MANIFEST` 在模块顶层且导入无副作用**（技术方案 §7.2）：
-发现阶段只 import 本模块取那个对象，此时不该发生任何 IO——目录也在第一次写入时才建。
+记忆按 `FragmentScope` 在存储层分区。Kernel 可通过 `memory.provider` 启用 agent 范围召回；
+插件自身的 Context Provider 也可召回配置范围，两条路径不应同时包含 agent 范围，以免重复。
+`MemoryProvider` 契约不携带 `SessionKey`，所以该接口只处理 agent 范围；会话与工作区范围由
+插件的 Context 路径处理。`USER` 范围不受支持，因为召回阶段没有可靠的发送者身份。
 """
 
 from __future__ import annotations

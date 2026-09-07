@@ -29,7 +29,7 @@ from karyvia.contracts import ErrorCode, KaryviaError
 __all__ = ["RESERVED_DEVICE_NAMES", "PathGuard"]
 
 #: Windows 的保留设备名。能通过 containment 校验却根本不是文件——两个平台一律拒绝，
-#: 为它开平台分支等于让同一段插件代码在 Linux 上成功、在 Windows 上失败（`NFR-605`）。
+#: 为它开平台分支等于让同一段插件代码在 Linux 上成功、在 Windows 上失败。
 RESERVED_DEVICE_NAMES: Final = frozenset(
     {"con", "prn", "aux", "nul"}
     | {f"com{digit}" for digit in range(1, 10)}
@@ -72,7 +72,7 @@ class PathGuard:
 
         **异常约定**：空串、NUL 字节、保留设备名、绝对路径抛 `INPUT_MALFORMED`；
         越出根抛 `PERMISSION_PATH_OUTSIDE_WORKSPACE`，`detail` 里**只放原始
-        串不放解析结果**——把宿主机的绝对路径写进错误是另一种泄漏（`D20` 的同一条判据）。
+        串不放解析结果**——把宿主机的绝对路径写进错误是另一种泄漏（同一条判据）。
         """
         if not raw or not raw.strip():
             raise KaryviaError(ErrorCode.INPUT_MALFORMED, "路径不能为空。", detail={"path": raw})

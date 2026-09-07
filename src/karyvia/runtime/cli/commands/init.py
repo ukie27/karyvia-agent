@@ -1,4 +1,4 @@
-"""`karyvia init`：在实例目录里生成最小可用配置与它的 JSON Schema（`EDG-506`、`BAS-006`）。
+"""`karyvia init`：在实例目录里生成最小可用配置与它的 JSON Schema。
 
 职责：解析 `karyvia init` 的参数，调一次 `ensure_initial_config()`，打印指引并给出退出码。
 不负责：写盘与渲染指引（`runtime/first_run.py`）、加载配置（`kernel/config/`）、

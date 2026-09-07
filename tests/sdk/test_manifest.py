@@ -1,4 +1,4 @@
-"""manifest 的校验矩阵（技术方案 §7.2、`SDK-005`、`CMP-001`、`PLG-001`）。
+"""manifest 的校验矩阵。
 
 两条被反复验证的性质：**每一条校验失败都给出字段路径**，以及**失败一律是
 `KaryviaError`**——缺兼容字段直接判定失败并指出位置，不做兜底猜测。
@@ -155,7 +155,7 @@ def test_structural_errors_carry_a_field_path(patch: dict[str, object], path: st
 
 
 def test_missing_required_field_is_rejected_without_guessing() -> None:
-    """`CMP-001`：缺少 `sdk_range` 这类兼容字段直接判定失败，不做兜底。"""
+    """缺少 `sdk_range` 这类兼容字段直接判定失败，不做兜底。"""
     data = {key: value for key, value in VALID.items() if key != "sdk_range"}
     with pytest.raises(KaryviaError) as excinfo:
         parse_manifest(data, origin="test")
@@ -174,7 +174,7 @@ def test_direct_construction_still_validates_semantics() -> None:
         )
 
 
-# --------------------------------------------------------------- 命名空间声明（`D38-A`）
+# --------------------------------------------------------------- 命名空间声明
 #
 # 它是为「能力名要连上外部服务才知道」开的（MCP 的远端工具名只有 `list_tools` 之后才可知，
 # 而 manifest 是静态的）。两条限制在这里判死，kernel 侧只按标志位分派（`R2`）。
@@ -202,7 +202,7 @@ def test_no_other_kind_may_declare_a_namespace(kind: CapabilityKind) -> None:
 
 def test_a_namespace_may_not_also_declare_overrides() -> None:
     """一条声明能注册出任意多个名字，哪一个才是覆盖者无从判定——静默挑一个正是
-    `EDG-102`「覆盖永不由加载顺序决定」要堵的路。"""
+    「覆盖永不由加载顺序决定」要堵的路。"""
     with pytest.raises(KaryviaError) as caught:
         CapabilityDecl(
             kind=CapabilityKind.TOOL,
@@ -231,7 +231,7 @@ def test_a_namespace_prefix_still_obeys_the_capability_name_shape() -> None:
         CapabilityDecl(kind=CapabilityKind.TOOL, name="Bad Name", namespace=True)
 
 
-# ------------------------------------------------------- config_schema（`D41`）
+# ------------------------------------------------------- config_schema
 #
 # 字段的静态类型只精确到最外两层（`ManifestJsonValue`：容器分支的元素是 `object`），
 # 因为契约的 `JsonValue` 进不了 pydantic 模型、pydantic 自己的 `JsonValue` 又用不变的

@@ -2,7 +2,7 @@
 
 内建会话存储 `builtins/session_jsonl/` 的磁盘格式说明。
 
-这份文档是**对外承诺**（需求 `SES-006`）：内建实现的存储格式必须可被外部实现读取。
+这份文档是**对外承诺**：内建实现的存储格式必须可被外部实现读取。
 文档中的每个示例都由 `tests/builtins/test_session_jsonl.py` 直接喂给实现的解码器解析，
 因此它不会与代码漂移——漂移会让测试失败。
 
@@ -16,9 +16,9 @@
 └── cli~local~default.meta.json    # 元数据，原子替换
 ```
 
-文件名的主干是 `SessionKey.storage_id()`：三个分量（`channel_id`、`conversation_id`、
+文件名的主干是 `SessionKey.storage_id`：三个分量（`channel_id`、`conversation_id`、
 `scope`）各自按 UTF-8 逐字节百分号编码后，用 `~` 连接。编码是单射的，因此不同的
-`SessionKey` 不可能落在同一个文件上（`EDG-203`）。`~` 不在安全字符集内，所以按 `~`
+`SessionKey` 不可能落在同一个文件上。`~` 不在安全字符集内，所以按 `~`
 切分永远不会切错位置。
 
 ```text
@@ -47,7 +47,7 @@ UTF-8 编码，每行一条记录，行尾是 `\n`。记录内容里的换行由
 | `created_at` | string | 是 | **带时区**的 ISO-8601 时间戳 |
 | `turn_id` | string | 否 | 产生这条记录的 turn |
 | `tool_call_id` | string | 否 | **当且仅当** `role="tool"` 时出现 |
-| `interrupted` | bool | 否 | 缺省为 `false`；流式中途被打断的内容标记为 `true`，不得当作完整回答（`EDG-304`） |
+| `interrupted` | bool | 否 | 缺省为 `false`；流式中途被打断的内容标记为 `true`，不得当作完整回答 |
 | `attachments` | array | 否 | 缺省为 `[]`；结构与 `AttachmentRef` 一致，只保存引用与元数据，不保存文件字节 |
 | `metadata` | object | 否 | 缺省为 `{}`；受契约层的条数、深度与大小上限约束 |
 
@@ -89,7 +89,7 @@ UTF-8 编码的单个 JSON 对象，每次更新都以「临时文件 + `fsync` 
 
 ## 4. `committed_bytes`：整批原子性与半写恢复
 
-历史文件是追加写的，而 `SessionStore.append()` 要求**整批原子生效**（`SES-002`）。
+历史文件是追加写的，而 `SessionStore.append` 要求**整批原子生效**。
 本格式用 `committed_bytes` 表达这件事，规则只有两条：
 
 - **读**：只有 `[0, committed_bytes)` 这段字节算数。超出的部分一律忽略。
@@ -97,12 +97,12 @@ UTF-8 编码的单个 JSON 对象，每次更新都以「临时文件 + `fsync` 
   **最后**才原子替换 `meta.json`。
 
 因此进程在写入过程中被杀死时，只有两种可能的结果：`meta.json` 还没换掉，这一批整体不存在；
-或者已经换掉，这一批整体存在。不会出现半条记录，也不会出现半批（`EDG-504`）。
+或者已经换掉，这一批整体存在。不会出现半条记录，也不会出现半批。
 
 历史文件比 `committed_bytes` **短**是另一回事——那说明文件被外部截断或损坏，实现必须
 报错（`PERSISTENCE_RECORD_CORRUPT`），不能当成「少了几条」。
 
-## 5. 压缩与数据保留（`SES-005`）
+## 5. 压缩与数据保留
 
 压缩把前 `through` 条记录折成一条摘要。本实现的语义是：
 

@@ -6,10 +6,10 @@
 
 **为什么落在 `runtime/` 而不是 `kernel/plugins/`**：这三个门面的返回类型
 （`HttpResponse` / `ShellResult`）在 `sdk/api.py`，而 `R2` 禁止 `kernel/` import `sdk/`。
-把它们下沉到 `contracts/` 是另一条路（`CliEntry`、`SecretStr` 的先例），但那两次下沉是因为
+把它们下沉到 `contracts/` 是另一条路（`CliEntry`、`SecretStr` 的既有实现），但那两次下沉是因为
 **kernel 要调用**那些类型；这里 kernel 一次也不碰它们，为一个只有 `runtime/` 用得到的
 返回值去动已冻结的契约表面不划算。`runtime/` 本来就是全项目唯一同时看得见两边的层，
-`plugin_context.py` 与 `introspection.py` 是同一档的先例。
+`plugin_context.py` 与 `introspection.py` 是同一档的既有实现。
 
 **这些门面不是进程隔离**：同进程 Python 插件可以绕过它们直接 `import os` / `import httpx`。
 它们的价值是复用安全、可测试的常用实现，而不是控制插件权限。

@@ -1,7 +1,7 @@
-"""能力契约测试（`D04`，技术方案 §6.1、§6.6、需求 §9.3）。
+"""能力契约测试。
 
 两张常量表是本文件的重点：`CAPABILITY_ARITY` 与 `HOOK_KINDS` 都以**字面量**写在测试里，
-再与实现比对——从实现反推期望值的测试只能证明代码没改，证明不了它和技术方案一致。
+再与实现比对——从实现反推期望值的测试只能证明代码没改，证明不了公开契约保持稳定。
 """
 
 from __future__ import annotations
@@ -57,8 +57,7 @@ from karyvia.contracts.tool import SideEffect
 CORRELATION = Correlation(InstanceId("default"), SessionKey("cli", "local"), TurnId("t-1"))
 NOW = datetime(2026, 8, 11, tzinfo=UTC)
 
-#: 技术方案 §6.1 的表格，逐行抄写。`MEMORY` 一行是 `D04` 补齐的：原表只列了 8 个 kind，
-#: 决议见 `docs/project/README.md`——带 name 的注册方法本身就意味着可并存多个具名实现。
+#: 公开能力的规范 arity 表。带 name 的注册方法表示可并存多个具名实现。
 EXPECTED_ARITY: dict[CapabilityKind, CapabilityArity] = {
     CapabilityKind.TOOL: CapabilityArity.MULTI_UNIQUE,
     CapabilityKind.COMMAND: CapabilityArity.MULTI_UNIQUE,
@@ -72,7 +71,7 @@ EXPECTED_ARITY: dict[CapabilityKind, CapabilityArity] = {
     CapabilityKind.CLI_ENTRY: CapabilityArity.SINGLETON,
 }
 
-#: 技术方案 §6.6 的 Hook 表格，逐行抄写。
+#: Hook 名称与派发类型的规范对照表。
 EXPECTED_HOOK_KINDS: dict[HookName, HookKind] = {
     HookName.INSTANCE_READY: HookKind.OBSERVER,
     HookName.INSTANCE_SHUTDOWN: HookKind.OBSERVER,
@@ -132,7 +131,7 @@ def outcome() -> TurnOutcome:
 
 
 def test_capability_kind_has_exactly_ten_values() -> None:
-    """10 个 kind 与 `sdk.KaryviaAPI` 的 10 个注册方法一一对应（技术方案 §7.5）。"""
+    """10 个 kind 与 `sdk.KaryviaAPI` 的 10 个注册方法一一对应。"""
     assert len(CapabilityKind) == 10
 
 
@@ -216,7 +215,7 @@ def test_capability_ref_is_frozen() -> None:
 
 
 def test_karyvia_error_carries_capability() -> None:
-    """`errors.py` 里承诺随 `D04` 补上的字段（`PLG-006`：谁的问题要能一眼看出）。"""
+    """`errors.py` 里承诺随  补上的字段（谁的问题要能一眼看出）。"""
     ref = CapabilityRef(CapabilityKind.MODEL, "openai-compat", Plugin(PluginId("acme")))
     error = KaryviaError(ErrorCode.CAPABILITY_MISSING, "能力缺失。", capability=ref)
     assert error.capability is ref
@@ -261,7 +260,7 @@ def test_hook_context_reports_every_missing_slot() -> None:
 
 
 def test_instance_hooks_need_no_correlation() -> None:
-    """实例启动与停止时还没有会话与 turn（`OBS-001` 允许实例级事件无关联标识）。"""
+    """实例启动与停止时还没有会话与 turn。"""
     assert HookContext(HookName.INSTANCE_READY).correlation is None
 
 

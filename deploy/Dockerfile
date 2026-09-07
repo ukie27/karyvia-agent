@@ -22,7 +22,7 @@ RUN uv pip install --python "$VIRTUAL_ENV/bin/python" --no-cache .
 
 # Official plugins are discovered through entry points, so they must actually be
 # installed. Pick what the image should serve; each plugin declares its own
-# platform SDK as an optional extra (D32-D34: the host depends on none of them).
+# platform SDK as an optional extra; the host depends on none of them.
 ARG KARYVIA_PLUGINS=
 COPY plugins/ plugins/
 RUN for plugin in $(printf '%s' "$KARYVIA_PLUGINS" | tr ',' ' '); do \
@@ -50,5 +50,5 @@ ENV PYTHONUNBUFFERED=1 PYTHONFAULTHANDLER=1
 EXPOSE 8760
 
 ENTRYPOINT ["entrypoint.sh"]
-# `D31` 之后默认跑无头模式：装了 Channel 插件就服务它们，没装就以退出码 1 说明。
+# 默认运行无头模式：装了 Channel 插件就服务它们，没装就以退出码 1 说明。
 CMD ["serve"]

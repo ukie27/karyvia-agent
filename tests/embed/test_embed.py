@@ -1,4 +1,4 @@
-"""`D23` 嵌入式门面：与 CLI 用同一个 `AgentInstance`。
+""" 嵌入式门面：与 CLI 用同一个 `AgentInstance`。
 
 职责：验 `open_instance()` / `run()` 真的走 `orchestrator.handle()`，同一份输入在嵌入式
 与 CLI 两条路上得到等价的 turn 结果，以及上下文管理器退出时实例真的停掉。
@@ -42,7 +42,7 @@ async def test_the_context_manager_stops_the_instance(tmp_path: Path) -> None:
 
 
 async def test_embed_and_cli_produce_equivalent_turns(tmp_path: Path) -> None:
-    """开发方案的验收：`embed.run()` 与 CLI 用同一个 `AgentInstance`，结果等价。"""
+    """`embed.run` 与 CLI 共用 `AgentInstance`，并产生等价结果。"""
     SCRIPT[:] = [text_response("好的。"), text_response("好的。")]
     write_config(tmp_path)
     async with open_instance(instance_dir=tmp_path, manifests=TEST_MANIFESTS) as agent:

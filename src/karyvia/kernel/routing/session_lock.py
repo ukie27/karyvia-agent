@@ -1,17 +1,17 @@
-"""Session 并发：三种策略与单写者不变量（技术方案 §6.5，需求 `KER-008`、`EDG-202`）。
+"""Session 并发：三种策略与单写者不变量。
 
 职责：为每个 `SessionKey` 维护一个槽位，按 `queue` / `merge` / `reject` 三种策略决定一条
 入站消息是排队、被合并进下一次执行，还是立刻被拒绝；并保证同一 session 的执行体
 （`run`）任何时刻至多有一个在跑。
 不负责：执行 turn（`run` 由调用方给）、写会话历史（写者是 `run` 里的编排层）、去重
-（`dedup.py`）、发布事件（`D14`）。
+（`dedup.py`）、发布事件。
 
 **不变量只有一条，三种策略共用同一段代码**：`run` 只在持有槽位时被调用，且同一 session
-同一时刻至多一个持有者。历史因此不可能乱序或并发写——这正是 `KER-008` 要的东西。三种
+同一时刻至多一个持有者。历史因此不可能乱序或并发写——这正是  要的东西。三种
 策略的差别只在「拿不到槽位时怎么办」：排队、并进下一批、还是拒绝。
 
 **显式 FIFO 票据，不用 `asyncio.Lock`。** `Lock` 的唤醒顺序是 CPython 的实现细节而不是
-文档保证，而 `EDG-202` 要断言的恰好是严格 FIFO；顺带地，票据让「队列多长」「谁在跑」
+文档保证，而  要断言的恰好是严格 FIFO；顺带地，票据让「队列多长」「谁在跑」
 变成可读的状态，而 `Lock` 的等待者是私有的。
 """
 
@@ -35,7 +35,7 @@ __all__ = [
     "SubmitStatus",
 ]
 
-#: 单个 session 的等待上限。超出即降级为拒绝，不静默丢弃（技术方案 §6.5 末段）。
+#: 单个 session 的等待上限。超出即降级为拒绝，不静默丢弃。
 #: 与 `kernel/config/schema.py` 的同名常量必须相等。
 DEFAULT_QUEUE_MAX_SIZE: Final = 32
 
@@ -44,7 +44,7 @@ _T = TypeVar("_T")
 
 
 class ConcurrencyPolicy(StrEnum):
-    """同一 session 收到多条消息时的处置策略（`KER-008`）。取值与配置字面量同名。"""
+    """同一 session 收到多条消息时的处置策略。取值与配置字面量同名。"""
 
     QUEUE = "queue"
     """默认：串行排队，严格 FIFO。"""
@@ -117,7 +117,7 @@ class _Ticket(Generic[_T]):
 
 @dataclass(slots=True)
 class SessionSlot(Generic[_T]):
-    """一个 session 的槽位（技术方案 §6.5 的同名 dataclass）。
+    """一个 session 的槽位。
 
     `pending` 只在 `MERGE` 策略下非空：其它两种策略里每张票据只代表它自己那条消息。
     """

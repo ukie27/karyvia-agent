@@ -51,7 +51,7 @@ def store(tmp_path: Path) -> MemoryStore:
 
 
 class TestJsonlStoreContract(MemoryProviderContract):
-    """通用契约。这是 `MEM-001`「后端可替换」的可执行形态。"""
+    """通用契约。这是 「后端可替换」的可执行形态。"""
 
     def make_provider(self) -> MemoryProvider:
         # `tmp_path` 是 pytest 的 fixture，契约基类不认识它（它不 import pytest）；
@@ -76,7 +76,7 @@ async def test_add_then_read_back(store: MemoryStore) -> None:
 async def test_reading_a_store_that_was_never_written_is_empty_not_an_error(
     store: MemoryStore,
 ) -> None:
-    """「还没写过」不是错误——这与 `SessionStore.load()` 的同一条契约判定。"""
+    """「还没写过」不是错误——这与 `SessionStore.load()` 采用的相同规则契约判定。"""
     assert await store.entries(KEY, scopes=ALL_SCOPES) == ()
     assert await store.search(KEY, "任何东西", scopes=ALL_SCOPES, limit=5) == ()
 
@@ -109,7 +109,7 @@ async def test_scopes_land_in_separate_partitions(store: MemoryStore, tmp_path: 
 
 
 async def test_another_session_does_not_see_session_scoped_memories(store: MemoryStore) -> None:
-    """`MEM-002` 在存储层成立而不是靠约定。"""
+    """ 在存储层成立而不是靠约定。"""
     from karyvia.contracts import SessionKey
 
     await store.add(KEY, make_fragment("只属于这段对话", scope=FragmentScope.SESSION))
@@ -172,7 +172,7 @@ async def test_remove_reports_whether_the_record_existed(store: MemoryStore) -> 
 
 
 async def test_remove_leaves_no_tombstone(store: MemoryStore, tmp_path: Path) -> None:
-    """`MEM-005` 要的是删除，而一条留在明文文件里的墓碑不是删除。"""
+    """ 要的是删除，而一条留在明文文件里的墓碑不是删除。"""
     stored = await store.add(KEY, make_fragment("要被删掉的内容"))
     await store.add(KEY, make_fragment("要留下的内容"))
     await store.remove(stored)

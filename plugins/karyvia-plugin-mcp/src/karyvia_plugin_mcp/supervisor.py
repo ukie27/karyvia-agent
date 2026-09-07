@@ -10,7 +10,7 @@
   在 `setup()` 里 `enter_async_context`、再由停止路径去 `aclose()`，会在关闭时炸出
   `RuntimeError: Attempted to exit cancel scope in a different task`。因此连接必须由
   打开 transport 的同一个任务关闭。
-- 本插件没有第二条清理通道：manifest **没有** teardown 字段，`EDG-105` 的取消痕迹清理
+- 本插件没有第二条清理通道：manifest **没有** teardown 字段， 的取消痕迹清理
   只作用在 `ctx.spawn_task()` 派生的任务上（`runtime/plugin_context.py::shutdown`）。
 
 于是形状定成：`setup()` 派生这条任务 → 等它把工具表准备好 → 用那张表注册 → 返回。
@@ -51,7 +51,7 @@ class Discovery:
     tools: tuple[DiscoveredTool, ...] = ()
     sessions: Mapping[str, McpSession] = field(default_factory=dict[str, McpSession])
     #: server 名 → 失败原因的**类型名**。不放异常消息：第三方 server 的异常文本可能
-    #: 带着它自己的凭据（`D13` 的先例）。
+    #: 带着它自己的凭据。
     failures: Mapping[str, str] = field(default_factory=dict[str, str])
     #: server 名 → 那个 server 的命名结果（撞车与被拒的原名都在里面）。
     naming: Mapping[str, NameAssignment] = field(default_factory=dict[str, NameAssignment])
@@ -138,5 +138,5 @@ class ConnectionSupervisor:
             return "TimeoutError"
         except Exception as error:  # noqa: BLE001 - 第三方传输什么都可能抛
             # **捕 `Exception` 不捕 `BaseException`**：取消要放行，否则停机路径会被这里
-            # 吞掉一次（engine 与 dispatcher 的同一条）。
+            # 吞掉一次（engine 与 dispatcher 采用的相同规则）。
             return type(error).__name__

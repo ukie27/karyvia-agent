@@ -1,4 +1,4 @@
-"""CLI 的控制台：stdin/stdout 与消息契约之间的那一层（`MSG-007`、技术方案 §8.1）。
+"""CLI 的控制台：stdin/stdout 与消息契约之间的那一层。
 
 职责：把一行输入变成 `InboundMessage` 交给队列，把 `OutboundMessage` 渲染到输出流，
 并让读循环知道「这一轮结束了」。
@@ -6,9 +6,9 @@
 （`runtime/`）。
 
 **一条输入只有一条路**：`submit()` 产出的 `InboundMessage` 与其它 Channel 产出的完全同型，
-CLI 不存在「直接调 orchestrator」的近路（`MSG-007`）。渲染同理只认 `OutboundMessage`。
+CLI 不存在「直接调 orchestrator」的近路。渲染同理只认 `OutboundMessage`。
 
-`is_complete_answer` 为假时**必须**附加标记（`EDG-304`）：被取消的半句、撞上预算上限的
+`is_complete_answer` 为假时**必须**附加标记：被取消的半句、撞上预算上限的
 回答与失败的 turn 都会以正文形式到达，不标注就等于把它们呈现成完整答案。
 """
 
@@ -29,7 +29,7 @@ from karyvia.contracts import (
 
 __all__ = ["ATTACHMENT_LINE", "CliConsole", "TERMINAL_MARKERS", "attachment_lines"]
 
-#: 附件的呈现（`D47`）。终端里能给出的最好形态就是**路径**：字节印不出来，而
+#: 附件的呈现。终端里能给出的最好形态就是**路径**：字节印不出来，而
 #: workspace 相对路径可以直接喂给 `fs.read`、也可以直接在文件管理器里打开。
 #: 不去读字节、不去校验文件在不在——渲染层做 IO 会让「投递」有失败的可能，而
 #: `deliver` 约定不抛。
@@ -48,7 +48,7 @@ TERMINAL_MARKERS: Final[dict[StreamState, str]] = {
 }
 
 #: 终态 stream_state，收到即认为这一轮结束。`FINAL` 也覆盖 `STOPPED_BY_LIMIT`
-#: （`TERMINAL_STREAM_STATES` 的映射，`D14`）。
+#: （`TERMINAL_STREAM_STATES` 的映射）。
 _TERMINAL: Final = (StreamState.FINAL, StreamState.CANCELLED, StreamState.FAILED)
 
 
@@ -169,7 +169,7 @@ class CliConsole:
 
         Windows 中文控制台的默认编码是 GBK，而模型的输出里随时可能有 emoji 或
         `»` 这种字符——`sys.stdout.write` 会当场抛 `UnicodeEncodeError`，把一次正常的
-        回答变成一条 traceback。降级成转义序列难看，但答案还在（`NFR-605` 的同一条精神）。
+        回答变成一条 traceback。降级成转义序列难看，但答案还在（同一条精神）。
         """
         if self._out is None:
             return

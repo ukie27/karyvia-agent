@@ -1,4 +1,4 @@
-"""配置的类型化视图：十个小节 dataclass 与 `KaryviaConfig`（技术方案 §6.7）。
+"""配置的类型化视图：十个小节 dataclass 与 `KaryviaConfig`。
 
 职责：把 `schema.SECTION_SPECS` 那张字段表表达成不可变、带默认值、可静态检查的类型，
 并提供 `TurnSection.to_limits()` / `RetrySection.to_policy()` / `MemorySection.critical`
@@ -15,7 +15,7 @@
 
 **不要在这里 module-level import `kernel.turn`**：`to_limits()` / `to_policy()` 用函数内
 import，理由见 `defaults.py`——那会把 engine/scheduling/folding 与 asyncio 拖上配置路径
-（`NFR-405` 的冷启动预算 300 ms）。
+（冷启动预算 300 ms）。
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ __all__ = [
 
 @dataclass(frozen=True, slots=True)
 class TurnSection:
-    """一次 turn 的预算。字段名与 `LimitKind` 的取值逐一对应（`limits.py` 的约定）。"""
+    """一次 turn 的预算。字段名与 `LimitKind` 的取值逐一对应（`limits.py`当前约定）。"""
 
     max_iterations: int = DEFAULT_MAX_ITERATIONS
     max_tool_calls_per_turn: int = DEFAULT_MAX_TOOL_CALLS_PER_TURN
@@ -114,7 +114,7 @@ class RoutingSection:
     command_prefix: str = DEFAULT_COMMAND_PREFIX
     #: `queue` / `merge` / `reject`，取值由 `SESSION_CONCURRENCY_CHOICES` 限定。
     session_concurrency: str = DEFAULT_SESSION_CONCURRENCY
-    #: 单个 session 的等待上限；超出即降级为拒绝，不静默丢弃（`EDG-202`）。
+    #: 单个 session 的等待上限；超出即降级为拒绝，不静默丢弃。
     queue_max_size: int = DEFAULT_QUEUE_MAX_SIZE
     dedup_capacity: int = DEFAULT_DEDUP_CAPACITY
     dedup_ttl_ms: int = DEFAULT_DEDUP_TTL_MS
@@ -124,7 +124,7 @@ class RoutingSection:
 
 @dataclass(frozen=True, slots=True)
 class HooksSection:
-    """Hook 分发的两项超时（技术方案 §6.6）。
+    """Hook 分发的两项超时。
 
     观察者是**整批**超时、拦截器是**每个 handler** 超时：前者并发执行、返回值被忽略，
     整体拖不动 turn 就行；后者串行且能改流水线，一个慢 handler 会连累后面全部。
@@ -136,13 +136,13 @@ class HooksSection:
 
 @dataclass(frozen=True, slots=True)
 class ContextSection:
-    """Context 组装（技术方案 §10.2 第 7 步 b）。
+    """Context 组装。
 
     `context_max_tokens` **不在这里**：它是 turn 的六项预算之一，字段名与 `LimitKind`
     的取值一一对应，搬过来会破坏那条已被测试钉死的对应关系。
     """
 
-    #: 单个 Context Provider 的独立超时。超时后记录故障并跳过（`CTX-005`、`EDG-302`）。
+    #: 单个 Context Provider 的独立超时。超时后记录故障并跳过。
     provider_timeout_ms: int = DEFAULT_CONTEXT_PROVIDER_TIMEOUT_MS
     #: 每轮模型请求超限时使用的统一压缩能力；生产实例必须能解析到该名字。
     turn_compactor: str = DEFAULT_TURN_COMPACTOR
@@ -152,7 +152,7 @@ class ContextSection:
 
 @dataclass(frozen=True, slots=True)
 class MemorySection:
-    """长期记忆的召回（需求 §9.8 `MEM-002`–`MEM-003`）。
+    """长期记忆的召回。
 
     **`provider = None` 是默认，含义是「不启用 kernel 侧召回」而不是「自动挑一个」。**
     自动挑会让装上一个记忆插件就悄悄改变每一轮请求的内容；而这一节唯一的作用是让运维
@@ -174,7 +174,7 @@ class MemorySection:
     recall_timeout_ms: int = DEFAULT_MEMORY_RECALL_TIMEOUT_MS
     #: 召回片段的 priority 下界；这是拦截器与诊断可见的来源元数据，不参与 token 预算。
     fragment_priority: int = DEFAULT_MEMORY_FRAGMENT_PRIORITY
-    #: `MEM-003`：`degrade` = 后端故障时这一轮没有记忆、turn 照常跑（默认）；
+    #: ：`degrade` = 后端故障时这一轮没有记忆、turn 照常跑（默认）；
     #: `fail` = turn `FAILED`。降级**不等于静默**，错误一定会被报出去。
     on_failure: str = DEFAULT_MEMORY_ON_FAILURE
 
@@ -196,16 +196,16 @@ class PluginsSection:
     """实例级插件启用状态、停止预算与逐插件配置块。
 
     `enabled` / `disable` / `stop_timeout_ms` 是**保留键**，`plugins` 小节里
-    其余的键都是插件 id（技术方案 §6.7 的 `plugins.<plugin_id>.config`），形状校验与那条
+    其余的键都是插件 id，形状校验与那条
     「保留键为什么撞不上插件 id」的理由都在 `plugin_blocks.py`。
     """
 
-    #: 显式启用的插件 id（技术方案 §7.1「发现与启用分离」）。**不在这张表里的
-    #: 候选连 manifest 都不会被读**，「安装 ≠ 启用」（`DST-002`）因此没有绕行路径。
+    #: 显式启用的插件 id。**不在这张表里的
+    #: 候选连 manifest 都不会被读**，「安装 ≠ 启用」因此没有绕行路径。
     enabled: tuple[str, ...] = ()
     #: 显式禁用的提供方 id。它压过 `enabled`，也对内建生效（`resolve(disabled=...)`）。
     disable: tuple[str, ...] = ()
-    #: 单个插件的停止预算（`EDG-104`）：超时即放弃等待、记事件、继续停其余插件。
+    #: 单个插件的停止预算：超时即放弃等待、记事件、继续停其余插件。
     stop_timeout_ms: int = DEFAULT_PLUGIN_STOP_TIMEOUT_MS
     #: 插件 id -> 它的 `{config, secrets}`。装配根按 id 取，取不到就给空块。
     entries: Mapping[str, PluginEntry] = blocks.NO_PLUGIN_ENTRIES
@@ -225,7 +225,7 @@ class ModelSection:
 
 @dataclass(frozen=True, slots=True)
 class RetrySection:
-    """模型请求的重试策略（`D48`，需求 `MOD-003`）。
+    """模型请求的重试策略。
 
     **它不是 turn 的第七项预算**：那六项说的是「一次 turn 能用掉多少」，重试说的是
     「一次失败之后怎么办」。`TurnLimits` 的 docstring 明写着不要往里加第七项。
@@ -261,7 +261,7 @@ class RetrySection:
 
 @dataclass(frozen=True, slots=True)
 class LoggingSection:
-    """事件 sink 的开关。sink 实现在 `D12`。"""
+    """事件 sink 的开关。sink 实现在 。"""
 
     level: str = "info"
     #: 写 `logs/events-<date>.jsonl`。

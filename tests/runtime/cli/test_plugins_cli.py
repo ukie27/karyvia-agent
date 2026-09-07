@@ -1,6 +1,6 @@
-"""`karyvia plugins` 与 `karyvia capabilities`（`D29`；技术方案 §10.4、§10.5，需求 `EDG-505`、`NFR-502`）。
+"""`karyvia plugins` 与 `karyvia capabilities`。
 
-职责：逐条对着开发方案 `D29` 的验收表——`enable`/`disable` 只改配置不在当前进程生效、
+职责：验证 `enable`/`disable` 只改配置不在当前进程生效、
 `uninstall` 后状态目录仍在、`purge` 无 `--confirm` 拒绝执行且事先打印路径与体积、
 `karyvia capabilities` 的 shadowed 关系可读且含 provider 标识。
 不负责：验编辑器本身（`tests/runtime/test_config_edit.py`）、验只读路径的三条承诺
@@ -30,7 +30,7 @@ from .._support import SCRIPT, text_response, write_config
 from ..test_plugin_plan import write_plugin
 
 #: 覆盖内建会话存储的插件的 manifest。`overrides` 指向 `builtin:jsonl`——`SESSION_STORE`
-#: 是 SINGLETON，不声明覆盖的话两份实现会双双出局（`D06` 的冲突语义）。
+#: 是 SINGLETON，不声明覆盖的话两份实现会双双出局（冲突语义）。
 _OVERRIDE_MANIFEST = """
 id = "shadow"
 version = "2.0.0"
@@ -130,7 +130,7 @@ def test_usage_and_unknown_subcommands(instance: Path, capsys: pytest.CaptureFix
 def test_list_says_so_when_there_are_no_plugins(
     instance: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """零插件是一等形态（`EDG-101`）：一句确认，而不是一张让人怀疑查询失败了的空表。"""
+    """零插件是一等形态：一句确认，而不是一张让人怀疑查询失败了的空表。"""
     assert app(_args(instance, "plugins", "list")) == 0
     assert "没有发现任何外部插件" in capsys.readouterr().out
 
@@ -163,7 +163,7 @@ def test_list_json_is_machine_readable(instance: Path, capsys: pytest.CaptureFix
 
 
 def test_enable_only_touches_the_config(instance: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """**首版不热更新**（需求 §4.2）：写进 `plugins.enabled`，当前进程什么都没变。"""
+    """**首版不热更新**：写进 `plugins.enabled`，当前进程什么都没变。"""
     _install_test_plugin(instance, "alpha")
     assert app(_args(instance, "plugins", "enable", "alpha")) == 0
     assert "下次启动" in capsys.readouterr().out
@@ -183,7 +183,7 @@ def test_enabling_twice_reports_nothing_to_do(
 def test_enable_lifts_an_existing_disable(
     instance: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`disable` 压过 `enabled`（`D25`），不摘掉它就等于让「启用」静默失效。
+    """`disable` 压过 `enabled`，不摘掉它就等于让「启用」静默失效。
 
     摘掉这件事印在输出里——这条命令不做用户看不见的改动。
     """
@@ -240,7 +240,7 @@ def test_a_plugin_id_is_required(instance: Path) -> None:
 def test_uninstall_keeps_the_state_directory(
     instance: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`EDG-505`：默认保留 `<instance>/plugins/<id>/`，并说清楚怎么删掉它。"""
+    """默认保留 `<instance>/plugins/<id>/`，并说清楚怎么删掉它。"""
     state = instance / "plugins" / "alpha"
     state.mkdir(parents=True)
     (state / "state.json").write_text("{}", encoding="utf-8")
@@ -324,7 +324,7 @@ def test_global_uninstall_rolls_back_configs_when_a_later_write_fails(
 def test_purge_prints_paths_and_size_before_asking_for_confirmation(
     instance: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """`EDG-505` 的核心：**先看见将要失去什么**，再确认。没有 `--confirm` 就一个字节不删。"""
+    """ 的核心：**先看见将要失去什么**，再确认。没有 `--confirm` 就一个字节不删。"""
     state = instance / "plugins" / "alpha"
     state.mkdir(parents=True)
     (state / "blob.bin").write_bytes(b"x" * 2048)
@@ -383,7 +383,7 @@ def test_capabilities_answers_even_without_credentials(
 def test_capabilities_prints_the_shadowed_relation(
     instance: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """**覆盖不静默**（§8.3 第 4 条、`NFR-502`）：两侧都带 provider 标识。"""
+    """**覆盖不静默**（§8.3 第 4 条）：两侧都带 provider 标识。"""
     monkeypatch.setenv("NM_TEST_KEY", "sk-0123456789abcdef")
     package = instance / "ext" / "shadow"
     package.mkdir(parents=True)
@@ -443,7 +443,7 @@ def test_capabilities_help(capsys: pytest.CaptureFixture[str]) -> None:
 def test_list_prints_a_failed_plugin_with_its_reason(
     instance: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """阶段 A 落榜的插件在这里显示 `failed` 并带上 detail——那正是「为什么没加载」。"""
+    """加载前校验 落榜的插件在这里显示 `failed` 并带上 detail——那正是「为什么没加载」。"""
     _install_test_plugin(instance, "alpha", dependencies=("missing",))
     assert app(_args(instance, "plugins", "enable", "alpha")) == 0
     capsys.readouterr()
@@ -455,7 +455,7 @@ def test_list_prints_a_failed_plugin_with_its_reason(
 def test_capabilities_prints_conflicts(
     instance: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """两份 SINGLETON 实现且无人声明覆盖 → 双方都不生效（`D06`），这条命令印出冲突。
+    """两份 SINGLETON 实现且无人声明覆盖 → 双方都不生效，这条命令印出冲突。
 
     **冲突印出来而不是抛出去**：`raise_if_failed()` 是启动路径的语义，而这条命令的用户
     恰恰是来查「为什么起不来」的。

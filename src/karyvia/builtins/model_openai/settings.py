@@ -1,4 +1,4 @@
-"""`model_openai` 的配置读取与校验（`CFG-002`：插件只看得见自己那一块）。
+"""`model_openai` 的配置读取与校验（插件只看得见自己那一块）。
 
 职责：把 `ctx.config` 校验成一份不可变的 `OpenAISettings`，并由它派生每个模型的
 `ModelInfo`。全部校验在 `setup()` 时发生一次。
@@ -10,7 +10,7 @@
 - **坏配置在加载期暴露，而不是让第一次 turn 失败**。若没有其他可用模型，Runtime
   随后的基础能力校验会拒绝启动。
 - **`max_tokens_field` 与 `supports_temperature` 是配置项，不是按模型名猜的表。**
-  gpt-5 / o1 / o3 / o4 只认 `max_completion_tokens` 且拒绝 `temperature`，旧实现为此维护
+  gpt-5 / o1 / o3 / o4 只认 `max_completion_tokens` 且拒绝 `temperature`，维护
   了一张靠 slug 匹配、越滚越大的厂商特例表。做成配置意味着用户换一个新模型只需改一行，
   不必等我们发版——这正是「显式优于魔法」。
 - **`describe()` 不得发网络请求**（契约写死：它在预算推导路径上）。因此模型窗口只能来自
@@ -105,7 +105,7 @@ _DEFAULT_MAX_OUTPUT: Final = 4_096
 _DEFAULT_REQUEST_TIMEOUT_MS: Final = 120_000
 _DEFAULT_STREAM_IDLE_TIMEOUT_MS: Final = 60_000
 
-#: 默认声明的能力。**只列真正做到的两项**（`MOD-005`）：图像输入、结构化输出、
+#: 默认声明的能力。**只列真正做到的两项**：图像输入、结构化输出、
 #: reasoning、prompt caching 都需要本实现没有的线格式支持，缺席即报缺失，不静默降级。
 _DEFAULT_CAPABILITIES: Final[frozenset[ModelCapability]] = frozenset(
     {ModelCapability.TOOL_CALLS, ModelCapability.STREAMING}

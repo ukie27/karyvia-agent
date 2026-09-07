@@ -1,4 +1,4 @@
-"""示例插件 `session-memory`：用一个纯内存实现**覆盖**内建会话存储（开发方案 `D30`）。
+"""示例插件 `session-memory`：用一个纯内存实现**覆盖**内建会话存储。
 
 职责：声明覆盖 `builtin:jsonl` 的 `SESSION_STORE` 能力，并给出一个完整的 `SessionStore`
 实现（五个方法俱全）。
@@ -6,7 +6,7 @@
 「不要在磁盘上留下对话」的场景。
 
 **为什么用它来演示覆盖**：`SESSION_STORE` 的 arity 是 SINGLETON——全实例只有一个生效实现，
-替换**必须**在 manifest 里显式声明 `overrides`（`EDG-102`：覆盖永不由加载顺序决定）。
+替换**必须**在 manifest 里显式声明 `overrides`（覆盖永不由加载顺序决定）。
 装上一个插件就悄悄换掉用户的会话历史后端，是这套设计明确要堵的路。
 
 把 `session-memory` 写进 `plugins.disable` 后，Runtime 不加载本插件，它的覆盖声明也不
@@ -37,7 +37,7 @@ __all__ = ["CAPABILITY_NAME", "MANIFEST", "OVERRIDE_TARGET", "MemorySessionStore
 CAPABILITY_NAME: Final = "memory"
 
 #: 覆盖目标串。`builtin:<name>` 是覆盖内建能力的写法；覆盖另一个插件写
-#: `plugin:<id>:<name>`。串里**不带 kind**——kind 取自声明覆盖的这一方（技术方案 §7.2）。
+#: `plugin:<id>:<name>`。串里**不带 kind**——kind 取自声明覆盖的这一方。
 OVERRIDE_TARGET: Final = "builtin:jsonl"
 
 MANIFEST: Final = PluginManifest(
@@ -62,10 +62,10 @@ class MemorySessionStore:
 
     **键用 `storage_id()` 而不是 `SessionKey` 本身**（`SessionKey` 可哈希，看上去更直接）：
     `storage_id()` 是已发布的持久化契约，让内存实现也走一遍，任何破坏「不同 key 不撞同一个
-    id」的改动在这里就会被撞出来，而不是等到某个真的落盘的实现上线（`EDG-203`）。
+    id」的改动在这里就会被撞出来，而不是等到某个真的落盘的实现上线。
 
-    单写者由 Kernel 的 session 锁保证（`KER-008`），因此这里不加锁；但「整批原子生效」
-    （`SES-002`）仍要自己兑现——下面的 `append()` 一次性 `extend`，不存在半批状态。
+    单写者由 Kernel 的 session 锁保证，因此这里不加锁；但「整批原子生效」
+    仍要自己兑现——下面的 `append` 一次性 `extend`，不存在半批状态。
     """
 
     __slots__ = ("_compacted", "_created", "_keys", "_messages", "_updated")
@@ -136,6 +136,6 @@ def setup(api: KaryviaAPI) -> None:
     """注册入口。
 
     注册的名字是 `CAPABILITY_NAME`，而**覆盖谁**由 manifest 的 `overrides` 决定——两件事
-    分开是刻意的：注册面不认识覆盖，覆盖只从声明来（`EDG-102`）。
+    分开是刻意的：注册面不认识覆盖，覆盖只从声明来。
     """
     api.register_session_store(CAPABILITY_NAME, MemorySessionStore())

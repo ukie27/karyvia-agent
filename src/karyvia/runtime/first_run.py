@@ -1,23 +1,23 @@
-"""首次运行：生成最小 `config.json` 与它的 JSON Schema（`D24`，`EDG-506`、`BAS-006`）。
+"""首次运行：生成最小 `config.json` 与它的 JSON Schema。
 
 职责：把 `kernel/config/scaffold.py` 渲染出来的初始配置**落盘**（绝不覆盖既有文件），
 写出派生的 `config.schema.json`，并渲染一段「填哪个文件、哪个字段、导出哪个变量」的指引。
 不负责：决定什么时候调它（`karyvia init` 显式调、`karyvia run` 在配置缺失时调一次）、加载配置
 （`kernel/config/loader.py`）、装配实例（`bootstrap.py`）。
 
-**这里是 `config.json` 的创建点，`config_edit.py` 是它唯一的修改点**（`D29` 起）。
-`kernel/config/` 一个字节都不写（`EDG-501`），它只以 `"rb"` 读；生成属于装配层的职责，
+**这里是 `config.json` 的创建点，`config_edit.py` 是它唯一的修改点**。
+`kernel/config/` 一个字节都不写，它只以 `"rb"` 读；生成属于装配层的职责，
 因此落在 `runtime/`。分工是硬的：本模块只用 `O_CREAT|O_EXCL` 建**新**文件、既有文件一个
 字节都不动；`karyvia plugins enable` 那种「已经有了，改其中一个列表」走另一边。
 
-**用 `O_CREAT|O_EXCL` 而不是「先判断存不存在再写」**：`EDG-501` 要的是「不得静默覆盖
+**用 `O_CREAT|O_EXCL` 而不是「先判断存不存在再写」**： 要的是「不得静默覆盖
 原文件」，而 exists-then-write 之间有一个窗口——两个 `karyvia init` 同时跑就会有一个把另一个
 刚写的配置盖掉。`O_EXCL` 让「没有就建、有就退让」是一次原子操作，因此本模块**没有**
 `--force` 这类开关：一个能覆盖用户配置的旋钮就是那条需求的反面。
 
 **默认模型的四个事实各写一份**（与 `builtins/model_openai/` 对照，见下面的常量）：
 `karyvia init` 不该为了读四个字符串把 httpx 拉进进程——`model_openai/__init__.py` 一路 import
-到 `provider.py`，而 `NFR-405` 的冷启动预算里没有这笔钱。对照由
+到 `provider.py`，而 既定冷启动预算里没有这笔钱。对照由
 `tests/runtime/test_first_run.py::test_defaults_match_the_builtin_model_provider` 钉住，
 与 `estimate_tokens` / `DEFAULT_GRACE_MS` 各写一份是同一种做法。
 """
@@ -61,7 +61,7 @@ MODEL_PLUGIN_ID: Final = "model-openai"
 #: 它的凭据名（`model_openai.SECRET_NAME`，固定不可配置）。
 MODEL_SECRET_NAME: Final = "api_key"
 
-#: 模板里引用的环境变量。**只有名字进配置文件**，值永远只在环境里（`CFG-003`、`EDG-502`）。
+#: 模板里引用的环境变量。**只有名字进配置文件**，值永远只在环境里。
 MODEL_API_KEY_ENV: Final = "OPENAI_API_KEY"
 
 #: 模板里的默认模型。挑一个便宜、广泛可用、且带工具调用的：首次运行的那次 turn 要能真的
@@ -166,7 +166,7 @@ def ensure_initial_config(
 
 
 def guidance_lines(result: FirstRunResult) -> tuple[str, ...]:
-    """渲染「填哪个文件、哪个字段」的指引（`BAS-006`、`EDG-506`）。
+    """渲染「填哪个文件、哪个字段」的指引。
 
     **只印变量名，绝不印值**——本模块从头到尾就没有读过任何凭据的值。
     """

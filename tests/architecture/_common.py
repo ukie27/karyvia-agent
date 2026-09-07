@@ -14,7 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SRC_DIR = REPO_ROOT / "src"
 PACKAGE_DIR = SRC_DIR / "karyvia"
 
-#: 五层 + `embed`。`D35` 删掉 `legacy/` 之后，这就是包里的全部内容。
+#: 五层 + `embed`。这是主包允许的完整层次集合。
 NEW_LAYERS: tuple[str, ...] = (
     "contracts",
     "kernel",
@@ -31,7 +31,7 @@ IGNORED_DIRS = frozenset({"__pycache__", ".venv", "node_modules", "dist", "build
 def iter_modules(root: Path) -> list[Path]:
     """递归收集 `root` 下的 `.py` 文件；`root` 不存在时返回空列表。
 
-    空目录返回空列表而不是报错，是 `D01` 的验收前提：新层此时多为空骨架。
+    空目录返回空列表而不是报错，是 当前行为前提：新层此时多为空骨架。
     """
     if not root.is_dir():
         return []

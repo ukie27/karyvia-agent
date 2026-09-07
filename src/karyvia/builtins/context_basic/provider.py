@@ -1,4 +1,4 @@
-"""内建 Context Provider：无 Memory、无检索插件时的可用上下文（技术方案 §8.1、`CTX-006`）。
+"""内建 Context Provider：无 Memory、无检索插件时的可用上下文。
 
 职责：实现 `ContextProvider`，为每次 turn 贡献基线系统指令、运行时事实与运维配置的自定义
 指令三类片段；同时提供内建注册入口 `setup(api)`。
@@ -7,17 +7,17 @@
 
 三条决定了本模块形状的规则：
 
-- **Provider 只读不写**（技术方案 §14 的职责划分风险项）。它连 `os` / `pathlib` 都不
+- **Provider 只读不写**。它连 `os` / `pathlib` 都不
   import，由架构测试的一条扫描盯着。「贡献上下文」和「记住些什么」是两件事，后者是
   Memory 插件。
 - **`trust` 分成两级**：内建基线指令与运行时事实是系统自己产出的，`trust=SYSTEM`；
   运维在 `config.json` 里写的 `instructions` 是 `TrustLevel.OPERATOR`——契约对这一级的
   定义就是「实例拥有者通过配置显式提供的内容，可信但不是系统本身」。代价是它落在
   历史之后的一条 user 消息里而不是 system 消息里，因此给它内建基准 `priority=0`。
-  想让配置文本进系统指令位置，等于取消 `CMD-005` 的分级，那不是一个内建能力
+  想让配置文本进系统指令位置，等于取消的分级，那不是一个内建能力
   该自行决定的事。
 - **历史不由这里贡献**。历史由组装器按 Session 快照统一重放，Provider 再贡献一份历史
-  片段就是把同一段对话讲两遍，还绕过了 `EDG-305` 的投影规则。见交接文档对 §8.1 的细化。
+  片段就是把同一段对话讲两遍，还绕过了的投影规则。见交接文档对 §8.1 的细化。
 """
 
 from __future__ import annotations
@@ -139,7 +139,7 @@ class BasicContextProvider:
         correlation: Correlation,
         cancel: CancelSignal,
     ) -> tuple[ContextFragment, ...]:
-        """贡献本轮片段。空会话同样有产出（`CTX-006`、`EDG-307`）。
+        """贡献本轮片段。空会话同样有产出。
 
         **异常约定**：不抛。三段文本全部来自已校验的配置与快照自身的字段，没有可失败的
         外部依赖；配置非法在 `setup()` 时就已经抛出（`resolve_settings`），而不是拖到第
@@ -234,10 +234,10 @@ def _read_instructions(config: Mapping[str, JsonValue]) -> str:
 
 
 def resolve_settings(ctx: PluginContext) -> BasicContextSettings:
-    """把 `ctx.config` 校验成一份设置（`CFG-002`：只看得到自己那一块）。
+    """把 `ctx.config` 校验成一份设置（只看得到自己那一块）。
 
     **异常约定**：类型不对抛 `CONFIG_INVALID`；同时关掉基线指令又不配 `instructions`
-    也抛——那等于要求一个没有任何系统指令的 Agent，`CTX-006` 不允许内建 Provider 悄悄
+    也抛——那等于要求一个没有任何系统指令的 Agent， 不允许内建 Provider 悄悄
     产出一份空上下文。要真的不要系统指令，正规做法是在 `plugins.disable` 里禁用本内建。
     """
     config = ctx.config

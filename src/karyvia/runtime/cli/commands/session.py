@@ -1,4 +1,4 @@
-"""`karyvia session`：列出会话与打印单个会话的摘要（需求 §16.1）。
+"""`karyvia session`：列出会话与打印单个会话的摘要。
 
 职责：把生效的 `SessionStore`（可能被插件覆盖）里的会话列出来，或读一个会话的快照。
 不负责：删除或压缩会话（那是有副作用的操作，要单独的确认流程）、装配完整实例。
@@ -71,7 +71,7 @@ async def _list(sessions: SessionStore) -> int:
 async def _show(sessions: SessionStore, storage_id: str) -> int:
     """打印一个会话的摘要。
 
-    **`from_storage_id()` 是 `storage_id()` 的逆运算**（`D02` 的持久化契约），因此这里
+    **`from_storage_id` 是 `storage_id` 的逆运算**（持久化契约），因此这里
     不自己拆字符串——那个编码里 `~` 是转义过的分隔符，手拆迟早在带 `~` 的会话上切错。
     """
     key = SessionKey.from_storage_id(storage_id)

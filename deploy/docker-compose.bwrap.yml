@@ -5,7 +5,7 @@ x-bwrap-security: &bwrap-security
     - apparmor=unconfined
     - seccomp=unconfined
 
-# 服务名与 docker-compose.yml 同步（`D31` 起只剩两个）。
+# 服务名与 docker-compose.yml 同步。
 services:
   karyvia-serve:
     <<: *bwrap-security

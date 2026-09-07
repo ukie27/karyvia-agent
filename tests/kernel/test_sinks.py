@@ -1,4 +1,4 @@
-"""`kernel/observability/sinks.py` 的行为测试（`D12`：`NFR-404`、`OBS-002`、`OBS-003`、`EDG-501`）。
+"""`kernel/observability/sinks.py` 的行为测试。
 
 四类验收点：内存环的容量上限与 `dropped` 计数、JSONL 按天分片与写失败被计数而不是抛出、
 哨兵扫描（埋入密钥后扫描两个 sink 的全部输出）、配置错误落盘。
@@ -54,7 +54,7 @@ def _event(sequence: int, *, turn: str = "turn-1", day: int = 11) -> RuntimeEven
     )
 
 
-# ------------------------------------------------------------------ 内存环（NFR-404）
+# ------------------------------------------------------------------ 内存环
 
 
 def test_ring_default_capacity_is_bounded() -> None:
@@ -193,7 +193,7 @@ def test_a_failing_jsonl_sink_does_not_break_the_bus(tmp_path: Path) -> None:
     assert len(ring) == 1
 
 
-# ------------------------------------------------------------------ 哨兵扫描（OBS-003）
+# ------------------------------------------------------------------ 哨兵扫描
 
 
 def test_no_sentinel_reaches_any_sink(tmp_path: Path) -> None:
@@ -235,7 +235,7 @@ def test_no_sentinel_reaches_any_sink(tmp_path: Path) -> None:
             assert SENTINEL not in event.error.user_message
 
 
-# ------------------------------------------------------------------ 配置错误落盘（EDG-501）
+# ------------------------------------------------------------------ 配置错误落盘
 
 
 def test_config_error_is_appended_as_jsonl(tmp_path: Path) -> None:

@@ -85,7 +85,7 @@ MCP 协议不报告副作用：一个写文件的远端工具与一个只读的�
 
 ### 3. 启动路径上多一次往返
 
-连接发生在 `setup()` 里——registry 解析之后只读（`NFR-403`），没有第二个注册时机。因此每台
+连接发生在 `setup` 里——registry 解析之后只读，没有第二个注册时机。因此每台
 server 都会给冷启动加上它自己的连接时间，`connect_timeout_ms` 是上界，超时即跳过那台。
 
 **单台连不上不致命**：记一条日志、跳过它的工具，其余照常。
@@ -96,7 +96,7 @@ server 都会给冷启动加上它自己的连接时间，`connect_timeout_ms` �
 `StopOutcome.timed_out` 如实标着——那时那个子进程可能还在跑。
 
 连接由**一条后台任务**拥有（`supervisor.py`）：`mcp` 的三种传输都建在 anyio 的任务组上，
-而任务组必须在进入它的那个任务里退出。在 `setup()` 里打开、在停止路径上关闭，会炸出
+而任务组必须在进入它的那个任务里退出。在 `setup` 里打开、在停止路径上关闭，会炸出
 `Attempted to exit cancel scope in a different task`。
 
 ## 不做的事
@@ -104,7 +104,7 @@ server 都会给冷启动加上它自己的连接时间，`connect_timeout_ms` �
 | 不做 | 理由 |
 | --- | --- |
 | resources / prompts 桥接 | 新层没有对应的能力种类；伪装成工具会让模型拿到一堆语义不明的调用 |
-| 热重载（旧实现的 `RUNTIME_CONTROL_MCP_RELOAD`） | registry 解析后只读、首版不热更新；只在自己这一层成立的「重载」会让 `karyvia capabilities` 说谎 |
+| 热重载 | registry 解析后只读；局部重载会让 `karyvia capabilities` 与实际状态不一致 |
 | sampling（server 反向调模型） | 那是一条绕过主 Turn、`TurnLimits` 与取消链的模型调用通道 |
 | OAuth 流程 | 目前只支持静态 header 鉴权 |
 

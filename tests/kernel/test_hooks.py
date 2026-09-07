@@ -1,10 +1,10 @@
-"""`HookRouter` 的行为测试（`D14` 验收：§6.6 的两类扩展点）。
+"""`HookRouter` 的行为测试。
 
 | 组 | 验收内容 |
 | --- | --- |
-| A 顺序 | 拦截器按 `(priority, provider, name)` 顺序执行且多次运行一致（`CTX-002`） |
+| A 顺序 | 拦截器按 `(priority, provider, name)` 顺序执行且多次运行一致 |
 | B 累积与短路 | `REPLACE` 逐个回灌、`REJECT`/`BLOCK` 首个即短路 |
-| C 隔离 | 观察者与拦截器异常/超时不影响 turn（`NFR-204`） |
+| C 隔离 | 观察者与拦截器异常/超时不影响 turn |
 | E 形状 | 用错处置/载荷被当作插件故障，而不是静默忽略 |
 | F 注册 | `bindings_from()` 认 `RegisteredHook`，别的载荷当场报错 |
 """
@@ -373,7 +373,7 @@ async def test_failure_detail_never_carries_the_exception_message() -> None:
 
 
 async def test_observer_failure_does_not_raise() -> None:
-    """观察者失败只上报，不改变 turn 结果（`NFR-204`）。"""
+    """观察者失败只上报，不改变 turn 结果。"""
     from karyvia.contracts import TurnOutcome, TurnStatus
 
     router = HookRouter(

@@ -13,7 +13,7 @@ license = { text = "MIT" }
 # `karyvia.sdk` 不单独发行，能被 pip 解析的名字只有这一个。
 dependencies = ["karyvia>=0.3.0"]
 
-# 发现的唯一入口（技术方案 §7.1）。**name 必须等于 manifest 里的 `id`**：
+# 发现的唯一入口。**name 必须等于 manifest 里的 `id`**：
 # `plugins.enabled` 写的是这个 name，对不上即失败（`runtime/inventory.py::_validate`）。
 # 值指向 manifest 对象而不是 `setup`——读一份声明不该导入实现。
 [project.entry-points."karyvia.plugins"]

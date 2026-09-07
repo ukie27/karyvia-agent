@@ -1,4 +1,4 @@
-"""`commands_core` 的配置：命令名清单与单命令禁用（`TOL-006` 的同一条机制）。
+"""`commands_core` 的配置：命令名清单与单命令禁用（同一条机制）。
 
 职责：定义六个命令名常量，解析本内建的配置块，并导出 `enabled_command_names()` 供装配根
 过滤 manifest 声明。
@@ -8,7 +8,7 @@
 `enabled_tool_names()` 同型：`CapabilityHost.finish()` 要求 manifest 声明的每一项都真的
 被注册，而「按名字关掉一个命令」要求被关掉的那项从 registry 里消失。静态 manifest 无法
 按配置少声明一项，因此由 `runtime/wiring.py` 的 `keep` 裁掉声明、由 `setup()` 用**同一份
-配置**决定注册谁。两者同源是这条机制成立的全部条件（`D20` 的结论）。
+配置**决定注册谁。两者同源是这条机制成立的全部条件（结论）。
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ __all__ = [
     "resolve_settings",
 ]
 
-#: 六个命令名（技术方案 §8.1）。顺序即 `/help` 的默认展示顺序之外的唯一用途是断言，
+#: 六个命令名。顺序即 `/help` 的默认展示顺序之外的唯一用途是断言，
 #: 实际输出按名字排序（`CommandIndex.specs()` 已排好）。
 COMMAND_NAMES: Final[tuple[str, ...]] = (
     "help",

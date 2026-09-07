@@ -191,7 +191,7 @@ class _Tool:
     #: 成功时的副作用档位。
     side_effect: SideEffect = SideEffect.NONE
 
-    #: 成功时正文的可信度（`D42`）。默认是自己的话——三条工具交出的都是本插件渲染的
+    #: 成功时正文的可信度。默认是自己的话——三条工具交出的都是本插件渲染的
     #: 回执。**`cron.list` 例外**：它把任务正文原样印出来，而那段文字是谁创建任务谁写的
     #: （群聊里任何人都能敲 `/cron`），因此它声明 `UNTRUSTED`。
     trust: TrustLevel = TrustLevel.SYSTEM
@@ -212,7 +212,7 @@ class _Tool:
                 side_effect=SideEffect.NONE,
                 error=error,
                 duration_ms=_elapsed_ms(started),
-                # 失败正文是本层自己写的文案，不含外部内容（`D42`）。
+                # 失败正文是本层自己写的文案，不含外部内容。
                 trust=TrustLevel.SYSTEM,
             )
         text, cut = _truncate(content, _MAX_RESULT_CHARS)

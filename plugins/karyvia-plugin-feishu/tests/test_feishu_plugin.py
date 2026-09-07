@@ -1,4 +1,4 @@
-"""官方插件 `feishu` 的验收：manifest、配置、生命周期、SDK 边界（开发方案 `D34`）。
+"""官方插件 `feishu`当前行为：manifest、配置、生命周期、SDK 边界。
 
 | 验收项 | 测试 |
 | --- | --- |
@@ -104,7 +104,7 @@ class TestFeishuChannelContract(ChannelContract):
 
 class TestManifest:
     def test_entry_point_name_equals_the_manifest_id(self) -> None:
-        """`D25` 的判定：对不上时 `plugins.enabled` 指不到任何东西。"""
+        """ 的判定：对不上时 `plugins.enabled` 指不到任何东西。"""
         assert MANIFEST.id in {item.name for item in entry_points(group="karyvia.plugins")}
 
     def test_one_channel_capability_and_no_overrides(self) -> None:
@@ -115,11 +115,11 @@ class TestManifest:
         assert decl.overrides is None
 
     def test_priority_is_not_declared(self) -> None:
-        """写了默认值 100 会被原样采纳，而内建基准是 0（`D16` 记的坑）。"""
+        """写了默认值 100 会被原样采纳，而内建基准是 0。"""
         assert "priority" not in MANIFEST.capabilities[0].model_fields_set
 
     def test_config_schema_matches_the_settings_table(self) -> None:
-        """两处都「自洽」而对不上时，一个写对了的配置会在阶段 A 被 schema 拒掉。"""
+        """两处都「自洽」而对不上时，一个写对了的配置会在加载前校验 被 schema 拒掉。"""
         assert set(CONFIG_SCHEMA["properties"]) == set(CONFIG_KEYS)
         assert CONFIG_SCHEMA["additionalProperties"] is False
 
@@ -239,7 +239,7 @@ class TestChannelLifecycle:
         await channel.stop()
 
     async def test_stop_is_idempotent_and_never_raises(self) -> None:
-        """`EDG-104`：一个抛异常的 `stop()` 会让别的收尾也做不完。"""
+        """一个抛异常的 `stop` 会让别的收尾也做不完。"""
         channel, _, _ = make_channel()
         await channel.start()
         await channel.stop()
@@ -299,11 +299,12 @@ class TestChannelLifecycle:
         channel, _, client = make_channel()
         await channel.start()
         await channel._on_event(FakeEvent())  # noqa: SLF001
+
         assert client.added == [(MESSAGE_ID, "THUMBSUP")]
         await channel.stop()
 
     async def test_a_malformed_event_does_not_take_the_bot_down(self) -> None:
-        """`MSG-004`：一条看不懂的平台事件不该让 bot 下线。"""
+        """一条看不懂的平台事件不该让 bot 下线。"""
         channel, _, _ = make_channel()
         await channel.start()
         await channel._on_event(object())  # noqa: SLF001 - 故意畸形
@@ -314,6 +315,7 @@ class TestChannelLifecycle:
         channel, _, _ = make_channel(reply_to_message=False)
         await channel.start()
         await channel._on_event(FakeEvent())  # noqa: SLF001
+
         _, _, in_thread = channel._target_for(outbound("答案").conversation_id)  # noqa: SLF001
         assert in_thread is False
         await channel.stop()
@@ -365,7 +367,7 @@ class TestSdkBoundary:
         assert offenders == SDK_MODULES
 
     def test_importing_the_plugin_does_not_pull_in_the_sdk(self) -> None:
-        """`NFR-405` 的冷启动预算：`lark_oapi` 会拉进一整套生成代码。
+        """既定冷启动预算：`lark_oapi` 会拉进一整套生成代码。
 
         legacy 有这条纪律（`test_feishu_lazy_import.py`），这里**加强一格**：连
         `setup()` 之后（构造完 Channel）都不许拉进来。

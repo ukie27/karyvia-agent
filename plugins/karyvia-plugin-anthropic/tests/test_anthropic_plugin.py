@@ -1,10 +1,10 @@
-"""官方插件 `anthropic` 的验收：行为、配置与 manifest（开发方案 `D32`）。
+"""官方插件 `anthropic`当前行为：行为、配置与 manifest。
 
 | 验收项 | 测试 |
 | --- | --- |
 | 通过 `ModelProviderContract` 全部用例 | `TestAnthropicModelProvider` |
-| 错误映射到正确的 `ErrorCategory` 且 `retryable` 正确（`MOD-003`） | `TestFaultMapping` |
-| 凭据不进日志与事件（`MOD-002`） | `TestCredentialNeverLeaks` |
+| 错误映射到正确的 `ErrorCategory` 且 `retryable` 正确 | `TestFaultMapping` |
+| 凭据不进日志与事件 | `TestCredentialNeverLeaks` |
 | 取消语义 | `TestCancellation` |
 | 配置校验在 `setup()` 时发生一次 | `TestSettings` |
 | manifest 自洽、经真注册路径装得起来 | `TestManifest` |
@@ -330,7 +330,7 @@ class TestSettings:
 
     @pytest.mark.parametrize("capability", ["reasoning", "prompt_caching"])
     def test_declaring_a_derived_capability_is_rejected(self, capability: str) -> None:
-        """声明了却没开开关，等于让组装器以为拿得到一份它拿不到的东西（`MOD-005`）。"""
+        """声明了却没开开关，等于让组装器以为拿得到一份它拿不到的东西。"""
         with pytest.raises(KaryviaError) as excinfo:
             make_settings(**{CONFIG_CAPABILITIES_KEY: [capability]})
         assert excinfo.value.code is ErrorCode.CONFIG_INVALID
@@ -402,7 +402,7 @@ class TestSettings:
 
 class TestManifest:
     def test_entry_point_name_equals_the_manifest_id(self) -> None:
-        """`D25` 的判定：对不上时 `plugins.enabled` 指不到任何东西。"""
+        """ 的判定：对不上时 `plugins.enabled` 指不到任何东西。"""
         names = {item.name for item in entry_points(group="karyvia.plugins")}
         assert MANIFEST.id in names
 
@@ -415,11 +415,11 @@ class TestManifest:
         assert decl.overrides is None
 
     def test_priority_is_not_declared(self) -> None:
-        """写了默认值 100 会被原样采纳，而内建基准是 0（`D16` 记的坑）。"""
+        """写了默认值 100 会被原样采纳，而内建基准是 0。"""
         assert "priority" not in MANIFEST.capabilities[0].model_fields_set
 
     def test_config_schema_entry_properties_match_the_settings_table(self) -> None:
-        """两处都「自洽」而对不上时，一个写对了的配置会在阶段 A 被 schema 拒掉。"""
+        """两处都「自洽」而对不上时，一个写对了的配置会在加载前校验 被 schema 拒掉。"""
         assert set(ENTRY_PROPERTIES) == set(MODEL_ENTRY_KEYS)
 
     def test_config_schema_enums_come_from_the_constants(self) -> None:

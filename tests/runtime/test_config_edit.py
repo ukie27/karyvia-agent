@@ -1,4 +1,4 @@
-"""`config.json` 的第二个写入点：改一个字符串列表（`D29` 的 `runtime/config_edit.py`）。
+"""`config.json` 的第二个写入点：改一个字符串列表。
 
 职责：验「只改那一层」「形状不对即拒绝」「原子写回」「不存在时让用户先 karyvia init」四件事。
 不负责：验 `karyvia plugins` 的语义（`tests/runtime/cli/test_plugins_cli.py`）、验首次生成
@@ -109,7 +109,7 @@ def test_only_the_edited_list_is_added(config_path: Path) -> None:
 
     written = json.loads(config_path.read_text(encoding="utf-8"))
     assert written["plugins"]["enabled"] == ["acme"]
-    # 用户写的三样东西一个字都没动，`${VAR}` 仍是字面量（`CFG-003` 的结构性保证）。
+    # 用户写的三样东西一个字都没动，`${VAR}` 仍是字面量（结构性保证）。
     assert written["$schema"] == _ORIGINAL["$schema"]
     assert written["model"] == _ORIGINAL["model"]
     assert written["plugins"]["model-openai"]["secrets"]["api_key"] == "${OPENAI_API_KEY}"

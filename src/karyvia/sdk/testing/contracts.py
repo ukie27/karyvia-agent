@@ -1,4 +1,4 @@
-"""契约测试基类：可替换性的证明（技术方案 §12.3、`NFR-702`）。
+"""契约测试基类：可替换性的证明。
 
 职责：为 7 类能力提供可继承的契约测试基类——实现方（内建或插件）继承对应基类并提供
 构造夹具，即获得全部通用用例。
@@ -21,7 +21,7 @@ class TestMyStore(SessionStoreContract):
   SDK 也不因为一个测试工具而多一条运行期依赖。异步用例依赖调用方开启
   `asyncio_mode = "auto"`（或自行加 `@pytest.mark.asyncio`）。
 - **只断言契约文本明确要求的行为**。「实现大概会这么做」的断言会把契约测试变成对某个
-  具体实现的模仿，反而挡住合法的替代实现——那与 `NFR-702` 的目的正相反。当前是第一版
+  具体实现的模仿，反而挡住合法的替代实现——那与的目的正相反。当前是第一版
   骨架，各基类的 docstring 列出了后续模块应当补齐的用例。
 """
 
@@ -97,9 +97,9 @@ class _ContractBase:
 
 
 class ModelProviderContract(_ContractBase):
-    """`ModelProvider` 的通用契约（需求 §9.5）。
+    """`ModelProvider` 的通用契约。
 
-    后续应补齐：限流/超时/认证失败到 `ErrorCode` 的映射（`MOD-003`）、流式中途失败必须
+    后续应补齐：限流/超时/认证失败到 `ErrorCode` 的映射、流式中途失败必须
     先 yield `DONE(ERROR)`、`CONTENT_FILTER` 作为正常响应而非异常。这些都需要能操纵
     provider 的对端，属于各实现自带的注入夹具，不能在通用基类里假设。
     """
@@ -126,7 +126,7 @@ class ModelProviderContract(_ContractBase):
         info = self.make_provider().describe(self.model_id())
         assert info.model_id == self.model_id()
         assert info.provider
-        # `CTX-003` 的预算推导直接读这个数；声明 0 等于让组装器无从判断上限。
+        #的预算推导直接读这个数；声明 0 等于让组装器无从判断上限。
         assert info.context_window_tokens > 0
 
     async def test_complete_returns_a_response_for_the_same_model(self) -> None:
@@ -135,7 +135,7 @@ class ModelProviderContract(_ContractBase):
         assert response.model_id == self.model_id()
 
     async def test_stream_matches_the_declared_streaming_capability(self) -> None:
-        """声明了流式就必须能流；没声明就必须报缺失，不得静默降级（`MOD-005`）。"""
+        """声明了流式就必须能流；没声明就必须报缺失，不得静默降级。"""
         provider = self.make_provider()
         declared = ModelCapability.STREAMING in provider.describe(self.model_id()).capabilities
         request = self.make_request(stream=True)
@@ -161,10 +161,10 @@ class ModelProviderContract(_ContractBase):
 
 
 class SessionStoreContract(_ContractBase):
-    """`SessionStore` 的通用契约（需求 §9.7）。
+    """`SessionStore` 的通用契约。
 
-    后续应补齐：并发写入的顺序保证（`SES-002`）、损坏记录必须抛
-    `PERSISTENCE_RECORD_CORRUPT` 而不是伪装成空历史、跨实现的格式迁移（`SES-006`）。
+    后续应补齐：并发写入的顺序保证、损坏记录必须抛
+    `PERSISTENCE_RECORD_CORRUPT` 而不是伪装成空历史、跨实现的格式迁移。
     后两项需要能构造坏数据，属于实现自带的夹具。
     """
 
@@ -213,7 +213,7 @@ class SessionStoreContract(_ContractBase):
         assert key in await store.list_keys()
 
     async def test_compact_advances_the_watermark(self) -> None:
-        """`load()` 之后 `compacted_through` 必须等于 `through`（`SES-005`）。"""
+        """`load` 之后 `compacted_through` 必须等于 `through`。"""
         store = self.make_store()
         key = self.make_key("compacted")
         await store.append(key, [self.make_message(f"m{i}") for i in range(4)])
@@ -230,10 +230,10 @@ class SessionStoreContract(_ContractBase):
 
 
 class ContextProviderContract(_ContractBase):
-    """`ContextProvider` 的通用契约（需求 §9.6）。
+    """`ContextProvider` 的通用契约。
 
-    后续应补齐：`CTX-005`（非关键 Provider 异常时被跳过）与预算裁剪下的行为——两者都要
-    Kernel 的组装器参与，属于 `D08` 的集成测试而不是单个实现的契约。
+    后续应补齐：（非关键 Provider 异常时被跳过）与预算裁剪下的行为——两者都要
+    Kernel 的组装器参与，属于的集成测试而不是单个实现的契约。
     """
 
     def make_provider(self) -> ContextProvider:
@@ -251,7 +251,7 @@ class ContextProviderContract(_ContractBase):
         assert all(isinstance(fragment, ContextFragment) for fragment in fragments)
 
     async def test_an_empty_session_is_not_an_error(self) -> None:
-        """空会话下返回空元组是正常结果；`CTX-001` 不允许把「没有贡献」当成失败。"""
+        """空会话下返回空元组是正常结果； 不允许把「没有贡献」当成失败。"""
         await self.make_provider().provide(
             SessionSnapshot(session_key=SessionKey(channel_id="contract", conversation_id="empty")),
             make_correlation(),
@@ -318,10 +318,10 @@ class _ContractCompactionModel:
 
 
 class ToolContract(_ContractBase):
-    """`ToolHandler` + `ToolSpec` 的通用契约（需求 §9.9）。
+    """`ToolHandler` + `ToolSpec` 的通用契约。
 
-    后续应补齐：取消宽限期内必须返回结果并如实标注 `side_effect`（`EDG-407`）、
-    超长输出的截断与 `truncated=True`（`TOL-003`）——前者需要能让工具阻塞住的夹具。
+    后续应补齐：取消宽限期内必须返回结果并如实标注 `side_effect`、
+    超长输出的截断与 `truncated=True`——前者需要能让工具阻塞住的夹具。
     """
 
     def make_tool(self) -> tuple[ToolSpec, ToolHandler]:
@@ -362,7 +362,7 @@ class ToolContract(_ContractBase):
         assert result.side_effect is SideEffect.NONE
 
     async def test_bad_arguments_come_back_as_a_result_not_an_exception(self) -> None:
-        """`TOL` 的约定：失败是一等结果。逸出的异常会让 Kernel 只能标 `UNKNOWN` 副作用。"""
+        """`TOL`当前约定：失败是一等结果。逸出的异常会让 Kernel 只能标 `UNKNOWN` 副作用。"""
         arguments = self.invalid_arguments()
         if arguments is None:
             return
@@ -373,10 +373,10 @@ class ToolContract(_ContractBase):
 
 
 class ChannelContract(_ContractBase):
-    """`Channel` 的通用契约（需求 §9.4）。
+    """`Channel` 的通用契约。
 
-    后续应补齐：入站归一化（原始 SDK 对象不得进入 Kernel，`MSG-004`）、平台长度上限下的
-    分段降级（`MSG-003`）、`is_complete_answer=False` 时必须附加标记（`EDG-304`）——
+    后续应补齐：入站归一化（原始 SDK 对象不得进入 Kernel）、平台长度上限下的
+    分段降级、`is_complete_answer=False` 时必须附加标记——
     这三条都要一个可断言的假平台，属于各 Channel 自带的夹具。
     """
 
@@ -402,7 +402,7 @@ class ChannelContract(_ContractBase):
         assert channel.channel_id == channel.channel_id
 
     async def test_stop_is_safe_to_call_twice(self) -> None:
-        """`stop()` 约定不抛：停止阶段的异常只会拖住整个实例退出（`EDG-104`）。"""
+        """`stop` 约定不抛：停止阶段的异常只会拖住整个实例退出。"""
         channel = self.make_channel()
         await channel.start()
         await channel.stop()
@@ -423,9 +423,9 @@ class ChannelContract(_ContractBase):
 
 
 class MemoryProviderContract(_ContractBase):
-    """`MemoryProvider` 的通用契约（需求 §9.8 `MEM-001`–`MEM-005`）。
+    """`MemoryProvider` 的通用契约。
 
-    `MEM-001`「Kernel 只依赖 Memory Interface，不假设文件、向量或图数据库」的全部意义
+    「Kernel 只依赖 Memory Interface，不假设文件、向量或图数据库」的全部意义
     就是后端可替换——而没有一个可执行的契约基类，那句话只是文档。这个基类是它的可执行形态：
     换后端的人继承它，就拿到「换完之后调用方看到的行为不变」的证明。
 
@@ -433,7 +433,7 @@ class MemoryProviderContract(_ContractBase):
     契约的三个方法**都不带 `SessionKey`**，因此只有实例级范围在这条接口上无歧义；
     需要别的范围的实现方自己覆盖它。
 
-    后续应补齐：`MEM-003` 的降级（后端不可用时 Kernel 按配置继续对话）需要装配根参与，
+    后续应补齐： 的降级（后端不可用时 Kernel 按配置继续对话）需要装配根参与，
     属于集成测试而不是单个实现的契约。
     """
 
@@ -449,7 +449,7 @@ class MemoryProviderContract(_ContractBase):
             priority=50,
             estimated_tokens=len(content),
             scope=FragmentScope.AGENT,
-            # 模型生成内容应以 `UNTRUSTED` 写入——召回时会被包裹为数据块（`EDG-306`）。
+            # 模型生成内容应以 `UNTRUSTED` 写入——召回时会被包裹为数据块。
             trust=TrustLevel.UNTRUSTED,
         )
 
@@ -473,7 +473,7 @@ class MemoryProviderContract(_ContractBase):
         assert await provider.forget(record_id) is False
 
     async def test_recall_keys_can_be_fed_back_to_forget(self) -> None:
-        """`recall()` 返回映射而不是元组，正是为了让 `MEM-005` 的删除拿得到标识。"""
+        """`recall` 返回映射而不是元组，正是为了让的删除拿得到标识。"""
         provider = self.make_provider()
         content = "召回之后要能删掉这一条"
         await provider.remember(self.make_fragment(content), ManualCancel())

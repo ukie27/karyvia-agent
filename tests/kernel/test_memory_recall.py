@@ -1,6 +1,6 @@
-"""`D44` 长期记忆的召回路径：`kernel/turn/memory.py` 与它在组装器里的落点。
+""" 长期记忆的召回路径：`kernel/turn/memory.py` 与它在组装器里的落点。
 
-职责：验那四条判定——只用 `AGENT` 范围召回、priority 有下界、失败按 `MEM-003` 分叉、
+职责：验那四条判定——只用 `AGENT` 范围召回、priority 有下界、失败按  分叉、
 空查询不打扰后端；以及「召回出来的片段与其余片段完全同等」（同批拦截、同批裁剪）。
 不负责：验装配根怎么挑 provider（`tests/runtime/test_bootstrap.py`）、验配置字段
 （`tests/kernel/test_config.py`）、验某个具体后端（各插件自己的 `tests/`）。
@@ -164,11 +164,11 @@ async def test_recall_order_is_the_backends_order() -> None:
     assert [item.content for item in got] == ["最相关", "次相关", "第三"]
 
 
-# ------------------------------------------------------------------ `MEM-003` 分叉
+# ------------------------------------------------------------------  分叉
 
 
 async def test_a_broken_backend_degrades_by_default() -> None:
-    """`MEM-003`：这一轮没有记忆，turn 照常跑。**但错误一定被报出去**——降级不等于静默。"""
+    """这一轮没有记忆，turn 照常跑。**但错误一定被报出去**——降级不等于静默。"""
     memory = FakeMemory(fails=KaryviaError(ErrorCode.PERSISTENCE_READ_FAILED, "后端挂了。"))
     reported: list[KaryviaError] = []
 
@@ -270,7 +270,7 @@ async def assembled(memory: MemoryRecall | None, **kwargs: object) -> object:
 async def test_recalled_memory_reaches_the_model_request() -> None:
     """整条路径的功能形态：注册一条 `MEMORY`、配上名字，记忆就真的进了模型消息。
 
-    这是 `D39` 留下的缺口——那时只注册一条 `MEMORY` 能力，记忆永远进不了模型。
+    这是  留下的缺口——那时只注册一条 `MEMORY` 能力，记忆永远进不了模型。
     """
     memory = FakeMemory(fragments={"r1": fragment("用户偏好简短回答", priority=100)})
     context = await assembled(recall_for(memory))
@@ -297,7 +297,7 @@ async def test_a_secret_memory_is_dropped_like_any_other_fragment() -> None:
 
 
 async def test_no_memory_means_no_change_at_all() -> None:
-    """`memory=None`（默认）时组装结果与 `D44` 之前逐字相同。"""
+    """`memory=None`（默认）时组装结果与此前逐字相同。"""
     context = await assembled(None)
     assert context.fragments == ()  # type: ignore[attr-defined]
     assert [message.content for message in context.messages] == ["记得我的偏好吗"]  # type: ignore[attr-defined]

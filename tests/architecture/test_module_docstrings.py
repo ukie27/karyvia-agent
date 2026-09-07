@@ -1,4 +1,4 @@
-"""模块头部「职责/不负责」两行的检查（技术方案 §4.6、§12.1）。
+"""模块头部「职责/不负责」两行的检查。
 
 职责：断言 `contracts/`、`kernel/`、`sdk/`、`runtime/` 的每个模块首个 docstring
 含「职责：」与「不负责：」两行，并用注入样例证明缺行会被拦。
@@ -14,7 +14,7 @@ import pytest
 
 from ._common import PACKAGE_DIR, REPO_ROOT, iter_modules, rel, write_module
 
-#: 强制范围。`builtins/` 与 `embed/` 不在内（技术方案 §4.6 只列这四层）。
+#: 强制范围。`builtins/` 与 `embed/` 不在内。
 ENFORCED_LAYERS: tuple[str, ...] = ("contracts", "kernel", "sdk", "runtime")
 
 RESPONSIBILITY_PREFIX = "职责："
@@ -60,7 +60,7 @@ def test_enforced_layers_declare_responsibilities() -> None:
 
 
 def test_empty_layer_passes(tmp_path: Path) -> None:
-    """目标目录尚不存在时返回通过而非报错，否则 D01 自身无法验收。"""
+    """目标目录尚不存在时返回通过而非报错，否则  自身无法验收。"""
     assert check_tree(tmp_path / "karyvia", repo_root=tmp_path) == {}
 
 

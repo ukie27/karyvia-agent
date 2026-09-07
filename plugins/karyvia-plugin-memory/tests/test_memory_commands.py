@@ -58,7 +58,7 @@ def test_the_trailing_parameter_is_repeated() -> None:
 
 
 def test_the_command_name_does_not_collide_with_the_builtin_command_set() -> None:
-    """命令名与别名在同一个命名空间里判定（`build_command_index()`，`CMD-002`）。
+    """命令名与别名在同一个命名空间里判定（`build_command_index`）。
 
     `R4` 让本插件够不着 `builtins/commands_core`，因此这里对照的是那六个名字的字面量。
     """
@@ -225,7 +225,7 @@ async def test_bad_input_is_rejected_not_raised(store: MemoryStore, args: list[s
 
 
 async def test_the_session_stays_usable_after_a_rejection(store: MemoryStore) -> None:
-    """`CMD-003` 的可断言形态：炸掉一次之后，下一条命令照常跑。"""
+    """ 的可断言形态：炸掉一次之后，下一条命令照常跑。"""
     command = _command(store)
     assert (await command.handle(make_command(["nope"]), NoCancel())).disposition is Disposition.REJECTED
     assert (await command.handle(make_command(["list"]), NoCancel())).disposition is Disposition.COMMAND_HANDLED
@@ -238,6 +238,7 @@ async def test_an_unexpected_exception_becomes_a_rejection_without_its_message(
 
     class Exploding(MemoryStore):
         async def entries(self, key: object, *, scopes: object) -> tuple[()]:  # type: ignore[override]
+
             raise RuntimeError("sk-secret-token-must-not-appear-1234")
 
     command = MemoryCommand(Exploding(tmp_path / "memory"), MemorySettings())
@@ -256,6 +257,7 @@ async def test_cancellation_is_not_swallowed(tmp_path: Path) -> None:
 
     class Cancelling(MemoryStore):
         async def entries(self, key: object, *, scopes: object) -> tuple[()]:  # type: ignore[override]
+
             raise asyncio.CancelledError
 
     command = MemoryCommand(Cancelling(tmp_path / "memory"), MemorySettings())

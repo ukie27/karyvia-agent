@@ -23,10 +23,10 @@ __all__ = [
     "render_runtime_facts",
 ]
 
-#: 基线系统指令（`CTX-006`）：没有 Memory、没有检索插件、没有任何运维配置时，这一段
+#: 基线系统指令：没有 Memory、没有检索插件、没有任何运维配置时，这一段
 #: 独自构成「可用上下文」。
 #:
-#: 最后一条直接引用契约里的 `UNTRUSTED_DATA_PREFIX` 而不是复述它：`EDG-306` 的数据块包裹
+#: 最后一条直接引用契约里的 `UNTRUSTED_DATA_PREFIX` 而不是复述它： 的数据块包裹
 #: 在 `ContextFragment.as_model_text()` 里完成，模型侧要认得那句前缀这条包裹才有意义。
 #: 用常量插值，改契约措辞时这里跟着变，不会留下一段说着旧暗号的系统指令。
 BASELINE_INSTRUCTIONS: Final = (

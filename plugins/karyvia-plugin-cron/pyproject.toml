@@ -18,7 +18,7 @@ license = { text = "MIT" }
 # DST 用例用手写的 `tzinfo` 子类驱动（`settings.py`、`tests/_cron_fakes.py`）。
 dependencies = ["karyvia>=0.3.0", "tzdata; sys_platform == 'win32'"]
 
-# 发现的唯一入口（技术方案 §7.1）。name 必须等于 manifest 里的 `id`。
+# 发现的唯一入口。name 必须等于 manifest 里的 `id`。
 [project.entry-points."karyvia.plugins"]
 cron = "karyvia_plugin_cron:MANIFEST"
 

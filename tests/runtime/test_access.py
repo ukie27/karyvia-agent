@@ -1,4 +1,4 @@
-"""`runtime/access/` 的用例：三个受守卫的资源门面（`D26`）。
+"""`runtime/access/` 的用例：三个受守卫的资源门面。
 
 覆盖四组：路径守卫（含与 `builtins/tools_fs` 那份的逐条对照）、读写分离的文件门面、
 受限子进程（真的起进程，因为「函数是对的」不等于「调用它的那条路径是对的」）、
@@ -109,7 +109,7 @@ async def test_writing_leaves_no_temporary_file_behind(tmp_path: Path) -> None:
     assert [p.name for p in (tmp_path / "ws").iterdir()] == ["a.txt"]
 
 
-# ------------------------------------------------- 二进制读写（`D42`）
+# ------------------------------------------------- 二进制读写
 
 
 async def test_bytes_round_trip(tmp_path: Path) -> None:
@@ -195,7 +195,7 @@ async def test_a_timeout_returns_a_result_with_the_flag_set(tmp_path: Path) -> N
 
 async def test_the_parent_environment_does_not_reach_the_child(tmp_path: Path) -> None:
     """哨兵走**真实子进程**打印自己的整个环境再搜——`build_environment()` 是对的
-    不等于调用它的那条路径是对的（漏传 `env=` 单测看不见，`D21` 的同一条判据）。
+    不等于调用它的那条路径是对的（漏传 `env=` 单测看不见， 采用的相同判据）。
     """
     source = {**os.environ, "MY_SECRET_TOKEN": SENTINEL}
     result = await _shell(tmp_path, env_source=source).run(
@@ -253,6 +253,7 @@ def _net(*, handler: object, resolver: object = None) -> GuardedHttpAccess:
     return GuardedHttpAccess(
         plugin_id="probe",
         resolver=resolver or (lambda host, port: ("93.184.216.34",)),  # pyright: ignore[reportUnknownLambdaType]
+
         transport=httpx.MockTransport(handler),  # pyright: ignore[reportArgumentType]
     )
 
@@ -276,7 +277,7 @@ async def test_a_non_2xx_is_a_result_not_an_exception() -> None:
     assert response.status == 503
 
 
-# --------------------------------------------------- 下载上界（`D42`）
+# --------------------------------------------------- 下载上界
 
 
 async def test_max_bytes_truncates_and_says_so() -> None:
@@ -362,7 +363,7 @@ async def test_one_public_address_does_not_excuse_a_private_one() -> None:
 
 
 async def test_a_redirect_into_the_private_range_is_denied() -> None:
-    """`EDG-406`：交给 httpx 跟随重定向等于让第 2 跳绕过守卫。"""
+    """交给 httpx 跟随重定向等于让第 2 跳绕过守卫。"""
 
     def handler(request: httpx.Request) -> httpx.Response:
         if request.url.host == "example.com":

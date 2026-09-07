@@ -1,4 +1,4 @@
-"""内建会话存储：每 session 一个 JSONL + 一个 `meta.json`（技术方案 §8.1、需求 §9.7）。
+"""内建会话存储：每 session 一个 JSONL + 一个 `meta.json`。
 
 职责：实现 `SessionStore` 的五个方法——追加、读取、压缩、删除与枚举，并保证整批追加的
 顺序与原子性；同时提供内建注册入口 `setup(api)`。
@@ -10,7 +10,7 @@
 
 - **追加**先把文件截断到 `committed_bytes`（丢弃上次崩溃留下的半批），写入整批并 `fsync`，
   最后原子替换 `meta.json`。因此崩在任何一步，下次读到的要么是「整批都在」要么是
-  「整批都不在」，不会有半条记录，也不会有半批（`SES-002`、`EDG-504`）。
+  「整批都不在」，不会有半条记录，也不会有半批。
 - **读取**只看 `[0, committed_bytes)`。超出的字节存在也不算数。
 
 **为什么不用 `ctx.fs`**：`FileAccess` 只有 `read_text` / `write_text` / `list_dir`，没有追加、
@@ -62,7 +62,7 @@ META_SUFFIX: Final = ".meta.json"
 #: 临时文件后缀。原子替换用，落在同一目录以保证 `os.replace` 不跨设备。
 _TEMP_SUFFIX: Final = ".tmp"
 
-#: 存储目录的配置键。`D23` 在装配根上把 `InstanceLayout.sessions_dir` 经这个键交下来。
+#: 存储目录的配置键。 在装配根上把 `InstanceLayout.sessions_dir` 经这个键交下来。
 CONFIG_DIRECTORY_KEY: Final = "dir"
 
 #: 本内建的能力名与插件 id，`manifest.py` 与注册调用共用。
@@ -128,7 +128,7 @@ class JsonlSessionStore:
     def paths_for(self, key: SessionKey) -> tuple[Path, Path]:
         """`(历史文件, 元数据文件)`。文件名只由 `SessionKey.storage_id()` 决定。
 
-        绝不自己编码会话标识：那个编码已发布即为持久化契约（`EDG-203`），在这里另写一份
+        绝不自己编码会话标识：那个编码已发布即为持久化契约，在这里另写一份
         等于给同一份历史造两个名字。
         """
         storage_id = key.storage_id()
@@ -150,7 +150,7 @@ class JsonlSessionStore:
         await asyncio.to_thread(self._append_sync, key, tuple(messages))
 
     async def compact(self, key: SessionKey, through: int, summary: SessionMessage) -> None:
-        """把前 `through` 条记录折成摘要并推进水位（`SES-005`）。
+        """把前 `through` 条记录折成摘要并推进水位。
 
         **原始记录不物理删除**：摘要**插在水位处**（而不是替换掉前缀），`load()` 之后
         `compacted_through == through` 且摘要出现在 `live_messages` 的最前面。留着原文的
@@ -375,8 +375,8 @@ def resolve_directory(ctx: PluginContext) -> Path:
     """决定会话文件写在哪：配置里的 `dir`，否则退回插件私有状态目录。
 
     **本内建不知道实例布局**（`R4` 禁止 `builtins/` import `kernel/`），因此目录只能由
-    装配根交下来：`D23` 会把 `InstanceLayout.sessions_dir` 放进本插件的配置块
-    （`ctx.config` 按 `CFG-002` 只有自己那一块）。没配时退回 `ctx.state_dir`——那是每个
+    装配根交下来： 会把 `InstanceLayout.sessions_dir` 放进本插件的配置块
+    （`ctx.config` 按  只有自己那一块）。没配时退回 `ctx.state_dir`——那是每个
     插件都必然拥有的私有目录，比抛错更符合「插件在没有配置时也该能工作」。
 
     **异常约定**：`dir` 存在但不是非空字符串抛 `CONFIG_INVALID`——静默忽略一个写错类型

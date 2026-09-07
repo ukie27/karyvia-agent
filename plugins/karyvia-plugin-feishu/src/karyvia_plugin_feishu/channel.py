@@ -1,4 +1,4 @@
-"""`contracts.Channel` 的飞书实现（开发方案 `D34`）。
+"""`contracts.Channel` 的飞书实现。
 
 职责：`channel_id` / `start` / `stop` / `receive` / `deliver` 五个成员，以及把 gateway、
 归一化、流式与指示器组装到一起；维护「每 conversation 最后一条入站消息」表。
@@ -15,9 +15,9 @@
 `reply_to_message` 时才为真。否则「回复到一个已有话题」会让飞书**新建**一个话题——
 用户会看到自己的对话被切成一串互不相干的小话题。
 
-**`deliver()` 照约定抛 `EXTERNAL_CHANNEL`**（`D43` 起）：出站路由点
+**`deliver` 照约定抛 `EXTERNAL_CHANNEL`**：出站路由点
 （`runtime/instance.py::outbound_router`）捕获它、发一条 `channel.delivery_failed`，
-turn 照样走到自己的终态（`EDG-204`）。在此之前这里把投递故障整个吞掉，于是「答案发不出
+turn 照样走到自己的终态。在此之前这里把投递故障整个吞掉，于是「答案发不出
 去」在事件流里一个字都没有——用户看到的现象是 bot 不说话，而日志一片正常。
 **只有正文的投递会抛；指示器与工具提示仍然静默**（`_quietly`）：一个没清掉的「正在输入」
 是外观问题，而一条没发出去的答案不是。
@@ -110,7 +110,7 @@ class FeishuChannel:
         self._show_reasoning = show_reasoning
         self._started = False
         self._inbox: asyncio.Queue[InboundMessage | None] = asyncio.Queue()
-        # **门控只建一次并复用**：它持有去重表，每次新建会让 `EDG-201` 的第一道防线失效。
+        # **门控只建一次并复用**：它持有去重表，每次新建会让的第一道防线失效。
         self._gate = settings.gate()
         self._last_inbound: OrderedDict[str, str] = OrderedDict()
         #: `(conversation_id, turn_id, 工具名)`。回调只往里放，`_hint_pump` 只从里取。
@@ -143,7 +143,7 @@ class FeishuChannel:
 
     @property
     def channel_id(self) -> str:
-        """稳定标识，构成 `SessionKey.channel_id`（`SES-001`），也是出站路由键。"""
+        """稳定标识，构成 `SessionKey.channel_id`，也是出站路由键。"""
         return self._settings.channel_id
 
     async def start(self) -> None:
@@ -193,7 +193,7 @@ class FeishuChannel:
     async def deliver(self, message: OutboundMessage) -> None:
         """投递一条出站消息。
 
-        **正文失败抛 `EXTERNAL_CHANNEL`**（`D43`，见模块 docstring）；指示器的清理仍然
+        **正文失败抛 `EXTERNAL_CHANNEL`**（见模块 docstring）；指示器的清理仍然
         静默——它在正文之后，而一次失败的清理不该盖掉「正文已经送到了」。
         """
         if not self._show_reasoning and message.metadata.get(_REASONING):
@@ -207,7 +207,7 @@ class FeishuChannel:
     # ------------------------------------------------------------------ 工具提示
 
     def on_tool_call(self, event: RuntimeEvent) -> None:
-        """`tool.call_started` 的订阅者。**同步且不抛**（`sdk.api.EventSubscriber` 的约定）。
+        """`tool.call_started` 的订阅者。**同步且不抛**（`sdk.api.EventSubscriber`当前约定）。
 
         `setup()` 把它挂到 `ctx.events` 上。这里只做判定与入队：Kernel 在**发布事件的
         同一个栈**里调它，任何 `await` 都会把 turn 的执行卡在这条回调上。
@@ -279,7 +279,7 @@ class FeishuChannel:
             self._last_inbound.popitem(last=False)
 
     async def _on_event(self, event: Any) -> None:  # boundary: lark 的事件对象
-        """gateway 的回调。**一条消息炸掉不该让 bot 下线**（`MSG-004`）。"""
+        """gateway 的回调。**一条消息炸掉不该让 bot 下线**。"""
         try:
             raw = event_to_raw(event)
             message = normalize(raw, self._gate)

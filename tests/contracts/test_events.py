@@ -1,4 +1,4 @@
-"""运行时事件契约测试（`D02`，需求 `OBS-001`–`OBS-003`）。"""
+"""运行时事件契约测试（需求 –）。"""
 
 from __future__ import annotations
 
@@ -59,15 +59,15 @@ def test_event_names_are_unique() -> None:
     assert len(set(values)) == len(values)
 
 
-#: `EventName` 的规范性快照（`NFR-104`）。以**字面量**写死：从实现反推的清单只能证明代码
+#: `EventName` 的规范性快照。以**字面量**写死：从实现反推的清单只能证明代码
 #: 没改，证明不了它经过评审。增删事件名必须同时改这张表，那就是评审闸门。
-#: `turn.stopped_by_limit` 由 `D12` 按 `NFR-104` 补入（`D09` 的 `TurnStoppedByLimit`
+#: `turn.stopped_by_limit` 由  按  补入（ `TurnStoppedByLimit`
 #: 原本没有落点，用 `turn.completed` 承载会让两种终态不可区分）。
 #: Channel 泵可能在**进 orchestrator 之前**因总在途上界拒绝一条消息。它刻意不是
 #: `turn.rejected`
 #: ——那条消息从未进过 orchestrator，而 turn 事件只有那一个发布点。
-#: `channel.delivery_failed` 由 `D43` 补入，用来消解 `Channel.deliver` 的 docstring 与
-#: `EDG-204` 之间那条真实存在的矛盾（前者要求投递失败抛，后者要求 turn 仍走到终态，
+#: `channel.delivery_failed` 由  补入，用来消解 `Channel.deliver` 的 docstring 与
+#: 之间那条真实存在的矛盾（前者要求投递失败抛，后者要求 turn 仍走到终态，
 #: 于是四个实现全都选了不抛）。它刻意不是 `turn.failed`：「答案没算出来」与「答案没送
 #: 出去」的处置不同（重跑 vs 重发），也不是 `plugin.failed`：内建 CLI 的投递失败与插件无关。
 EVENT_NAME_SNAPSHOT = (
@@ -112,7 +112,7 @@ def test_event_name_snapshot() -> None:
 
 
 def test_every_turn_terminal_status_has_its_own_event_name() -> None:
-    """四个终态在事件流里必须可区分（`EDG-304`）——`D09` 留下的缺口由 `D12` 补上。"""
+    """四个终态在事件流里必须可区分—— 留下的缺口由  补上。"""
     turn_names = {name.value for name in EventName if name.family is EventFamily.TURN}
     assert {
         "turn.completed",
@@ -148,7 +148,7 @@ def test_correlation_instance_must_match_event_instance() -> None:
 
 
 def test_instance_level_events_may_omit_correlation() -> None:
-    """实例启动阶段还没有会话与 turn，此时 correlation 必须允许为空（`OBS-001`）。"""
+    """实例启动阶段还没有会话与 turn，此时 correlation 必须允许为空。"""
     event = _event(name=EventName.INSTANCE_STARTING, correlation=None)
     assert event.correlation is None
     assert event.instance_id == INSTANCE
@@ -171,7 +171,7 @@ def test_payload_defaults_to_empty_and_is_read_only() -> None:
 
 
 def test_payload_is_redacted_at_construction() -> None:
-    """脱敏不依赖 sink：事件一旦存在就已经是安全的（`OBS-003`）。"""
+    """脱敏不依赖 sink：事件一旦存在就已经是安全的。"""
     event = _event(payload={"api_key": "S3NT1NEL-value", "model": "claude-fable-5"})
     assert event.payload["api_key"] == MASK
     assert event.payload["model"] == "claude-fable-5"

@@ -1,4 +1,4 @@
-"""工具契约：声明、调用、结果与副作用（需求 §10.5、`TOL-001`–`TOL-004`）。
+"""工具契约：声明、调用、结果与副作用。
 
 职责：定义工具声明 `ToolSpec`、模型发出的 `ToolCall`、带执行上下文的 `ToolInvocation`、
 产物引用 `ArtifactRef` 与结果 `ToolResult`，以及风险、并发与副作用三组枚举。
@@ -8,7 +8,7 @@
 两条不肯让步的规则：
 
 - `side_effect` 必填且没有默认值。中断与超时场景下「副作用是否已经发生」是一等状态
-  （`EDG-401`、`EDG-407`），给默认值等于允许构造点不表态，而不表态的代价由用户承担。
+  ，给默认值等于允许构造点不表态，而不表态的代价由用户承担。
 - `ok=False` 必须带 `error`。§10.5 末段要求 Tool 错误不得伪装为普通成功文本，
   在类型层堵住比在评审里提醒可靠。
 """
@@ -43,10 +43,10 @@ __all__ = [
 ]
 
 #: 供模型消费的结果文本上限（字符）。超出由 Kernel 截断并置 `truncated=True`
-#: （`TOL-003`、`EDG-403`）；契约层只拦住「截断没做」的情况。
+#: ；契约层只拦住「截断没做」的情况。
 MAX_TOOL_RESULT_LENGTH: Final = 64 * 1024
 
-#: 工具名形状：小写、点分命名空间，如 `fs.read`、`shell.exec`（技术方案 §8.2）。
+#: 工具名形状：小写、点分命名空间，如 `fs.read`、`shell.exec`。
 _TOOL_NAME_PATTERN: Final = re.compile(r"^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$")
 
 
@@ -56,7 +56,7 @@ _TOOL_RESULT_TRUST: Final = frozenset({TrustLevel.SYSTEM, TrustLevel.UNTRUSTED})
 
 
 class RiskLevel(StrEnum):
-    """风险等级（`TOL-004`、技术方案 §5.2）。确认策略按它分档。"""
+    """风险等级。确认策略按它分档。"""
 
     SAFE = "safe"
     MUTATING = "mutating"
@@ -64,14 +64,14 @@ class RiskLevel(StrEnum):
 
 
 class Concurrency(StrEnum):
-    """并发语义。`EXCLUSIVE` 的工具在一个 turn 内串行执行（技术方案 §6.2 调度）。"""
+    """并发语义。`EXCLUSIVE` 的工具在一个 turn 内串行执行。"""
 
     PARALLEL = "parallel"
     EXCLUSIVE = "exclusive"
 
 
 class SideEffect(StrEnum):
-    """副作用状态（§10.5、`EDG-401`、`EDG-407`）。
+    """副作用状态（§10.5）。
 
     `UNKNOWN` 是一等状态而不是兜底：工具超时、进程崩溃或取消宽限期用尽时，Kernel
     确实不知道外部世界变了没有，此时谎报 `NONE` 会让用户据此重试并造成重复副作用。
@@ -84,7 +84,7 @@ class SideEffect(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ToolSpec:
-    """工具声明（`TOL-001`）：名称、描述、输入 schema、输出语义与风险信息。
+    """工具声明：名称、描述、输入 schema、输出语义与风险信息。
 
     `read_only` 与 `risk` 冗余但不重复：前者是给调度与缓存看的硬事实，后者是给确认
     策略看的分档。两者矛盾（只读却声称会破坏）时构造直接失败，不猜哪个是真的。
@@ -147,7 +147,7 @@ class ToolCall:
 class ToolInvocation:
     """一次调用的完整执行上下文（§10.5「Turn、Session 和调用方关联信息」）。
 
-    `idempotency_key` 对应 `EDG-402`：可能重复提交的工具要么带幂等键，要么禁止自动
+    `idempotency_key` 对应 ：可能重复提交的工具要么带幂等键，要么禁止自动
     重试。为 None 时执行器不得自动重试。
     """
 
@@ -160,7 +160,7 @@ class ToolInvocation:
         if self.timeout_ms <= 0:
             raise KaryviaError(
                 ErrorCode.INPUT_MALFORMED,
-                "工具超时必须为正——没有「永不超时」这个选项（KER-009）。",
+                "工具超时必须为正——没有「永不超时」这个选项。",
                 detail={"call_id": self.call.call_id, "timeout_ms": self.timeout_ms},
             )
         if self.idempotency_key is not None:
@@ -168,7 +168,7 @@ class ToolInvocation:
 
     @property
     def auto_retry_allowed(self) -> bool:
-        """没有幂等键就不允许自动重试（`EDG-402`）。"""
+        """没有幂等键就不允许自动重试。"""
         return self.idempotency_key is not None
 
 
@@ -206,7 +206,7 @@ class ToolResult:
     """一次调用的结果（§10.5 输出七条）。
 
     `content` 是**已经截断**的、供模型消费的有界文本；`data` 是可选的机器可读数据；
-    `artifacts` 指向不适合进上下文的大产物（`TOL-003`）。
+    `artifacts` 指向不适合进上下文的大产物。
     `duration_ms` 与 `error.detail` 构成「安全的诊断信息」——堆栈不进这里，
     `KaryviaError` 在构造时已完成脱敏。
 
@@ -293,7 +293,7 @@ class ToolResult:
         """交给模型的最终文本。`UNTRUSTED` 的结果包成带来源标注的数据块。
 
         与 `ContextFragment.as_model_text()` 共用 `wrap_untrusted`，因此两条通路上的
-        「不可信内容」在模型眼里长得一模一样——`EDG-306` 要的正是这个。
+        「不可信内容」在模型眼里长得一模一样—— 要的正是这个。
 
         **`source` 由调用方给，不是工具自己写的字段。** 折叠这条结果的是 Kernel，
         它知道这次调用的工具名（`ToolCall.name`）；让工具自报来源，等于把数据块上那句

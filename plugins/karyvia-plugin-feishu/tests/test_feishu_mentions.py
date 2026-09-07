@@ -1,4 +1,4 @@
-"""@ 门控与 mention 占位符的验收（开发方案 `D34`）。
+"""@ 门控与 mention 占位符的验收。
 
 | 验收项 | 测试 |
 | --- | --- |
@@ -125,7 +125,7 @@ class TestResolve:
 
 class TestMentionsFrom:
     def test_malformed_entries_are_skipped_not_fatal(self) -> None:
-        """一条看不懂的 mention 不该让整条消息被丢掉（`MSG-004`）。"""
+        """一条看不懂的 mention 不该让整条消息被丢掉。"""
         parsed = mentions_from(["nope", {"no_key": 1}, {"key": "@_user_1", "name": "甲"}])
         assert len(parsed) == 1
         assert parsed[0].key == "@_user_1"

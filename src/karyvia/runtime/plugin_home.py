@@ -580,7 +580,7 @@ def _validate_install_set(installed: Sequence[InstalledPlugin]) -> None:
     if plan.failures:
         failure = plan.failures[0]
         failure_detail = dict(failure.error.detail)
-        # Kernel 的阶段 A 诊断面向“实例启用”；安装期只要求全局在场，不能让那条建议误导
+        # Kernel 的加载前校验 诊断面向“实例启用”；安装期只要求全局在场，不能让那条建议误导
         # 用户顺手修改实例配置。
         failure_detail.pop("suggestion", None)
         if "missing" in failure_detail:

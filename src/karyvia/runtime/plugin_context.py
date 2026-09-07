@@ -106,7 +106,7 @@ class PluginEventBridge:
             )
 
     def close(self) -> None:
-        """退订并停止接受新的投递（`EDG-105` 的「取消其事件订阅」）。
+        """退订并停止接受新的投递（「取消其事件订阅」）。
 
         **握着 `Subscription` 就是为了这一刻**：`bus.subscribe()` 返回的句柄是退订的唯一
         途径，丢掉它，一个已停止的插件的 handler 会跟着实例活到进程结束。
@@ -158,10 +158,10 @@ class RuntimePluginContext:
     #: 资源门面的根：实例的 workspace（与 `tools_fs` 同一个根）。`None` 时三个门面一律
     #: 抛 `CAPABILITY_MISSING`——那只发生在没有布局可言的调用点。
     workspace: Path | None = None
-    #: `config.json` 的路径。只用来让缺凭据的错误指得出「去改哪个文件」（`BAS-006`）；
+    #: `config.json` 的路径。只用来让缺凭据的错误指得出「去改哪个文件」；
     #: 本类**从不打开它**——配置的读取只在 `kernel/config/sources.py` 一处。
     config_path: Path | None = None
-    #: 经 `spawn_task()` 派生的任务。实例停止时由装配根取消（`EDG-104`、`EDG-105`）。
+    #: 经 `spawn_task` 派生的任务。实例停止时由装配根取消。
     tasks: set[asyncio.Task[None]] = field(default_factory=set)
     #: `setup()` 只登记生命周期与任务；实例按依赖序激活时才执行或启动。
     start_actions: list[LifecycleAction] = field(default_factory=list)
@@ -178,7 +178,7 @@ class RuntimePluginContext:
 
     @property
     def config(self) -> Mapping[str, JsonValue]:
-        """**只有自己那一块**（`CFG-002`）：`plugins.<id>.config` 原样交出。"""
+        """**只有自己那一块**：`plugins.<id>.config` 原样交出。"""
         return self.config_
 
     @property
@@ -280,7 +280,7 @@ class RuntimePluginContext:
         """取一个凭据：`plugins.<id>.secrets.<name>` 的 `${VAR}` 字面量 → 环境变量。
 
         变量名没导出或导出成空串，同样是 `CONFIG_SECRET_MISSING`——由 `resolve_text()` 抛出，
-        错误里只有变量名与位置（`EDG-502`）。
+        错误里只有变量名与位置。
         """
         literal = self.secret_refs.get(name)
         pointer = f"/plugins/{self.plugin_id_}/secrets/{name}"
@@ -311,13 +311,13 @@ class RuntimePluginContext:
     async def shutdown(self) -> None:
         """本插件的停止动作：停止任务，然后逆序释放登记的资源。
 
-        `EDG-105` 的三项里这里做两项。**第三项「注销能力」不在这里，也不在运行期**：
-        registry 解析后只读（`NFR-403`），而首版不热更新（技术方案 §10.4）——一个被
+         的三项里这里做两项。**第三项「注销能力」不在这里，也不在运行期**：
+        registry 解析后只读，而首版不热更新——一个被
         `plugins.disable` 关掉的插件在**下一次启动**时连 `setup()` 都不会跑，它的能力
         因此从来没进过 registry。运行期把已冻结的能力表改掉是另一件事（P2 的热更新），
         在它存在之前，这句诚实声明比一个只在测试里成立的 `unregister()` 有用。
 
-        **不设自己的超时**：预算由 `stop_plugins()` 统一施加（`EDG-104`），两处各判一次
+        **不设自己的超时**：预算由 `stop_plugins` 统一施加，两处各判一次
         会让「到底等了多久」取决于两个数的最小值，而配置里只有一个。
 
         任务自己的异常不会阻断清理。清理动作的异常在全部动作跑完后抛出第一条，由

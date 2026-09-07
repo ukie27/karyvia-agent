@@ -1,4 +1,4 @@
-"""初始配置模板与派生 JSON Schema（`D24`：`kernel/config/{scaffold,json_schema}.py`）。
+"""初始配置模板与派生 JSON Schema（`kernel/config/{scaffold,json_schema}.py`）。
 
 职责：验模板自己加载得了、文本形态跨平台一致、`${VAR}` 能被列出来；验派生的 schema 覆盖
 字段表的每一项、且真的能校验生成的配置。
@@ -57,7 +57,7 @@ class TestInitialConfig:
         assert sample().document[SCHEMA_KEY] == f"./{JSON_SCHEMA_FILENAME}"
 
     def test_the_text_is_utf8_lf_and_ends_with_a_newline(self) -> None:
-        """`NFR-605`：两个平台上生成的字节必须一致。"""
+        """两个平台上生成的字节必须一致。"""
         text = sample().text
         assert "\r" not in text
         assert text.endswith("\n")
@@ -65,7 +65,7 @@ class TestInitialConfig:
         assert json.loads(text)["model"]["name"] == "gpt-4o-mini"
 
     def test_required_env_lists_every_referenced_variable(self) -> None:
-        """指引照它印。只有名字，没有值——这里根本没有值可言（`EDG-502`）。"""
+        """指引照它印。只有名字，没有值——这里根本没有值可言。"""
         assert sample().required_env == ("OPENAI_API_KEY",)
 
     def test_the_template_only_carries_keys_the_user_must_touch(self) -> None:
@@ -75,7 +75,7 @@ class TestInitialConfig:
         assert set(document) < set(defaults()) | {SCHEMA_KEY, "model", "plugins"}
 
     def test_the_credential_is_a_sibling_of_config_not_inside_it(self) -> None:
-        """`D19`/`D23` 定死的分界：凭据不在插件自己的配置块里（`CFG-003`）。"""
+        """/ 定死的分界：凭据不在插件自己的配置块里。"""
         entry = sample().document["plugins"]["model-openai"]  # type: ignore[index]
         assert "config" not in entry
         assert entry["secrets"] == {"api_key": SECRET_REF}

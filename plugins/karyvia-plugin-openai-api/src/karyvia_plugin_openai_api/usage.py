@@ -4,8 +4,7 @@
 分片里填 OpenAI 的 `usage` 块。
 不负责：定义用量本身（`contracts.TokenUsage`）、决定何时发送（`http.py`）。
 
-**旧实现读的是 `AgentLoop._last_usage` 这个私有属性**，本插件不复刻那条路：用量的公开
-可观测形态是事件总线上的 `model.response_received` 载荷（`D31` 为此在
+用量只来自事件总线上的 `model.response_received` 载荷（
 `kernel/turn/orchestrator.py` 的那**唯一**发布点补了 `input_tokens` / `output_tokens`
 两个键）。订阅事件是只读可观测性，与 `ctx.instance`
 同一档。

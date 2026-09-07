@@ -1,4 +1,4 @@
-"""六个单值能力的注册载荷与取回函数（技术方案 §6.1）。
+"""六个单值能力的注册载荷与取回函数。
 
 职责：为 `MODEL` / `SESSION_STORE` / `CHANNEL` / `MEMORY` / `CLI_ENTRY` /
 `TURN_COMPACTOR` 定义注册载荷（`Registered*`）和从冻结 Registry 取回生效实现的函数，
@@ -19,7 +19,7 @@ ModelProvider)` 当分支条件正是它禁止的用法（Protocol 的 `isinstan
 应与注册分派 `host.py` 放在同一个包里。否则每个消费点都要自行定义和检查 payload 形状。
 
 **两个 SINGLETON 的取回函数返回 `| None` 而不是抛错**：Registry 查询只回答是否存在；
-`BAS-009`/`EDG-108` 的“CLI 入口必须存在”由知道启动语义的组装根判定。
+/ 的“CLI 入口必须存在”由知道启动语义的组装根判定。
 """
 
 from __future__ import annotations
@@ -141,7 +141,7 @@ class CapabilityBinding(Generic[_T]):
 
     @property
     def ref(self) -> CapabilityRef:
-        """诊断用的能力标识，挂到 `KaryviaError.capability` 上（`PLG-006`）。"""
+        """诊断用的能力标识，挂到 `KaryviaError.capability` 上。"""
         return CapabilityRef(kind=self.kind, name=self.name, provider=self.owner)
 
 
@@ -235,7 +235,7 @@ def channels_from(registry: CapabilityRegistry) -> tuple[ChannelBinding, ...]:
 
 
 def memory_providers_from(registry: CapabilityRegistry) -> tuple[MemoryProviderBinding, ...]:
-    """取回全部生效的 Memory 实现（MULTI_UNIQUE，`MEM-003` 允许并存多个具名后端）。
+    """取回全部生效的 Memory 实现（MULTI_UNIQUE， 允许并存多个具名后端）。
 
     **异常约定**同 `model_providers_from()`。
     """
@@ -270,7 +270,7 @@ def session_store_from(registry: CapabilityRegistry) -> SessionStoreBinding | No
 def cli_entry_from(registry: CapabilityRegistry) -> CliEntryBinding | None:
     """取回唯一生效的 CLI 入口（SINGLETON）；没有实现时返回 `None`。
 
-    返回 `None` 不代表这是可接受的终局：`BAS-009`/`EDG-108` 要求 CLI 入口始终存在，
+    返回 `None` 不代表这是可接受的终局：/ 要求 CLI 入口始终存在，
     但那条判定（以及覆盖失败时回落内建）属于组装根。本层只如实回答有没有。
 
     **异常约定**同 `session_store_from()`。

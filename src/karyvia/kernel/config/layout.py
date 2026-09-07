@@ -1,4 +1,4 @@
-"""实例目录的路径代数（技术方案 §11、§10.1 步骤 1）。
+"""实例目录的路径代数。
 
 职责：把「实例在哪」解析成一个 `InstanceLayout`，并给出实例目录内每个 Kernel 拥有的
 子路径；`ensure()` 创建那些目录。
@@ -151,7 +151,7 @@ class InstanceLayout:
 
     @property
     def config_path(self) -> Path:
-        """`config.json`。只由 `sources.read_config_file` 打开，且只读（`EDG-501`）。"""
+        """`config.json`。只由 `sources.read_config_file` 打开，且只读。"""
         return self.root / CONFIG_FILENAME
 
     @property
@@ -193,13 +193,13 @@ class InstanceLayout:
         )
 
     def events_log_path(self, day: date) -> Path:
-        """按天分片的事件日志。`D12` 的文件 sink 写它，`D10` 只给路径。"""
+        """按天分片的事件日志。 的文件 sink 写它， 只给路径。"""
         return self.logs_dir / f"events-{day.isoformat()}.jsonl"
 
     def config_error_log_path(self, day: date) -> Path:
-        """配置解析错误的落点（§6.7 的 `EDG-501` 子句）。
+        """配置解析错误的落点（§6.7 的  子句）。
 
-        `D10` 只提供路径：写盘归 `D12` 的 sink 与 `D23` 的接线。让 loader 在自己的错误
+         只提供路径：写盘归的 sink 与的接线。让 loader 在自己的错误
         路径上做 IO 会多出一个失败面，而 `KaryviaError.detail` 本身已可 JSON 序列化。
         """
         return self.logs_dir / f"config-errors-{day.isoformat()}.jsonl"
@@ -207,7 +207,7 @@ class InstanceLayout:
     def ensure(self) -> None:
         """创建实例目录与 Kernel 拥有的子目录。**绝不创建任何文件**。
 
-        `config.json` 缺失不是错误（默认值本身完整合法），生成它是 `D24` 的事；
+        `config.json` 缺失不是错误（默认值本身完整合法），生成它是的事；
         锁文件由 `lock.py` 用 `O_EXCL` 创建，那是它的互斥机制本身。
         """
         try:

@@ -1,4 +1,4 @@
-"""`SessionKey` 编码与 `Correlation` 的契约测试（`D02`，需求 `EDG-203`、`KER-010`）。
+"""`SessionKey` 编码与 `Correlation` 的契约测试（需求）。
 
 重点是 `storage_id()` 的两条性质：可逆（往返还原）与无碰撞（不同输入不可能同 id）。
 这套编码一旦发布即为持久化契约，改动会让历史会话失联，因此测试写得比实现严。
@@ -55,7 +55,7 @@ def test_storage_id_round_trips() -> None:
 
 
 def test_storage_id_never_collides() -> None:
-    """不同 `SessionKey` 必须产出不同 id——这是 `EDG-203` 的全部意义。"""
+    """不同 `SessionKey` 必须产出不同 id——这是的全部意义。"""
     keys = [
         SessionKey(channel_id, conversation_id, scope)
         for channel_id, conversation_id, scope in itertools.product(TRICKY_COMPONENTS, repeat=3)

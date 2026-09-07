@@ -1,16 +1,16 @@
-"""取消令牌与 6 个命名检查点的测试（`D08` 验收：幂等、父子传播、取消后数据可保存）。
+"""取消令牌与 6 个命名检查点的测试。
 
 四条主线：
 
 | 验收项 | 测试 |
 | --- | --- |
-| `request()` 幂等（`EDG-206`） | `test_request_is_idempotent*` |
+| `request` 幂等 | `test_request_is_idempotent*` |
 | `child()` 父取消传播到子 | `test_child_*` |
-| 取消后已产生内容仍可保存（`KER-007`） | `test_partial_output_survives_cancellation` |
+| 取消后已产生内容仍可保存 | `test_partial_output_survives_cancellation` |
 | 6 个检查点各自可测 | `test_checkpoint_reports_where_it_stopped`、`test_checkpoint_owner_table` |
 
-对照表（`CHECKPOINT_OWNERS`、`CANCEL_REASON_CODES`）以**字面量**写在测试里再与实现比对：
-从实现反推的表格只能证明代码没改，证明不了它和技术方案 §6.4 一致。
+对照表（`CHECKPOINT_OWNERS`、`CANCEL_REASON_CODES`）以**字面量**写在测试里再与实现比对，
+防止检查点归属或原因码随实现一起静默漂移。
 """
 
 from __future__ import annotations
@@ -76,7 +76,7 @@ def test_token_satisfies_cancel_signal_protocol() -> None:
 
 
 # --------------------------------------------------------------------------------------
-# 幂等（EDG-206）
+# 幂等
 # --------------------------------------------------------------------------------------
 
 
@@ -170,13 +170,13 @@ def test_checkpoint_owner_table() -> None:
 
 
 def test_checkpoints_are_exactly_six() -> None:
-    """技术方案 §6.4 的表格是 6 行。加一个检查点就是加一种善后语义，必须走评审。"""
+    """检查点固定为 6 个；新增检查点就是新增一种善后语义。"""
     assert len(Checkpoint) == 6
     assert set(CHECKPOINT_OWNERS) == set(Checkpoint)
 
 
 def test_engine_owns_four_checkpoints() -> None:
-    """`D09` 的 engine 实现 2/3/5/6，1/4 在 `D14` 的 orchestrator 边界上。"""
+    """ 的 engine 实现 2/3/5/6，1/4 在 orchestrator 边界上。"""
     engine = {cp for cp, owner in CHECKPOINT_OWNERS.items() if owner is CheckpointOwner.ENGINE}
     assert engine == {
         Checkpoint.BEFORE_MODEL_REQUEST,
@@ -267,7 +267,7 @@ def test_wait_returns_immediately_when_already_cancelled() -> None:
 
 
 def test_wait_wakes_up_on_parent_cancellation() -> None:
-    """`EDG-407` 的宽限期要与取消赛跑，只有轮询的话 Kernel 只能指望工具自觉。"""
+    """ 的宽限期要与取消赛跑，只有轮询的话 Kernel 只能指望工具自觉。"""
 
     async def scenario() -> CancelReason:
         parent = CancelToken()
@@ -282,12 +282,12 @@ def test_wait_wakes_up_on_parent_cancellation() -> None:
 
 
 def test_grace_default_is_two_seconds() -> None:
-    """技术方案 §15 决策表第 7 行。它是取消参数而不是预算项，不在 `TurnLimits` 六项里。"""
+    """工具取消宽限期是取消参数，不在 `TurnLimits` 六项里。"""
     assert DEFAULT_TOOL_CANCEL_GRACE_MS == 2000
 
 
 # --------------------------------------------------------------------------------------
-# 取消后数据仍可保存（KER-007，本模块存在的理由）
+# 取消后数据仍可保存（本模块存在的理由）
 # --------------------------------------------------------------------------------------
 
 
@@ -295,7 +295,7 @@ def test_partial_output_survives_cancellation() -> None:
     """显式令牌而非 `CancelledError` 的核心收益：退出点由我们选，善后代码一定跑得到。
 
     模拟检查点 3（流式分片之间）：中断发生时已产生的文本必须完整留在手里，
-    并可标记 `interrupted=True` 落库（`EDG-304`）。
+    并可标记 `interrupted=True` 落库。
     """
     token = CancelToken()
     chunks = ["第一段", "第二段", "第三段", "第四段"]

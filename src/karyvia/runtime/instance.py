@@ -1,4 +1,4 @@
-"""`AgentInstance`：一个已装好的实例的运行与停止（技术方案 §10.1 步骤 9–10、§10.3）。
+"""`AgentInstance`：一个已装好的实例的运行与停止。
 
 职责：启动长生命周期服务（Channel + 每个 Channel 的入站泵）、把出站消息路由回对应
 Channel、跑 CLI 入口、按相反顺序停止一切并释放实例锁。
@@ -7,7 +7,7 @@ Channel、跑 CLI 入口、按相反顺序停止一切并释放实例锁。
 
 **Channel 泵是「CLI 也是 Channel」这条设计的兑现点**：入站消息从
 `channel.receive()` 来、经 `orchestrator.handle()`、出站经 `deliver` 路由回
-`channel.deliver()`。CLI 与未来任何平台走的是同一段代码，没有第二条路径（`MSG-007`）。
+`channel.deliver`。CLI 与未来任何平台走的是同一段代码，没有第二条路径。
 
 **泵只负责流量，不调度 Session**：每条消息按接收顺序同步登记到 Orchestrator，再并发等待
 结果；同一 Session 的 `queue` / `merge` / `reject` 只由 `SessionScheduler` 决定。泵只保留
@@ -126,7 +126,7 @@ class AgentInstance:
     #: 每个提供方的生命周期，与 `contexts` 同序。装配根按加载结果把它们置于
     #: `LOADED` 或 `FAILED`；`start()` / `stop()` 在这里继续推进。
     lifecycles: tuple[PluginLifecycle, ...] = ()
-    #: 单个插件的停止预算（配置 `plugins.stop_timeout_ms`，`EDG-104`）。
+    #: 单个插件的停止预算（配置 `plugins.stop_timeout_ms`）。
     stop_timeout_ms: int = DEFAULT_STOP_TIMEOUT_MS
     turn_shutdown_grace_ms: int = DEFAULT_TURN_SHUTDOWN_GRACE_MS
     #: 单条 Channel 的总在途消息上限，来自配置 `routing.channel_concurrency`。
@@ -389,7 +389,7 @@ class AgentInstance:
             )
 
     def _report_orphans(self) -> None:
-        """停止时报告孤儿工具任务（`EDG-104`，`D14` 留下的那条）。
+        """停止时报告孤儿工具任务（留下的那条）。
 
         孤儿是「超时后连宽限期都没等回来」的工具调用，它的副作用是 `UNKNOWN`。实例正在
         关闭，这是最后一个能说出「有几次调用可能还在改外部世界」的时刻——不说，那条信息
@@ -494,7 +494,7 @@ class AgentInstance:
         )
 
     async def _safe(self, awaitable: Awaitable[object]) -> None:
-        """跑一件收尾/投递，异常只记不抛（`NFR-204`）。`BaseException` 放行。"""
+        """跑一件收尾/投递，异常只记不抛。`BaseException` 放行。"""
         try:
             await awaitable
         except Exception as exc:  # noqa: BLE001 - 见 docstring
@@ -537,10 +537,10 @@ def outbound_router(
         **它在这里而不是在装配根里**：`bootstrap.py` 只负责「装」，而「出站怎么走」是本模块
         的职责第二条。路由行为与实例运行期放在一起，装配根只传入完成接线后的 callable。
 
-    找不到对应 Channel 时**静默丢弃**（`MSG-006`：寻址在消息自己身上）：那是
+    找不到对应 Channel 时**静默丢弃**（寻址在消息自己身上）：那是
     `embed.submit()` 这类没有 Channel 的调用方的正常情形，它拿的是 `TurnReceipt.messages`。
 
-    **投递失败折成一条 `channel.delivery_failed`，不上抛**（`D43`、`EDG-204`）：这一步在
+    **投递失败折成一条 `channel.delivery_failed`，不上抛**：这一步在
     turn 的最后，模型输出与会话历史都已经正确产生了，让它把 turn 变成 `FAILED` 等于用
     「没送出去」冒充「没算出来」。这里是那条约定的兑现点——
     `contracts/protocols.py::Channel.deliver` 因此可以照约定抛 `EXTERNAL_CHANNEL`。
@@ -557,7 +557,7 @@ def outbound_router(
             bus.publish(
                 EventName.CHANNEL_DELIVERY_FAILED,
                 # 关联标识齐全，因此这条事件挂在**它所属的那个 turn** 上：出站消息自带
-                # `session_key + turn_id`，`OBS-002` 的按序重放不需要再猜。
+                # `session_key + turn_id`， 的按序重放不需要再猜。
                 correlation=Correlation(
                     instance_id=bus.instance_id,
                     session_key=message.session_key,
@@ -595,7 +595,7 @@ def delivery_error(exc: Exception) -> KaryviaError:
 
 def _as_karyvia(exc: Exception) -> KaryviaError:
     """折成 `KaryviaError`。**只放类型名不放异常消息**——第三方实现的异常文本可能带凭据
-    （`D13` 的先例）。"""
+    。"""
     if isinstance(exc, KaryviaError):
         return exc
     return KaryviaError(
@@ -615,7 +615,7 @@ def _rejection(message: InboundMessage, receipt: TurnReceipt) -> OutboundMessage
     """给一条未被准入的消息合成回音。
 
     去重命中时说清楚指向哪个 turn——「什么也没发生」和「这条我上次已经答过了」是两个
-    不同的结论（`EDG-201`）。
+    不同的结论。
     """
     if receipt.duplicate_of is not None:
         content = f"[重复投递，已忽略；上一次是 turn {receipt.duplicate_of}]"

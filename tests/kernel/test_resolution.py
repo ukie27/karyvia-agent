@@ -1,4 +1,4 @@
-"""覆盖解析的测试（`D06` 验收表第 1–6 行 + 报告序列化与排序稳定性）。
+"""覆盖解析的测试。
 
 验收表逐条对齐，每条一个测试：
 
@@ -332,7 +332,7 @@ def test_multi_kind_lookup_all_returns_every_implementation() -> None:
 
 
 def test_successful_override_records_shadowed() -> None:
-    """覆盖成功 —— 被覆盖项进入 `shadowed`，报告中可见（`NFR-502`）。"""
+    """覆盖成功 —— 被覆盖项进入 `shadowed`，报告中可见。"""
     resolution = resolve(
         [
             make(CapabilityKind.TOOL, "fs.read", Builtin()),

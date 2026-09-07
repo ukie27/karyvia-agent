@@ -1,4 +1,4 @@
-"""能力登记：注册项、事务性批次与冻结的注册表（技术方案 §6.1，需求 `EDG-103`、`NFR-403`）。
+"""能力登记：注册项、事务性批次与冻结的注册表。
 
 职责：定义 `Registration`（一条登记）、`RegistrationBatch`（先入暂存区、`commit()` 才并入
 的事务性批次）与 `CapabilityRegistry`（登记容器 + 冻结 + `dict[(kind, name)]` 的 O(1)
@@ -10,8 +10,8 @@
 
 - **注册与生效是两件事**。`commit()` 只表示「登记完成」，不表示「这个能力会被用到」；
   同名并存、覆盖与遮蔽都留给 `resolution.py` 统一裁决。注册点自己判冲突，就等于把
-  「先注册的赢」写进了实现，而 `EDG-102` 要的恰恰是覆盖永不由加载顺序决定。
-- **批次是全有或全无**（`EDG-103`）。`setup(api)` 中途抛异常时 registry 不得留下半注册
+  「先注册的赢」写进了实现，而  要的恰恰是覆盖永不由加载顺序决定。
+- **批次是全有或全无**。`setup(api)` 中途抛异常时 registry 不得留下半注册
   状态，因此批次用上下文管理器形态：正常退出即 `commit()`，异常退出即 `rollback()` 并
   原样抛出。这不是便利封装，是唯一保证不遗漏 rollback 的写法。
 - **冻结后只读**。解析完成即冻结，之后的写入抛 `KERNEL_INVARIANT_VIOLATED`；反过来，
@@ -20,7 +20,7 @@
 
 `payload` 的类型是 `object` 而不是 `Any`：注册表不解释载荷，只搬运它。用 `object` 时
 调用方想使用载荷就必须先窄化，用 `Any` 则会让未经检查的值一路流进 Kernel
-（`AGENTS.md` 约束 6）。按 kind 还原具体类型是消费方的事，在 `D16` 的 Host 分派里完成。
+（`AGENTS.md` 约束 6）。按 kind 还原具体类型是消费方的事，在 Host 分派里完成。
 """
 
 from __future__ import annotations
@@ -52,13 +52,13 @@ __all__ = [
     "base_priority_for",
 ]
 
-#: 内建能力的 priority 基准值（技术方案 §6.1 解析规则 1、§15 决策表第 3 行）。
+#: 内建能力的 priority 基准值。
 #: 内建排在前面**不是**靠 provider 字典序，而是靠这个数值；它只决定能力解析与调用顺序，
 #: 不参与 token 预算或压缩判断。
 BUILTIN_BASE_PRIORITY = 0
 
 #: 插件能力的 priority 基准值，与 manifest 的 `CapabilityDecl.priority` 默认值
-#: （技术方案 §7.2）和 `KaryviaAPI.on(..., priority=100)` 一致。
+#: 和 `KaryviaAPI.on(..., priority=100)` 一致。
 #: 插件仍可显式声明更小的值，同值时按 provider 字典序，内建依然在前。
 PLUGIN_BASE_PRIORITY = 100
 
@@ -84,7 +84,7 @@ class BatchState(StrEnum):
 class Registration:
     """一条登记：谁、提供了什么、以什么优先级、是否声明覆盖。
 
-    `overrides` 是**唯一**的覆盖来源，取自 manifest 的同名字段（技术方案 §7.2）。这里存
+    `overrides` 是**唯一**的覆盖来源，取自 manifest 的同名字段。这里存
     原始串而不是解析结果：`kernel/` 不能 import `sdk/`（规则 `R2`），manifest 类型在
     `sdk.manifest`，因此跨层传递的只能是契约层认识的东西——而 `parse_capability_target`
     正在契约层，两边解码同一份实现，不会出现两套正则对不上的情况。
@@ -138,14 +138,14 @@ class Registration:
 
 
 class RegistrationBatch:
-    """一个提供方的一批登记，全有或全无（`EDG-103`）。
+    """一个提供方的一批登记，全有或全无。
 
     用法是上下文管理器，正常退出即提交、异常退出即回滚：
 
         with registry.batch(Plugin(PluginId("acme"))) as batch:
             batch.add(CapabilityKind.TOOL, "fs.read", handler)
 
-    也可以显式 `commit()` / `rollback()`——`D16` 的 Host 需要在 `setup(api)` 返回之后
+    也可以显式 `commit` / `rollback`—— 的 Host 需要在 `setup(api)` 返回之后
     才提交，而 `setup` 的调用点与批次的创建点不在同一个作用域。
     """
 
@@ -186,7 +186,7 @@ class RegistrationBatch:
         """把一条登记放进暂存区，返回构造出的 `Registration`。
 
         `provider` 不是参数——它由批次决定。让调用方传 provider 就等于允许一个插件以
-        另一个插件（或内建）的名义注册能力，那会让 `PLG-006`「报告标明每项能力的来源」
+        另一个插件（或内建）的名义注册能力，那会让 「报告标明每项能力的来源」
         变成一句没有约束力的话。
 
         `priority` 省略时取提供方的基准值（内建 0、插件 100，见 `base_priority_for()`），
@@ -272,7 +272,7 @@ class RegistrationBatch:
 
 
 class CapabilityRegistry:
-    """能力登记容器。解析前只写不读，解析后只读不写（`NFR-403`）。
+    """能力登记容器。解析前只写不读，解析后只读不写。
 
     「冻结前不可查找」是刻意的：注册表在解析完成前不知道谁会被覆盖，此时返回的任何结果
     都可能在下一次提交后失效。让它可查，调用方就会在启动期的某个角落缓存一个随后被

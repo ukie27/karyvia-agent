@@ -1,4 +1,4 @@
-"""写工具：`fs.write` 与 `fs.edit`（技术方案 §8.2、§8.3）。
+"""写工具：`fs.write` 与 `fs.edit`。
 
 职责：两个工具的 `ToolSpec` 与 `ToolHandler` 实现，以及本包**唯一**的落盘路径。
 不负责：路径判定（`paths.py`）、解码与截断（`content.py`）、注册（`registration.py`）。
@@ -6,7 +6,7 @@
 **本包只有这个模块会写盘**，拆出来正是为了让这件事在文件边界上就看得见：`readers.py`
 与 `search.py` 里出现一个 `os.replace` 会当场显眼。
 
-**原子写 + 副作用如实标注**（`EDG-401`）。写入走「同目录临时文件 → `fsync` → `os.replace`」，
+**原子写 + 副作用如实标注**。写入走「同目录临时文件 → `fsync` → `os.replace`」，
 因此：
 
 - `os.replace` **之前**的任何失败，目标文件一个字节都没变 → `side_effect=NONE`。
@@ -14,10 +14,10 @@
 - `os.replace` **之后**没有可失败的步骤 → 成功即 `OCCURRED`。
 
 没有第三种情况，所以本包不会产出 `SideEffect.UNKNOWN`——那个取值留给真的说不清的场合
-（`D21` 的 `shell.exec` 超时）。
+。
 
 **换行不翻译**：内容以 UTF-8 编码后按二进制写下去，`\\n` 就是 `\\n`。文本模式在 Windows
-上会把它变成 `\\r\\n`，那样同一次工具调用在两个平台产出的文件字节就不同了（`NFR-605`）。
+上会把它变成 `\\r\\n`，那样同一次工具调用在两个平台产出的文件字节就不同了。
 """
 
 from __future__ import annotations
@@ -68,10 +68,9 @@ WRITE_SPEC: Final = ToolSpec(
     },
     read_only=False,
     # 覆盖既有文件是不可撤销的内容丢失，而 `DESTRUCTIVE` 正是确认策略要拦的那一档
-    # （`TOL-004`）。「它只写一个文件」不构成把它降成 MUTATING 的理由。
+    # 。「它只写一个文件」不构成把它降成 MUTATING 的理由。
     risk=RiskLevel.DESTRUCTIVE,
-    # 两次写入同一个文件的结果取决于顺序，而 turn 内的并行调度不保证顺序（技术方案
-    # §6.2）。串行执行是唯一能让「模型看到的结果」可解释的选择。
+    # 两次写入同一个文件的结果取决于顺序，而 turn 内的并行调度不保证顺序。串行执行是唯一能让「模型看到的结果」可解释的选择。
     concurrency=Concurrency.EXCLUSIVE,
 )
 
@@ -169,7 +168,7 @@ class _WritingTool(FsTool):
         text, lossy = decode_text(data)
         if lossy:
             # 有损解码后写回去，等于把那些 `�` 变成文件的真实内容——一次编辑顺手毁掉
-            # 原本还能被别的工具正确读出的字节。读可以将就，写不行（`EDG-205`）。
+            # 原本还能被别的工具正确读出的字节。读可以将就，写不行。
             raise KaryviaError(
                 ErrorCode.INPUT_UNSUPPORTED_MEDIA,
                 "文件不是合法 UTF-8，编辑它会丢失原有字节。",
@@ -207,7 +206,7 @@ class WriteTool(_WritingTool):
             started=started,
             data={"path": display, "bytes": written, "overwritten": existed},
             # 回执是本工具自己的话（唯一的外部成分是那个相对路径，它来自模型自己的入参），
-            # 因此不包不可信数据块——四个读类工具走默认的 `UNTRUSTED`（`D42`）。
+            # 因此不包不可信数据块——四个读类工具走默认的 `UNTRUSTED`。
             trust=TrustLevel.SYSTEM,
         )
 

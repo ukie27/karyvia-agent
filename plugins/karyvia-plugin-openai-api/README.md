@@ -2,8 +2,8 @@
 
 Karyvia 官方插件：把一个实例接到 **OpenAI 兼容的 HTTP 接口**上。
 
-它取代了 `D31` 删除的 `legacy/api/server.py`，但不是移植——它是一条 `CHANNEL` 能力，
-消息走与 CLI 完全相同的契约路径（`MSG-007`），没有任何私有通道。
+它是一条标准 `CHANNEL` 能力，
+消息走与 CLI 完全相同的契约路径，没有任何私有通道。
 
 ## 安装
 
@@ -61,9 +61,9 @@ karyvia serve --port 9000           # 覆盖
 
 ## 已知边界
 
-- **同一 `conversation` 的请求串行，不同 `conversation` 并发**（`D33` 之后）：装配根的
+- **同一 `conversation` 的请求串行，不同 `conversation` 并发**：装配根的
   Channel 泵按 conversation 扇出。打同一个会话的并发客户端仍会排队——那是
-  `EDG-202` 要求的严格 FIFO，不是限制。上界由 `routing.channel_concurrency`（默认 64）
+   要求的严格 FIFO，不是限制。上界由 `routing.channel_concurrency`（默认 64）
   与 `routing.channel_queue_max_size`（默认 32）控制，撞上时返回明确的忙碌错误。
 - **`usage` 是整条 turn 之和**（含工具往返），不是最后一次模型调用——与 OpenAI 的
   单次调用语义不同，但那才是用户真正付的数。拿不到用量时**省略该字段**而不是报零。

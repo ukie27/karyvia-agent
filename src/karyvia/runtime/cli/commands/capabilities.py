@@ -1,11 +1,11 @@
-"""`karyvia capabilities`：打印覆盖解析报告（`D29`，技术方案 §10.4；`NFR-502`、`PLG-006`）。
+"""`karyvia capabilities`：打印覆盖解析报告。
 
 职责：跑一次只读装配并把 `ResolutionReport` 的四段印出来——生效、被覆盖、已禁用、冲突，
 每一条都带提供方标识。
 不负责：装配可用实例（`bootstrap.py`）、判定覆盖（`kernel/registry/resolution.py`）、
 改配置（`karyvia plugins`）。
 
-**覆盖不静默**（技术方案 §8.3 第 4 条）：一个插件替掉了内建的会话存储，用户必须能一眼
+**覆盖不静默**：一个插件替掉了内建的会话存储，用户必须能一眼
 看到 `(builtin:jsonl, plugin:session-pg)` 这对关系。因此 `shadowed` 段即使为空也照印
 ——「零条」是一条有价值的结论，只在非空时才提它会让用户不确定到底查没查。
 
@@ -85,7 +85,7 @@ def _load_failures(outcomes: Sequence[LoadOutcome]) -> str:
 
 
 def _render(report: ResolutionReport) -> str:
-    """四段文本。数据取自 `to_json()`——那是 `NFR-502` 承诺可序列化的那一份，
+    """四段文本。数据取自 `to_json`——那是  承诺可序列化的那一份，
     渲染读它就不会与 `--json` 的输出各说各话。"""
     document = report.to_json()
     return "".join(
@@ -107,7 +107,7 @@ def _ref(ref: Mapping[str, JsonValue] | None) -> str:
     """一条能力引用：`kind:name ← provider`。
 
     provider 已经由 `_ref_json()` 渲染成 `builtin` / `plugin:<id>`（与覆盖目标串同一套
-    编码），这里不再拼第二份——`NFR-502` 要的「包含 provider 标识」就是它。
+    编码），这里不再拼第二份—— 要的「包含 provider 标识」就是它。
     """
     if ref is None:
         return "（未知能力）"

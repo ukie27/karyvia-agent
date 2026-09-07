@@ -1,9 +1,9 @@
-"""`/memory` 命令：给**人**用的查询、检索与删除入口（`MEM-005`）。
+"""`/memory` 命令：给**人**用的查询、检索与删除入口。
 
 职责：把一次 `/memory <子命令> ...` 变成一段文本回复。
 不负责：存储（`store.py`）、给模型用的入口（`tools.py`）、自动召回（`provider.py`）。
 
-**`MEM-005` 要的三件事在这里各有落点**：查询 = `list` / `show` / `search`，
+** 要的三件事在这里各有落点**：查询 = `list` / `show` / `search`，
 删除 = `forget`，而「修正」**不单列子命令**——契约的 `MemoryProvider` 已经把这条定死了：
 `forget()` + 重新写一条的组合语义明确，而原地修改会让「这条记忆是什么时候、由谁写的」
 变得不可追溯。
@@ -106,10 +106,10 @@ class MemoryCommand:
     async def handle(
         self, invocation: CommandInvocation, cancel: CancelSignal
     ) -> CommandResult:
-        """**约定不抛**（`CMD-003`）：一切失败折成 `REJECTED`，会话保持可用。
+        """**约定不抛**：一切失败折成 `REJECTED`，会话保持可用。
 
         **取消语义**：入口检查一次。每个子命令都是一次读盘或一次写盘，在这之后再插检查点
-        只会得到一串必然为假的判断（`builtins/commands_core` 的同一条判定）。
+        只会得到一串必然为假的判断（`builtins/commands_core` 采用的相同规则判定）。
         """
         try:
             cancel.raise_if_requested()

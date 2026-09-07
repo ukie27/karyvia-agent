@@ -2,7 +2,7 @@
 
 `testpaths` 一次收集整个 `plugins/`，而 pytest 按模块名去重：两个插件各有一个
 `_fakes.py` 时，先导入的会顶掉后一个，另一棵测试树整体 `ImportError`。
-**单独跑各自目录看不出来，跑全量才炸**（`D34` 就是这么发现的）。
+**单独跑各自目录看不出来，跑全量才炸**。
 
 职责：一个不碰 `mcp` SDK 的 `McpSession` / `Connector` 替身、一个记录注册动作的
 `KaryviaAPI` 替身、以及构造 `ToolInvocation` 的小工厂。
@@ -135,7 +135,7 @@ class RecordingApi:
 class McpContext(FakePluginContext):
     """真的派生后台任务的上下文。
 
-    `FakePluginContext.spawn_task` 只记名字不起协程（`D16` 的它不需要真跑），而本插件的
+    `FakePluginContext.spawn_task` 只记名字不起协程（它不需要真跑），而本插件的
     连接**就在那条任务里**——用那个替身会让整套生命周期用例验的是一台不存在的机器。
     """
 

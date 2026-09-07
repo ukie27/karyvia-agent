@@ -1,4 +1,4 @@
-"""内建能力的静态清单（技术方案 §7.1、§8）。
+"""内建能力的静态清单。
 
 职责：以 `BUILTIN_MANIFESTS` 声明全部内建能力的 manifest——这是内建能力**唯一**的发现来源。
 不负责：导入任何 `setup` 实现、决定加载顺序或注册能力本身。
@@ -7,13 +7,13 @@
 分离」）：`import karyvia.builtins.registry` 只需要 pydantic 与几个字面量，
 `session_jsonl` 的 `setup` 只在真正加载它时才被 `import_setup()` 拉进来。
 
-**内建不享受特权**（`BAS-005`）：这里的每一条都是普通的 `PluginManifest`，与外部插件同型，
+**内建不享受特权**：这里的每一条都是普通的 `PluginManifest`，与外部插件同型，
 同样要声明 `capabilities`，同样经 `runtime/wiring.py` 翻译成 `LoadRequest`
 后走 `kernel/plugins/host.py` 那**一个** Host 注册。本目录受 `R4` 约束，只能 import
 `sdk/` 与 `contracts/`，因此这里连 registry 长什么样都看不见。
 
 **`priority` 一律不写**：`CapabilityDecl.priority` 的默认值是 100，而内建的基准是 0
-（技术方案 §6.1 规则 1）。写了就会被原样采纳，「内建排在插件前」与「内建最后被裁」会同时
+。写了就会被原样采纳，「内建排在插件前」与「内建最后被裁」会同时
 静默失效——`to_declaration()` 靠 pydantic 的 `model_fields_set` 判断作者到底写没写。
 """
 
@@ -37,7 +37,7 @@ __all__ = [
     "TOOLS_SHELL",
 ]
 
-#: `D17` 内建 Session（技术方案 §8.1）。没有会话存储时，Runtime 的基础能力校验会拒绝
+#: 内建 Session。没有会话存储时，Runtime 的基础能力校验会拒绝
 #: 启动；这不是 manifest 提供方可以选择的策略。
 #:
 #: 会话存储直接使用 pathlib，因为 `FileAccess` 没有追加、`fsync` 与原子替换；用门面实现
@@ -61,12 +61,12 @@ SESSION_JSONL: Final = PluginManifest(
     },
 )
 
-#: `D18` 内建 Context Provider（技术方案 §8.1）。
+#: 内建 Context Provider。
 #:
 #: 它是默认上下文来源，但 Context Provider 故障统一被隔离；插件不能借 manifest 获得
 #: 中断 turn 或启动的权力。
 #:
-#: 本内建纯内存、不读盘、不出网（技术方案 §14 的「Provider 只读不写」）。
+#: 本内建纯内存、不读盘、不出网。
 CONTEXT_BASIC: Final = PluginManifest(
     id="context-basic",
     version="0.1.0",
@@ -78,7 +78,7 @@ CONTEXT_BASIC: Final = PluginManifest(
         "properties": {
             "instructions": {
                 "description": "运维自定义的指令文本。它以 TrustLevel.OPERATOR 进入上下文，"
-                "不占据系统指令位置（`CMD-005`）。",
+                "不占据系统指令位置。",
                 "anyOf": [
                     {"type": "string"},
                     {"type": "array", "items": {"type": "string"}},
@@ -110,13 +110,13 @@ CONTEXT_COMPACT_BASIC: Final = PluginManifest(
     ),
 )
 
-#: `D19` 内建 Model Provider（技术方案 §8.1、§15 第 5 项）。
+#: 内建 Model Provider。
 #:
 #: 没有模型就没有 Agent；本项是宿主发布的内建基线，加载错误由 Runtime 原样拒绝启动。
 #:
 #: 直接用 httpx 而不是 `ctx.net`：模型端点由运维配置，必须支持本地 vLLM / Ollama /
 #: LM Studio，而安全客户端会拒绝私有网段。凭据只从 `ctx.secret("api_key")` 来，配置块里
-#:   `CFG-003`「明文不进配置文档」因此是结构性成立的而不是靠流程遵守。
+#: 「明文不进配置文档」因此是结构性成立的而不是靠流程遵守。
 MODEL_OPENAI: Final = PluginManifest(
     id="model-openai",
     version="0.1.0",
@@ -174,7 +174,7 @@ MODEL_OPENAI: Final = PluginManifest(
                 "type": "array",
                 "items": {"type": "string"},
                 "default": ["tool_calls", "streaming"],
-                "description": "显式列出支持项（MOD-005）。不在表里的能力一律报缺失，"
+                "description": "显式列出支持项。不在表里的能力一律报缺失，"
                 "不静默降级。",
             },
             "max_tokens_field": {
@@ -212,7 +212,7 @@ MODEL_OPENAI: Final = PluginManifest(
     },
 )
 
-#: `D20` 内建文件工具（技术方案 §8.2 的冻结清单，`shell.exec` 是 `D21`）。
+#: 内建文件工具。
 #:
 #: 没有文件工具的 Agent 仍然能对话。一份写错的 workspace 路径只让这一项加载失败并
 #: 留下诊断。
@@ -220,7 +220,7 @@ MODEL_OPENAI: Final = PluginManifest(
 #: **五条声明必须与 `tools_fs.TOOL_NAMES` 逐一对应**，由测试对照。被 `disable` 关掉的
 #: 工具**不会**被注册，因此装配根必须用同一份配置过滤这里的声明
 #: （`runtime/wiring.py` 的 `keep` 参数 + `tools_fs.enabled_tool_names()`）——否则
-#: `D16` 的 `CapabilityHost.finish()` 会以 `PLUGIN_LOAD_FAILED` 拒绝加载，而那个报错是对的。
+#: 的 `CapabilityHost.finish` 会以 `PLUGIN_LOAD_FAILED` 拒绝加载，而那个报错是对的。
 #:
 #: 文件工具直接实现自己的 workspace 守卫，因为它还需要目录遍历、原子替换和按字节数
 #: 截断读取；这些是模型工具的行为，不应依赖插件便利门面的较窄接口。
@@ -247,7 +247,7 @@ TOOLS_FS: Final = PluginManifest(
             "disable": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "要关掉的工具名（TOL-006）。被关掉的工具不会注册，"
+                "description": "要关掉的工具名。被关掉的工具不会注册，"
                 "因此也不出现在模型可见的工具列表里。表外的名字会被拒绝。",
             },
             "max_read_bytes": {
@@ -301,7 +301,7 @@ TOOLS_FILE: Final = PluginManifest(
     },
 )
 
-#: `D21` 内建 shell 工具（技术方案 §8.2 冻结清单的第 6 项，至此六件套齐）。
+#: 内建 shell 工具。
 #:
 #: 没有 shell 工具的 Agent 仍然能对话，与 `tools_fs` 同一条理由。
 #:
@@ -324,7 +324,7 @@ TOOLS_SHELL: Final = PluginManifest(
             "disable": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "要关掉的工具名（TOL-006）。被关掉的工具不会注册，"
+                "description": "要关掉的工具名。被关掉的工具不会注册，"
                 "因此也不出现在模型可见的工具列表里。表外的名字会被拒绝。",
             },
             "timeout_ms": {
@@ -344,7 +344,7 @@ TOOLS_SHELL: Final = PluginManifest(
                 "type": "array",
                 "items": {"type": "string"},
                 "description": "额外从父进程转发给子进程的环境变量名。"
-                "默认一个都不转发（NFR-307）；父进程里没有的名字会被静默跳过。",
+                "默认一个都不转发；父进程里没有的名字会被静默跳过。",
             },
             "env": {
                 "type": "object",
@@ -360,7 +360,7 @@ TOOLS_SHELL: Final = PluginManifest(
     },
 )
 
-#: `D22` 内建命令集（技术方案 §8.1）。
+#: 内建命令集。
 #:
 #: 没有斜杠命令的 Agent 仍然能对话。一份写错的 `disable` 只让这一项加载失败并留下诊断。
 #:
@@ -410,13 +410,13 @@ COMMANDS_CORE: Final = PluginManifest(
     },
 )
 
-#: `D23` 内建 CLI 入口（技术方案 §8.1，需求 `BAS-009`、`BAS-010`、`EDG-108`）。
+#: 内建 CLI 入口。
 #:
 #: CLI 入口不可禁用；它加载失败后，Runtime 的基础能力校验会拒绝启动。装配根另有一条
-#: 守卫：`plugins.disable` 试图关掉本项时显式拒绝配置（`EDG-108`）。
+#: 守卫：`plugins.disable` 试图关掉本项时显式拒绝配置。
 #:
 #: **两条能力，一份 manifest**：`CLI_ENTRY` 拥有进程（决定 `karyvia` 返回什么退出码），
-#: `CHANNEL` 拥有消息路径（`MSG-007`：CLI 的输入输出与其它平台走同一条契约）。
+#: `CHANNEL` 拥有消息路径（CLI 的输入输出与其它平台走同一条契约）。
 #: 拆成两份 manifest 会让它们可以各自被禁用，而它们共用一个控制台对象——那种组合无意义。
 #:
 #: stdin/stdout 是进程自己的 IO，不经过 Workspace 资源门面。

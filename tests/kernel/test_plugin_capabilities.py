@@ -1,4 +1,4 @@
-"""六个单值 kind 的载荷形状与取回函数测试（`D16`，技术方案 §6.1 的缺口）。
+"""六个单值 kind 的载荷形状与取回函数测试。
 
 三条主线：
 
@@ -7,12 +7,12 @@
   于是每个 kind 必须有一个具体 wrapper 供 `isinstance` 窄化。五个 kind 各有一条
   「塞错载荷必须被抓住」的用例。
 - **arity 决定取回的形状**。MULTI_UNIQUE 的三个返回元组，SINGLETON 的两个返回
-  单项或 `None`。`D16` 的 `BUILTIN_MANIFESTS` 是空元组，因此「什么都没有」是必须跑得通的
+  单项或 `None`。 的 `BUILTIN_MANIFESTS` 是空元组，因此「什么都没有」是必须跑得通的
   正常路径，不是退化分支。
 - **身份如实记着**。`owner` / `name` / `priority` 要能原样回答「这个实现是谁提供的」
-  （`PLG-006`），否则 `karyvia capabilities` 与诊断就没有数据源。
+  ，否则 `karyvia capabilities` 与诊断就没有数据源。
 
-能力经真 Host 注册再取回，而不是直接 `batch.add`：`D16` 之后这条路是唯一的注册路径，
+能力经真 Host 注册再取回，而不是直接 `batch.add`：这是唯一的注册路径，
 测试也该走它。
 """
 
@@ -120,7 +120,7 @@ def test_every_single_valued_kind_round_trips_through_the_host() -> None:
 
 
 def test_bindings_report_who_provided_the_implementation() -> None:
-    """`PLG-006`：诊断要能一眼看出是谁的问题。"""
+    """诊断要能一眼看出是谁的问题。"""
     provider: ProviderId = Plugin(PluginId("acme"))
     binding = model_providers_from(wired(provider=provider))[0]
     assert binding.owner == provider
@@ -139,10 +139,10 @@ def test_binding_sort_key_matches_the_registration_ordering() -> None:
 
 
 def test_an_empty_registry_yields_empty_tuples_and_none() -> None:
-    """`D16` 的形状：`BUILTIN_MANIFESTS` 为空时装配链必须照常跑完（`EDG-101`）。
+    """ 的形状：`BUILTIN_MANIFESTS` 为空时装配链必须照常跑完。
 
-    两个 SINGLETON 返回 `None` 而不是抛错——`BAS-009`/`EDG-108` 的「CLI 入口必须存在」
-    是 `D23` 在装配根上的判定，本层只如实回答有没有。
+    两个 SINGLETON 返回 `None` 而不是抛错——/ 的「CLI 入口必须存在」
+    是  在装配根上的判定，本层只如实回答有没有。
     """
     registry = CapabilityRegistry()
     resolve_into(registry)

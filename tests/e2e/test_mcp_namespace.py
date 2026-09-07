@@ -1,4 +1,4 @@
-"""`mcp` 插件的端到端用例（开发方案 `D38-B`）：命名空间声明在**真实装配路径**上成立。
+"""`mcp` 插件的端到端用例：命名空间声明在**真实装配路径**上成立。
 
 职责：验「远端工具名在 manifest 里一个字都没写，却真的进了 registry、真的转发到远端原名、
 参数 schema 真的是远端那份」。
@@ -76,7 +76,7 @@ class _Connector:
 class _Context(FakePluginContext):
     """真的派生后台任务：本插件的连接就在那条任务里。
 
-    真实装配根会在 `AgentInstance.stop()` 里统一取消它们（`EDG-105`），这里由用例自己
+    真实装配根会在 `AgentInstance.stop` 里统一取消它们，这里由用例自己
     在 `finally` 中做同一件事。
     """
 
@@ -141,7 +141,7 @@ def test_the_manifest_declares_names_it_cannot_know() -> None:
 
 
 async def test_remote_tools_reach_the_registry_under_the_namespace() -> None:
-    """`D38-A` 的端到端形态：`CapabilityHost` 按前缀回查放行了两次未声明的注册，
+    """ 的端到端形态：`CapabilityHost` 按前缀回查放行了两次未声明的注册，
     而 `finish()` 没有因为「声明了却没注册」把整个提供方判失败。"""
     registry, ctx = await _wire()
     try:

@@ -1,8 +1,8 @@
 """manifest、注册与配置的用例，外加那条 `inspect.signature` 守卫。
 
-**签名守卫是照抄 `plugins/…-memory/tests/test_memory_plugin.py` 的**（`D39` 的教训）：
+**签名守卫是照抄 `plugins/…-memory/tests/test_memory_plugin.py` 的**（教训）：
 `isinstance` 对 `runtime_checkable` Protocol 只查属性存在性，而 basedpyright 的 `include`
-只覆盖 `src/karyvia`——**插件全都不在类型检查范围内**。`D39` 就是这么漏掉
+只覆盖 `src/karyvia`——**插件全都不在类型检查范围内**。 就是这么漏掉
 `CommandHandler.handle` 的第二个参数、直到跑真实 `karyvia run` 才发现。
 """
 
@@ -36,7 +36,7 @@ SOURCE_DIR = Path(__file__).resolve().parents[1] / "src" / "karyvia_plugin_cron"
 
 
 def test_manifest_identity() -> None:
-    """entry point 的 name 必须等于 manifest 的 `id`（`D25`：候选 id 先于 manifest 可知）。"""
+    """entry point 的 name 必须等于 manifest 的 `id`（候选 id 先于 manifest 可知）。"""
     assert MANIFEST.id == "cron"
     assert MANIFEST.setup == "karyvia_plugin_cron:setup"
 
@@ -96,7 +96,7 @@ def test_setup_does_not_touch_the_disk(tmp_path: Path) -> None:
 
 
 def test_importing_the_module_has_no_side_effects() -> None:
-    """发现阶段只 import 本模块取 `MANIFEST`，此时不该发生任何 IO（技术方案 §7.2）。
+    """发现阶段只 import 本模块取 `MANIFEST`，此时不该发生任何 IO。
 
     用 AST 扫模块顶层：`import` 之后再断言「什么都没发生」是测不到的。
     """
@@ -119,7 +119,7 @@ def test_importing_the_module_has_no_side_effects() -> None:
 
 def test_the_plugin_imports_no_kernel_module() -> None:
     """`R4`：插件只能 import `contracts` 与 `sdk`。扫 import 语句而不是文本包含
-    （`D38-B` 把这条守成了 AST 断言，下一个插件照抄它）。"""
+    。"""
     for path in sorted(SOURCE_DIR.glob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"))
         for node in ast.walk(tree):
@@ -174,7 +174,7 @@ def test_no_third_party_import_outside_the_standard_library() -> None:
 def test_registered_implementations_match_the_contract_signatures(tmp_path: Path) -> None:
     """逐个比对注册实现与契约 Protocol 的签名。
 
-    `D39` 的 `/memory` 第一版只写了 `handle(invocation)`，49 个命令用例全绿——它们直接用
+     的 `/memory` 第一版只写了 `handle(invocation)`，49 个命令用例全绿——它们直接用
     一个实参调 `handle()`，测的是「我自己写的那个签名」而不是「kernel 会怎么调」。
     真实表现是 `karyvia run` 下一条 `kernel.unexpected` + `TypeError`。
     """

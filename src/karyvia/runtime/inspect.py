@@ -2,10 +2,10 @@
 
 职责：为 `karyvia plugins list` / `karyvia capabilities` / `karyvia session` 提供**不取实例锁、
 不装 orchestrator**的三条查询路径——`inspect_plugins()` 跑到
-阶段 A 为止，`inspect_capabilities()` 继续跑一次注册并交出覆盖解析报告，
+加载前校验 为止，`inspect_capabilities()` 继续跑一次注册并交出覆盖解析报告，
 `open_session_store()` 只装会话存储那一条能力。
 不负责：装配可用实例（`bootstrap.py`）、改配置（`config_edit.py`）、格式化输出
-（`runtime/cli/commands/`）、发现与阶段 A 的判定（`inventory.py` / `plugin_plan.py`）。
+（`runtime/cli/commands/`）、发现与加载前校验 的判定（`inventory.py` / `plugin_plan.py`）。
 
 除了配置读取的既有错误诊断，以及插件状态目录的幂等版本标记，本模块不写业务数据。
 
@@ -18,7 +18,7 @@
 **同样地，报告里的冲突不抛出**：`raise_if_failed()` 是启动路径的语义。对这两条命令而言，
 冲突正是要印出来的诊断结果。
 
-**一处如实记下的副作用**：阶段 A 的 `check_state_version()` 在插件状态目录**已经存在**
+**一处如实记下的副作用**：加载前校验 的 `check_state_version()` 在插件状态目录**已经存在**
 且还没有标记文件时会补写 `.karyvia-state.json`。它与一次真实加载写的内容完全相同、
 幂等，也不会为一个从未写盘的插件建目录。除此之外这两条路不写业务数据。
 """
@@ -58,7 +58,7 @@ __all__ = ["Inspection", "inspect_capabilities", "inspect_plugins", "open_sessio
 class Inspection:
     """一次只读查询的产物。
 
-    `inventory` 是**修正过的**那一份（阶段 A 落榜项已从 `discovered` 移进 `failures`），
+    `inventory` 是**修正过的**那一份（加载前校验 落榜项已从 `discovered` 移进 `failures`），
     与会话内 `/plugins` 看到的同源；`report` 只有 `inspect_capabilities()` 会填。
     """
 
@@ -86,7 +86,7 @@ def _prepare(
 ) -> tuple[InstanceLayout, LoadedConfig, tuple[PluginManifest, ...], EventBus]:
     """配置 → 内建清单 → 一个不接任何 sink 的事件总线。
 
-    总线是**必须**的（发现与阶段 A 都往上发事件），但这条路上没有订阅者：只读命令不该
+    总线是**必须**的（发现与加载前校验 都往上发事件），但这条路上没有订阅者：只读命令不该
     往 `logs/events-<date>.jsonl` 里追加一次「实例启动」。它同时也是「本函数不写文件」
     这条承诺的一部分——`bootstrap` 那条路上的 `write_config_error()` 同样不在这里。
     """
@@ -109,9 +109,9 @@ def inspect_plugins(
     home: Path | None = None,
     manifests: Sequence[PluginManifest] = BUILTIN_MANIFESTS,
 ) -> Inspection:
-    """发现外部插件并跑完阶段 A，**不导入任何 `setup`**。
+    """发现外部插件并跑完加载前校验，**不导入任何 `setup`**。
 
-    `karyvia plugins list` 的数据源。跳过原因、发现阶段的失败与阶段 A 的失败在同一份清单里
+    `karyvia plugins list` 的数据源。跳过原因、发现阶段的失败与加载前校验 的失败在同一份清单里
     ——用户不需要知道一个插件是在哪个阶段落的榜，他只需要知道它没被加载、以及为什么。
 
     **异常约定**：配置读不出来（文件坏了、字段非法）时原样抛 `KaryviaError`——那时连
@@ -154,8 +154,8 @@ async def inspect_capabilities(
     """跑一次完整注册并交出覆盖解析报告，**不做步骤 8 的必需能力判定**。
 
     `karyvia capabilities` 的数据源。它真的会跑每个提供方的 `setup()`——`shadowed` 关系只有在
-    全部登记都到齐之后才算得出来（`EDG-102`：覆盖永不由加载顺序决定），没有更便宜的路。
-    内建与外部插件走的仍是同一次 `wire_capabilities()`（`SDK-007`）。
+    全部登记都到齐之后才算得出来（覆盖永不由加载顺序决定），没有更便宜的路。
+    内建与外部插件走的仍是同一次 `wire_capabilities`。
 
     **跑完就把 ctx 收掉**：`setup()` 里订阅的事件与派生的后台任务在这条路上没有实例去
     停它们（`AgentInstance.stop()` 不在这条路上），因此本函数自己走一遍

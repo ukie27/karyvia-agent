@@ -1,7 +1,7 @@
-"""内建 sink：有界内存环、JSONL 文件，以及配置错误落盘（`NFR-404`、`OBS-005`、`EDG-501`）。
+"""内建 sink：有界内存环、JSONL 文件，以及配置错误落盘。
 
 职责：把 `EventBus` 扇出的事件收进一个有容量上限的内存环、或按天追加到 JSONL 文件；
-另提供 `EDG-501` 要求的配置解析错误落盘。
+另提供  要求的配置解析错误落盘。
 不负责：决定谁订阅（`bus.py`）、脱敏（`redaction.py`，事件到这里时已经安全）、
 知道实例目录在哪（路径由调用方注入，见 `JsonlFileSink`）。
 
@@ -35,7 +35,7 @@ DEFAULT_RING_CAPACITY: Final = 1024
 
 
 class MemoryRingSink:
-    """有界内存环，供 CLI 与诊断查询（`NFR-404`）。
+    """有界内存环，供 CLI 与诊断查询。
 
     满了丢**最旧**的。`dropped` 必须可查：诊断查不到某个 turn 时，「环里从来没有这条」
     与「它被挤出去了」是两个完全不同的结论，塌成「查不到」会让人去错的方向排查。
@@ -74,13 +74,13 @@ class MemoryRingSink:
     def events(self) -> tuple[RuntimeEvent, ...]:
         """环内全部事件，按 `sequence` 升序。
 
-        排序而不是直接返回插入顺序：`OBS-002` 的重放契约写的是「按序号」，而事件的
+        排序而不是直接返回插入顺序： 的重放契约写的是「按序号」，而事件的
         构造点与投递点可以不同（重入排队、将来的跨线程发布）。
         """
         return tuple(sorted(self._events, key=lambda event: event.sequence))
 
     def by_turn(self, turn_id: TurnId) -> tuple[RuntimeEvent, ...]:
-        """属于某个 turn 的事件，按 `sequence` 升序（`OBS-002`）。"""
+        """属于某个 turn 的事件，按 `sequence` 升序。"""
         return tuple(
             event
             for event in self.events()
@@ -95,7 +95,7 @@ class MemoryRingSink:
 class JsonlFileSink:
     """按天分片的 JSONL 事件日志。
 
-    构造时接一个 `Callable[[date], Path]`，由 `runtime`（`D23`）传
+    构造时接一个 `Callable[[date], Path]`，由 `runtime`传
     `layout.events_log_path`。**不 import `kernel.config`，也不在这里第二次拼
     `events-<date>.jsonl` 这个文件名**——两处各写一份必然分叉。
 
@@ -173,9 +173,9 @@ class JsonlFileSink:
 def write_config_error(
     path: Path, error: KaryviaError, *, occurred_at: datetime | None = None
 ) -> bool:
-    """把一条配置解析错误追加写到 `path`，返回是否成功（`EDG-501` 后半句）。
+    """把一条配置解析错误追加写到 `path`，返回是否成功。
 
-    刻意**不是**一个 sink：`EDG-501` 的场景是配置解析失败，那时事件总线还没建起来
+    刻意**不是**一个 sink： 的场景是配置解析失败，那时事件总线还没建起来
     （启动第 2 步在建 bus 之前）。做成订阅者就等于把这条需求推回它无法成立的时序里。
 
     `KaryviaError` 构造时已脱敏，因此这里直接序列化；best-effort，失败返回 False 而不是

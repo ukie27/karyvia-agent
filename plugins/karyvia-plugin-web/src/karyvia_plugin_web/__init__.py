@@ -1,45 +1,13 @@
-"""官方插件 `web`：给实例装上「抓网页」与「搜网」两件工具（开发方案 `D36`）。
+"""官方 Web 插件：提供 `web.fetch` 与 `web.search` 工具。
 
-职责：声明两条 `TOOL` 能力（`web.fetch` / `web.search`），把一次抓取或一次搜索翻成
-`ToolResult`。
-不负责：决定什么时候调它们（模型与 `kernel/turn/`）、校验参数（kernel 的
-`ToolInvoker` 按 `ToolSpec.parameters` 校验）、把结果放进上下文（`kernel/turn/context_builder.py`）。
+职责：执行有界网页抓取与搜索，并把响应规范化为 `ToolResult`。
+不负责：决定何时调用工具、Kernel 参数校验或 Context 组装。
 
-**当前实现保持有界的后端集合**：
-
-- 旧实现有 **13 个写死的搜索后端**（duckduckgo / brave / tavily / searxng / jina / kagi /
-  exa / bocha / serper / olostep / volcengine / keenable …）。这里只写死四个形状差异大的，
-  其余交给可配置的 `custom` 后端。理由与 `D19` 拒掉 `max_tokens_field` slug 表、`D32` 拒掉
-  四张版本 gating 表完全相同：**表只会越滚越大，而用户接一个新后端要等我们发版**。
-- 旧实现在**凭据缺失时静默回退到 DuckDuckGo**。这里不回退：配了 tavily 却没给 key，
-  得到的是一条指名道姓的 `CONFIG_SECRET_MISSING`，而不是一份来自另一个后端、看起来一切
-  正常的结果（原则 7「不静默修正坏输入」）。
-- 旧实现的 `duckduckgo` 后端依赖第三方包 `ddgs`。这里自己解析 `html.duckduckgo.com/html/`
-  的返回，因此**默认后端不引入任何新依赖**。
-- 旧实现把 `web_search` 与 `web_fetch` 缠在一个 1186 行的文件里、且两者共用一套 httpx
-  调用。这里按**谁决定 URL** 切开出网路径，见下。
-
-**三条如实记着的边界**，写在这里而不是留给用户发现：
-
-- **`web.fetch` 走 `ctx.net`，`web.search` 直接用 httpx**，判据是那个 URL 由谁决定：
-  前者整个来自模型（正是 SSRF 守卫存在的理由，`EDG-406`），后者的端点来自运维配置而
-  模型只控制 query——自托管 SearXNG 常在私有网段，`ctx.net` 会按设计拒掉它。后一条与内建
-  `model_openai` 要连本地 vLLM / Ollama 是同一条先例：资源门面不适合该端点时，可信插件
-  直接使用与自身协议匹配的客户端。
-- **抓回来的正文是不可信数据，`D42` 起真的被隔离了。** 那次给 `ToolResult` 加了 `trust`
-  字段，`fold_tool_result` 因此把 `UNTRUSTED` 的结果包成带来源标注的数据块——与
-  `ContextFragment` 共用 `contracts.context.wrap_untrusted`，内容里自带的闭合标记会被中和。
-  本插件两条工具都走默认的 `UNTRUSTED`，不再自己加横幅（原来那行 `UNTRUSTED_BANNER`
-  已删）。**仍要如实说的是**：这是「标注 + 隔离」，不是内容审查——模型仍然读得到那段
-  文本，只是它以数据而不是指令的身份出现。
-- **`ctx.net.request` 仍不能流式，但字节上界真的生效了。** `D42` 给它加了 `max_bytes`：
-  读到上界即停止并断开，`HttpResponse.truncated` 标着。在那之前 `fetch.max_bytes` 只在
-  整份响应体进过内存**之后**才切一刀。完整的流式接口（把响应生命周期交给调用方）今天
-  没有消费者，因此刻意没做——见 `sdk/api.py::HttpAccess.request` 的那段说明。
-
-**只 import `karyvia.contracts` 与 `karyvia.sdk`**（依赖规则 `R4`）；`httpx` 是
-`web.search` 的实现细节，在 `tools.py` 里惰性 import。**`MANIFEST` 在模块顶层且导入无副作用**
-（技术方案 §7.2）：发现阶段只 import 本模块取那个对象，此时不该发生任何 IO。
+四个内建搜索后端覆盖不同协议形态，其余服务通过 `custom` 后端接入。凭据缺失会明确报错，
+不会静默切换后端。模型决定 URL 的 `web.fetch` 使用带 SSRF 守卫的 `ctx.net`；运维决定端点
+的 `web.search` 使用插件自己的客户端，以支持私有网络中的搜索服务。抓取内容始终作为
+`UNTRUSTED` 数据进入模型；这是来源隔离，不是内容审查。读取达到 `max_bytes` 时立即停止并
+通过 `HttpResponse.truncated` 标记截断。
 """
 
 from __future__ import annotations
@@ -140,7 +108,7 @@ __all__ = [
     "truncate",
 ]
 
-#: `plugins.web.config` 的形状。阶段 A 用它校验（`kernel/plugins/loader.py`），
+#: `plugins.web.config` 的形状。加载前校验 用它校验（`kernel/plugins/loader.py`），
 #: `settings.py` 再做它表达不了的那些（枚举可选值、跨字段依赖、上界）。
 #: 标注成 `ManifestJsonSchema` 而不是 `contracts.JsonSchema`：契约那个类型进不了
 #: pydantic 模型（会 `RecursionError`），细节见 `sdk/manifest.py::ManifestJsonValue`。
@@ -247,6 +215,6 @@ def setup(api: KaryviaAPI) -> None:
     时才变成一条工具失败。**凭据不在这里取**，理由见 `settings.py` 的模块 docstring。
 
     **在返回前完成全部注册**：注册先进暂存批次，`setup` 正常返回才一次性并入 registry；
-    中途抛异常则整批丢弃（`EDG-103`）。
+    中途抛异常则整批丢弃。
     """
     register(api, api.ctx)

@@ -1,4 +1,4 @@
-"""事件总线：序号分配、订阅与带隔离的扇出（技术方案 §6.8；`OBS-002`、`NFR-204`、`NFR-504`）。
+"""事件总线：序号分配、订阅与带隔离的扇出。
 
 职责：分配单调 `sequence`、构造已脱敏的 `RuntimeEvent`、把它扇给全部订阅者，并把
 订阅者的异常与耗时隔离在扇出循环内。
@@ -157,11 +157,11 @@ class Subscription:
 
 
 class EventBus:
-    """单一事件总线。只做扇出，不认识任何具体消费者（`OBS-005`、`NFR-504`）。
+    """单一事件总线。只做扇出，不认识任何具体消费者。
 
     **`publish()` 同步、绝不抛出、绝不 await。** 三条理由：
 
-    1. `NFR-204` 要求观察者故障不中断 turn。bus 一旦 await 订阅者，一个慢订阅者就直接
+    1.  要求观察者故障不中断 turn。bus 一旦 await 订阅者，一个慢订阅者就直接
        拉长 turn，那条要求在时间维度上已经不成立。
     2. publish 会在没有事件循环的路径上被调用：`instance.starting` 在启动第 1 步、
        `karyvia config show`、绝大多数测试都不在 loop 里。要求 bus 有 loop 等于要求每条诊断
@@ -264,7 +264,7 @@ class EventBus:
         """构造并扇出一条事件，返回它。绝不抛出订阅者的异常。
 
         事件在**构造前**就已脱敏（`prepare_payload`），因此任何 sink 拿到的都是安全值；
-        新增一个 sink 不会重新引入泄漏面（`OBS-003`）。
+        新增一个 sink 不会重新引入泄漏面。
         """
         event = RuntimeEvent(
             name=name,
@@ -289,7 +289,7 @@ class EventBus:
 
         订阅者在回调里再 `publish()` 是合法的（sink 记录自身失败、诊断插件派生事件）。
         朴素实现会递归扇出：深度不可控，投递顺序还会变成后序遍历。这里让最外层那次扇出
-        在自己结束后按序 flush——序号仍严格单调，投递顺序 == 发布顺序（`OBS-002`）。
+        在自己结束后按序 flush——序号仍严格单调，投递顺序 == 发布顺序。
         """
         self._pending.append(event)
         if self._dispatching:

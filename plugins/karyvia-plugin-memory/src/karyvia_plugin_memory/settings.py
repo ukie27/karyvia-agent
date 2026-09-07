@@ -1,12 +1,12 @@
-"""配置解析与一次性校验（`CFG-002`：插件只看得见自己那一块）。
+"""配置解析与一次性校验（插件只看得见自己那一块）。
 
 职责：把 `plugins.memory.config` 变成一个不可变设置对象，并在 `setup()` 里把能查的错一次查完。
 不负责：存储（`store.py`）、召回（`provider.py`）、工具与命令的参数校验（各自模块）。
 
 **没有「记忆后端」这个配置项。** 换后端的正规做法是装另一个声明 `overrides` 的插件，
 而不是在这里长一张 `backend: "jsonl" | "sqlite" | "qdrant"` 的表——那张表会把每一种后端的
-依赖都拖进本发行包，而 `MEM-001` 的全部意义就是不必如此（`D19` 拒过 `max_tokens_field`
-slug 表、`D32` 拒过四张版本 gating 表，理由一个字没变）。
+依赖都拖进本发行包，而的全部意义就是不必如此（ 拒过 `max_tokens_field`
+slug 表、 拒过四张版本 gating 表，理由一个字没变）。
 """
 
 from __future__ import annotations
@@ -171,7 +171,7 @@ def _boolean(config: Mapping[str, JsonValue], key: str, default: bool) -> bool:
     value = config.get(key)
     if value is None:
         return default
-    # `1` 不是 `True`：静默把它当成开启会让「我明明关掉了」查不出原因（`D18` 的先例）。
+    # `1` 不是 `True`：静默把它当成开启会让「我明明关掉了」查不出原因。
     if not isinstance(value, bool):
         raise _invalid(_NOT_A_BOOL, key)
     return value

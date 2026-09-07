@@ -1,11 +1,11 @@
-"""Turn Engine 的行为测试（`D09` 验收）。
+"""Turn Engine 的行为测试。
 
-九组，对应技术方案 §6.2 与 `D09` 的验收项：
+九组行为如下：
 
 | 组 | 验收内容 |
 | --- | --- |
 | A 事件流不变量 | 恰好一个终态、终态在末尾、终态之后无事件 |
-| B 迭代与终止 | 无工具即完成、多轮迭代、上限终止（`KER-005`） |
+| B 迭代与终止 | 无工具即完成、多轮迭代、上限终止 |
 | C 工具阶段 | 未知工具、Hook 拦截、截断、并发批真的重叠、消息顺序 |
 | D 取消 | 4 个检查点各自的中断后语义（§6.4） |
 | E 预算 | 五项越界的终态与可诊断说明 |
@@ -131,7 +131,7 @@ async def test_response_completed_carries_no_message_when_turn_ends() -> None:
 
 
 async def test_every_terminal_maps_to_a_turn_status() -> None:
-    """`D14` 要把终态事件翻成 `TurnStatus`；四个终态各自有唯一落点。"""
+    """ 要把终态事件翻成 `TurnStatus`；四个终态各自有唯一落点。"""
     assert {TurnStatus.COMPLETED, TurnStatus.FAILED, TurnStatus.CANCELLED} <= set(TurnStatus)
     assert TurnStatus.STOPPED_BY_LIMIT in set(TurnStatus)
 
@@ -192,7 +192,7 @@ async def test_completion_order_may_differ_from_call_order() -> None:
 
 
 async def test_unbounded_loop_stops_by_iteration_limit() -> None:
-    """缺省配置下不存在无界执行路径（`KER-005`）：模型永远要工具，engine 仍会停。"""
+    """缺省配置下不存在无界执行路径：模型永远要工具，engine 仍会停。"""
     model = ScriptedProvider(default=tool_response(tool_call("echo")))
     deps = build_deps(model, limits=TurnLimits(max_iterations=3))
     events = await collect(run_turn(make_request(tools=[tool_spec("echo")]), deps, CancelToken()))
@@ -206,7 +206,7 @@ async def test_unbounded_loop_stops_by_iteration_limit() -> None:
 
 
 async def test_stopped_by_limit_keeps_completed_tool_results() -> None:
-    """撞上限不是失败：已经执行过的工具结果仍在事件流里，`D14` 据此持久化。"""
+    """撞上限不是失败：已经执行过的工具结果仍在事件流里， 据此持久化。"""
     model = ScriptedProvider(default=tool_response(tool_call("echo")))
     deps = build_deps(model, limits=TurnLimits(max_iterations=3))
     events = await collect(run_turn(make_request(tools=[tool_spec("echo")]), deps, CancelToken()))
@@ -324,7 +324,7 @@ async def test_tool_result_is_truncated_by_limit() -> None:
     completed = events_of(events, ToolCallCompleted)[0]
     assert isinstance(completed, ToolCallCompleted)
     assert completed.result.truncated is True
-    # 预算作用在**结果正文**上。消息还要多一层不可信数据块（`D42`），
+    # 预算作用在**结果正文**上。消息还要多一层不可信数据块，
     # 那几行是常数开销，不受 `tool_result_max_bytes` 管——见 `fold_tool_result`。
     assert len(completed.result.content.encode()) == 32
     assert completed.result.content in completed.message.content
@@ -374,7 +374,7 @@ async def test_exclusive_tool_is_not_overlapped() -> None:
 
 
 # ======================================================================================
-# D. 取消（技术方案 §6.4 的 4 个 engine 检查点）
+# D. 取消
 # ======================================================================================
 
 
@@ -395,7 +395,7 @@ async def test_cancel_before_model_request_produces_no_content() -> None:
 
 
 async def test_cancel_between_stream_chunks_keeps_produced_text() -> None:
-    """检查点 3：已产生的文本必须仍在事件流里（`KER-007`），不能被中断吞掉。"""
+    """检查点 3：已产生的文本必须仍在事件流里，不能被中断吞掉。"""
     cancel = CancelToken()
     chunks = [
         ModelChunk(kind=ChunkKind.TEXT, text="已经"),
@@ -493,7 +493,7 @@ async def test_cancel_reason_comes_from_the_token() -> None:
 
 
 async def test_tools_receive_a_child_token() -> None:
-    """工具拿到的是子令牌：它能观察取消，但无权取消整个 turn（`D08` 的两个面）。"""
+    """工具拿到的是子令牌：它能观察取消，但无权取消整个 turn（两个面）。"""
     cancel = CancelToken()
     model = ScriptedProvider([tool_response(tool_call("echo")), text_response()])
     invoker = RecordingToolInvoker()
@@ -578,7 +578,7 @@ async def test_model_request_timeout_is_positive_and_bounded() -> None:
 
 
 async def test_shared_ledger_accumulates_across_two_runs() -> None:
-    """`D14` 的续写要多次调用 `run_turn`：共享一本账，迭代数才不会分裂。"""
+    """ 的续写要多次调用 `run_turn`：共享一本账，迭代数才不会分裂。"""
     ledger = BudgetLedger(TurnLimits(max_iterations=4))
     for _ in range(2):
         model = ScriptedProvider([text_response()])
@@ -589,7 +589,7 @@ async def test_shared_ledger_accumulates_across_two_runs() -> None:
 async def test_exhausted_ledger_stops_before_calling_the_model() -> None:
     """迭代前那道预算判定的意义：账本进来时就已经用完，模型一次都不该被调用。
 
-    这正是 `D14` 续写的失败路径——前几次 `run_turn` 已经把 `max_iterations` 花光，
+    这正是  续写的失败路径——前几次 `run_turn` 已经把 `max_iterations` 花光，
     下一次调用必须立刻以 `STOPPED_BY_LIMIT` 收场，而不是再问一次模型。
     """
     ledger = BudgetLedger(TurnLimits(max_iterations=1))
@@ -648,7 +648,7 @@ async def test_engine_dispatches_exactly_its_four_hooks() -> None:
 
 
 async def test_before_model_request_fires_once_per_iteration() -> None:
-    """§10.2 把它画在进 engine 之前，实际由 engine 每轮分发；`D14` 不得再分发一次。"""
+    """§10.2 把它画在进 engine 之前，实际由 engine 每轮分发； 不得再分发一次。"""
     hooks = RecordingHookDispatcher()
     model = ScriptedProvider(
         [tool_response(tool_call("echo")), tool_response(tool_call("echo")), text_response()]
@@ -660,7 +660,7 @@ async def test_before_model_request_fires_once_per_iteration() -> None:
 
 
 async def test_hook_contexts_carry_the_turn_correlation() -> None:
-    """`KER-010`：关联标识贯穿模型调用与工具调用。"""
+    """关联标识贯穿模型调用与工具调用。"""
     hooks = RecordingHookDispatcher()
     model = ScriptedProvider([tool_response(tool_call("echo")), text_response()])
     deps = build_deps(model, hooks=hooks)
@@ -850,13 +850,13 @@ async def test_hook_error_becomes_turn_failed() -> None:
 
 
 async def test_tool_invoke_error_does_not_fail_the_turn() -> None:
-    """**与开发方案验收表措辞不同的一处，刻意如此。**
+    """**工具调用错误不应让整个 turn 失败。**
 
-    验收表写「每个 `deps` 回调注入异常都产出 `TurnFailed` 而非异常穿透」。`tools.invoke`
+    其他 `deps` 回调注入异常会产出 `TurnFailed` 而非异常穿透，但 `tools.invoke`
     这一条只满足前半句：异常不穿透，但折成 `ToolResult(ok=False, side_effect=UNKNOWN)`
     回给模型，turn 继续。理由有两条——`contracts/protocols.py` 已经写死「工具执行器逸出的
-    异常由 engine 兜成 `UNKNOWN` 结果」；旧实现同样让模型自己纠错（`tests/baseline` 的
-    `B2`）。一个工具炸了就打掉整轮对话是行为倒退。
+    异常由 engine 兜成 `UNKNOWN` 结果」；模型仍可根据结构化失败自行纠错。一个工具炸了
+    就打掉整轮对话会丢失这种恢复机会。
     """
     model = ScriptedProvider([tool_response(tool_call("echo")), text_response("我换个办法")])
     invoker = RecordingToolInvoker(results={"echo": RuntimeError("工具炸了")})
@@ -929,7 +929,7 @@ async def test_streamed_tool_calls_drive_the_tool_phase() -> None:
 
 
 async def test_provider_error_chunk_fails_the_turn_but_keeps_deltas() -> None:
-    """`DONE(ERROR)` 不得被折成一个「看起来正常」的响应（`EDG-304`）。"""
+    """`DONE(ERROR)` 不得被折成一个「看起来正常」的响应。"""
     chunks = [
         ModelChunk(kind=ChunkKind.TEXT, text="半句"),
         ModelChunk(kind=ChunkKind.DONE, stop_reason=StopReason.ERROR),
@@ -944,7 +944,7 @@ async def test_provider_error_chunk_fails_the_turn_but_keeps_deltas() -> None:
 
 
 async def test_max_tokens_turn_is_marked_truncated() -> None:
-    """续写上限耗尽后，engine 才把 `TurnCompleted.truncated` 置为 `True`（`EDG-304`）。"""
+    """续写上限耗尽后，engine 才把 `TurnCompleted.truncated` 置为 `True`。"""
     from karyvia.contracts import ModelResponse
 
     response = ModelResponse(
@@ -1059,13 +1059,13 @@ def test_engine_imports_nothing_that_touches_the_outside_world() -> None:
 
 
 def test_the_import_guard_actually_catches_a_violation() -> None:
-    """守卫自证：注入一个会读文件的 engine，检查必须失败（照抄 `D01` 的注入范式）。"""
+    """守卫自证：注入一个会读文件的 engine，检查必须失败（照抄的注入范式）。"""
     roots = module_import_roots("import os\nfrom pathlib import Path\n")
     assert roots & FORBIDDEN_ROOTS
     assert not roots <= ALLOWED_ENGINE_IMPORTS
 
 
 def test_engine_stays_within_its_line_budget() -> None:
-    """§6.2 给 engine 的目标是 ≤400 行；`D01` 的守卫按 kernel 500 行卡，这里卡得更紧。"""
+    """§6.2 给 engine 的目标是 ≤400 行； 的守卫按 kernel 500 行卡，这里卡得更紧。"""
     lines = len(ENGINE_PATH.read_bytes().splitlines())
     assert lines <= 400, f"engine.py 已经 {lines} 行——超出的部分属于某个兄弟模块"

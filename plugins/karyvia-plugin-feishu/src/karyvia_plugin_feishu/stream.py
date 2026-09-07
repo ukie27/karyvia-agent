@@ -1,4 +1,4 @@
-"""CardKit 流式 edit-in-place 的状态机（`MSG-005`、`EDG-304`，开发方案 `D34`）。
+"""CardKit 流式 edit-in-place 的状态机。
 
 职责：把一串 `STARTED` / `DELTA` / 终态出站消息变成「建一张流式卡片、按节流反复更新它、
 最后关掉流式模式」的平台动作序列；全部失败路径的回落。
@@ -21,7 +21,7 @@
 
 **注入时钟**：节流是本模块唯一的时间语义，用真实时间测它意味着每个用例都要等 0.5 秒。
 
-**缓冲表按 conversation 分片，不加锁**：`D33` 的泵按 conversation 扇出、lane 内串行，
+**缓冲表按 conversation 分片，不加锁**： 的泵按 conversation 扇出、lane 内串行，
 而 `conversation_id ↔ SessionKey` 是双射（`normalize.encode_conversation` 是可逆纯函数），
 因此各条 lane 只碰自己那个键。
 """
@@ -126,7 +126,7 @@ class StreamRelay:
     async def handle(self, message: OutboundMessage) -> None:
         """处理一条出站消息。
 
-        **`D43` 起它可以抛 `EXTERNAL_CHANNEL`**：`_send_plain` 一条都没发出去时抛，
+        ** 起它可以抛 `EXTERNAL_CHANNEL`**：`_send_plain` 一条都没发出去时抛，
         由 `channel.py` 原样带给出站路由点。其余失败（卡片更新、关流）仍然内部降级——
         那些路径上还有别的出路，而「一条都没发出去」没有。
         """
@@ -181,7 +181,7 @@ class StreamRelay:
 
     def _buffer_for(self, message: OutboundMessage) -> _Card:
         """取（或换）缓冲。`turn_id` 变了就换——旧卡片原样留在飞书里，它自己的终态已经
-        带过 `EDG-304` 标记了，在这里再补一条等于把同一件事说两遍。"""
+        带过  标记了，在这里再补一条等于把同一件事说两遍。"""
         buffer = self._buffers.get(message.conversation_id)
         if buffer is None or buffer.turn_id != str(message.turn_id):
             buffer = _Card(turn_id=str(message.turn_id))
@@ -224,7 +224,7 @@ class StreamRelay:
         `buffer.text` 里写**，写完之后要做的事一模一样。
         """
         if not self.streaming or buffer.degraded:
-            # 关掉流式（或已经降级）就只累积，终态时一次发完（`MSG-005` 的降级）。
+            # 关掉流式（或已经降级）就只累积，终态时一次发完（降级）。
             return
         if buffer.card_id is None:
             if not buffer.text.strip():
@@ -289,7 +289,7 @@ class StreamRelay:
     async def _send_plain(self, message: OutboundMessage, body: str) -> None:
         """不走流式的那条路：按格式级联发 text / post，或拆成一到多张卡片。
 
-        **一条都没发出去就抛 `EXTERNAL_CHANNEL`**（`D43`）。这是最后一条出路——走到这里
+        **一条都没发出去就抛 `EXTERNAL_CHANNEL`**。这是最后一条出路——走到这里
         说明流式卡片那条路没成功（或压根没开），因此它失败就等于这条答案一个字都没送到。
         飞书的失败信号是 `None` 返回值而不是异常（`client.py` 的四个方法都是这样），
         因此判据是返回值：不看它，一次失败的投递在事件流里连一条记录都留不下。

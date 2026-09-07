@@ -1,6 +1,6 @@
 """`kernel/config/` 的行为测试：四层合并、来源追踪、schema 校验、加载与实例锁。
 
-覆盖 D10 的验收点：优先级顺序、`origin_of` 的可回答性、深合并的边界（dict 递归 / 标量
+覆盖 当前行为点：优先级顺序、`origin_of` 的可回答性、深合并的边界（dict 递归 / 标量
 与列表整体替换）、校验一次报全、workspace 相对路径按实例目录解析、锁的获取·冲突·
 陈旧回收。
 """
@@ -266,7 +266,7 @@ class TestSchema:
         assert config.context.turn_compactor == "basic"
 
     def test_unknown_key_rejected_with_pointer_and_suggestion(self) -> None:
-        """`CFG-001`：未知字段用自己的码，不被笼统的「配置无效」吞掉。"""
+        """未知字段用自己的码，不被笼统的「配置无效」吞掉。"""
         with pytest.raises(KaryviaError) as caught:
             validate_config({"turn": {"max_iterationz": 4}})
         error = caught.value
@@ -315,7 +315,7 @@ class TestSchema:
     def test_wrong_types_report_their_pointer(
         self, payload: dict[str, object], pointer: str
     ) -> None:
-        """`CFG-001` 的「类型错误」一行：每处都要定位得到。"""
+        """ 的「类型错误」一行：每处都要定位得到。"""
         with pytest.raises(KaryviaError) as caught:
             validate_config(payload)  # type: ignore[arg-type]
         assert caught.value.detail["errors"][0]["pointer"] == pointer
@@ -416,7 +416,7 @@ class TestSchema:
         )
 
     def test_orchestration_defaults_match_the_turn_package(self) -> None:
-        """Hook 与 Context Provider 的三项超时同样在两处各写了一份（`D14`）。
+        """Hook 与 Context Provider 的三项超时同样在两处各写了一份。
 
         与上面两条同理：`schema.py` 不能 import `kernel.turn`（会把 engine 与 asyncio 拖上
         配置路径），代价就是这张对照表。
@@ -437,7 +437,7 @@ class TestSchema:
         )
 
     def test_memory_defaults_match_the_turn_package(self) -> None:
-        """长期记忆的四项默认值 + 一张取值表，同样在两处各写了一份（`D44`）。
+        """长期记忆的四项默认值 + 一张取值表，同样在两处各写了一份。
 
         与上面三条同理。**`on_failure` 的取值表也要对**：`MemorySection.critical` 把
         `"fail"` 翻成布尔，而那个字面量在 `kernel/turn/memory.py` 里也有一份。
@@ -452,7 +452,7 @@ class TestSchema:
         assert MEMORY_ON_FAILURE_CHOICES == memory.MEMORY_ON_FAILURE_CHOICES
 
     def test_retry_defaults_match_the_turn_package(self) -> None:
-        """模型请求重试的四项默认值同样在两处各写一份（`D48`）。
+        """模型请求重试的四项默认值同样在两处各写一份。
 
         `to_policy()` 与 `to_limits()` 一样用函数内 import，理由相同：`schema.py` 不得
         module-level import `kernel.turn`。
@@ -477,7 +477,7 @@ class TestSchema:
     def test_every_declared_field_actually_reaches_the_config_object(self) -> None:
         """**每个字段都要真的被 `validate_config` 接进对应的小节 dataclass。**
 
-        这条守卫是 `D48` 加的，它拦的是一个刚发生过的坑：`SECTION_SPECS` 里加了
+        这条守卫是  加的，它拦的是一个刚发生过的坑：`SECTION_SPECS` 里加了
         `retry` 小节、`sections.py` 里加了 `RetrySection`、
         `test_every_section_spec_has_a_dataclass_field` 照样绿——因为
         `validate_config()` 的返回值是**逐小节显式构造**的，漏掉一节的后果是用户写进
@@ -511,7 +511,7 @@ class TestSchema:
         assert validate_config({}).memory.critical is False
 
     def test_on_failure_fail_is_the_only_thing_that_makes_memory_critical(self) -> None:
-        """`MEM-003`：默认降级。`critical` 是那个字面量的唯一消费点。"""
+        """默认降级。`critical` 是那个字面量的唯一消费点。"""
         assert validate_config({"memory": {"on_failure": "fail"}}).memory.critical is True
         assert validate_config({"memory": {"on_failure": "degrade"}}).memory.critical is False
 
@@ -555,7 +555,7 @@ class TestLoadConfig:
         assert loaded.config.turn.max_iterations > 0
 
     def test_default_values_are_traced_to_the_default_layer(self, tmp_path: Path) -> None:
-        """`CFG-005` 对**所有**字段成立，包括没人写过的那些。
+        """ 对**所有**字段成立，包括没人写过的那些。
 
         默认值物化成一层，因此「这个值取自默认值」是查得到的答案，而不是「查不到来源」。
         """
@@ -912,7 +912,7 @@ class TestProcessProbe:
 
 
 def test_loading_config_does_not_import_the_turn_engine(tmp_path: Path) -> None:
-    """`karyvia config show` 不该把 turn 引擎与 asyncio 调度拖上路径（`NFR-405` 冷启动预算）。
+    """`karyvia config show` 不该把 turn 引擎与 asyncio 调度拖上路径。
 
     `schema.py` 只从 `kernel.turn.limits` 取六个默认值常量，engine / scheduling / folding
     都不该被牵连；`routing` 的五个默认值同理，那个包会把调度器与 asyncio 一起带进来。
@@ -939,7 +939,7 @@ def test_loading_config_does_not_import_the_turn_engine(tmp_path: Path) -> None:
 
 
 def test_loading_config_does_not_import_pydantic(tmp_path: Path) -> None:
-    """决策「schema 手写、不用 pydantic」的可执行形态（`NFR-405`）。
+    """决策「schema 手写、不用 pydantic」的可执行形态。
 
     `import pydantic` 实测约 90 ms，会把 `kernel.config` 的导入推到 300 ms 以上，而那是
     整个冷启动的预算。配置加载在启动第 2 步、永远在必经路径上。

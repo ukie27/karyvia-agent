@@ -1,21 +1,21 @@
-"""外部插件的两阶段加载（`D27`；技术方案 §7.3，需求 `PLG-003`、`PLG-004`、`PLG-007`、`EDG-103`）。
+"""外部插件的两阶段加载。
 
 这套用例走的是**真实装配链**：真的 `plugin.toml` 落在真的搜索路径上，真的被发现、校验、
 排序，再经与内建**同一条**注册路径（`wire_capabilities` → `load_into` →
 `RegistrationBatch`）跑进 registry。只有模型是 Fake（`_support.TEST_MANIFESTS`），
 理由与 `test_bootstrap.py` 相同。
 
-五条主线，逐条对着开发方案 `D27` 的验收表：
+本文件覆盖五条主线：
 
 - **加载成功**：外部插件以 `plugin:<id>` 身份注册，配置块与内建同一条路交下去。
-- **阶段 A 的三种落榜**（依赖缺失 / 成环 / 配置不合 schema）都不打掉实例（`PLG-004`），
+- **加载前校验 的三种落榜**（依赖缺失 / 成环 / 配置不合 schema）都不打掉实例，
   但都在 `/plugins` 的数据源里留下 `FAILED`。
-- **失败隔离**（`EDG-106`）：插件不能决定中断宿主。
-- **事务性**（`EDG-103`）：`setup` 中途抛异常时 registry 不留半注册状态。
-- **零外部插件是一等路径**（`PLG-007`）：内建基线照常启动。
+- **失败隔离**：插件不能决定中断宿主。
+- **事务性**：`setup` 中途抛异常时 registry 不留半注册状态。
+- **零外部插件是一等路径**：内建基线照常启动。
 
 `setup` 指向本模块的函数：`import_setup()` 接受任何 `module:func`，外部插件与内建在这
-一点上没有区别（`SDK-007`）。
+一点上没有区别。
 """
 
 from __future__ import annotations
@@ -81,7 +81,7 @@ def setup_gamma(api: KaryviaAPI) -> None:
 
 
 def setup_explodes(api: KaryviaAPI) -> None:
-    """先注册、再抛：这正是 `EDG-103` 要挡住的那半个批次。"""
+    """先注册、再抛：这正是  要挡住的那半个批次。"""
     _register(api, "boom")
     raise RuntimeError("插件自己炸了")
 
@@ -153,7 +153,7 @@ async def test_an_enabled_plugin_is_loaded_and_registers_as_itself(tmp_path: Pat
         assert "alpha.ping" in tool_names(instance)
         providers = {ref.provider for ref in instance.report.active}
         assert Plugin(PluginId("alpha")) in providers
-        # `D29`：清单的状态叠上了生命周期的投影，因此一个跑完 `setup()` 的插件不再显示
+        # ：清单的状态叠上了生命周期的投影，因此一个跑完 `setup` 的插件不再显示
         # `discovered`（实例尚未 `start()`，所以还不是 `activated`）。
         assert statuses(instance)["alpha"] is PluginState.LOADED
     finally:
@@ -161,7 +161,7 @@ async def test_an_enabled_plugin_is_loaded_and_registers_as_itself(tmp_path: Pat
 
 
 async def test_an_unenabled_plugin_is_not_loaded(tmp_path: Path) -> None:
-    """`plugins.enabled` 是外部插件的总开关（`D25`），加载阶段不会绕过它。"""
+    """`plugins.enabled` 是外部插件的总开关，加载阶段不会绕过它。"""
     write_plugin(tmp_path / "ext", "alpha")
     instance = await boot(tmp_path, {})
     try:
@@ -172,7 +172,7 @@ async def test_an_unenabled_plugin_is_not_loaded(tmp_path: Path) -> None:
 
 
 async def test_no_external_plugins_still_starts_on_the_builtin_baseline(tmp_path: Path) -> None:
-    """`PLG-007`、`EDG-101`：外部发现为空时实例照常启动。"""
+    """、：外部发现为空时实例照常启动。"""
     write_config(tmp_path)
     instance = await bootstrap(instance_dir=tmp_path, manifests=TEST_MANIFESTS)
     try:
@@ -185,7 +185,7 @@ async def test_no_external_plugins_still_starts_on_the_builtin_baseline(tmp_path
 
 
 async def test_dependencies_are_set_up_first(tmp_path: Path) -> None:
-    """`A4`：`beta` 依赖 `alpha`，因此 `alpha.setup` 必须先跑完。"""
+    """`beta` 依赖 `alpha`，因此 `alpha.setup` 必须先跑完。"""
     write_plugin(tmp_path / "ext", "alpha")
     write_plugin(tmp_path / "ext", "beta", dependencies=("alpha",))
     instance = await boot(tmp_path, {"enabled": ["beta", "alpha"]})
@@ -205,11 +205,11 @@ async def test_a_dependency_on_a_builtin_is_satisfied(tmp_path: Path) -> None:
         await instance.stop()
 
 
-# ------------------------------------------------------------------------- 阶段 A 的落榜
+# ------------------------------------------------------------------------- 加载前校验 的落榜
 
 
 async def test_a_missing_dependency_keeps_the_instance_up(tmp_path: Path) -> None:
-    """`PLG-004`：插件落榜不打掉实例，但要在诊断里查得到。"""
+    """插件落榜不打掉实例，但要在诊断里查得到。"""
     write_plugin(tmp_path / "ext", "alpha", dependencies=("nope",))
     instance = await boot(tmp_path, {"enabled": ["alpha"]})
     try:
@@ -221,7 +221,7 @@ async def test_a_missing_dependency_keeps_the_instance_up(tmp_path: Path) -> Non
 
 
 async def test_a_dependency_cycle_fails_both_and_names_the_cycle(tmp_path: Path) -> None:
-    """`PLG-003`：环路要指得出来，否则用户只知道「装不上」。"""
+    """环路要指得出来，否则用户只知道「装不上」。"""
     write_plugin(tmp_path / "ext", "alpha", dependencies=("beta",))
     write_plugin(tmp_path / "ext", "beta", dependencies=("alpha",))
     instance = await boot(tmp_path, {"enabled": ["alpha", "beta"]})
@@ -240,7 +240,7 @@ async def test_a_dependency_cycle_fails_both_and_names_the_cycle(tmp_path: Path)
 
 
 async def test_a_config_that_breaks_the_schema_drops_the_plugin(tmp_path: Path) -> None:
-    """`A5`：配置不合 `config_schema` 是阶段 A 失败，错误带 `config.json` 里的字段路径。"""
+    """配置不合 `config_schema` 时加载前校验失败，错误带 `config.json` 里的字段路径。"""
     schema = 'config_schema = { type = "object", properties = { retries = { type = "integer" } } }'
     write_plugin(tmp_path / "ext", "alpha", extra=schema)
     instance = await boot(
@@ -275,7 +275,7 @@ async def test_a_matching_config_reaches_setup(tmp_path: Path) -> None:
 async def test_a_state_version_change_drops_the_plugin_and_keeps_the_state(
     tmp_path: Path,
 ) -> None:
-    """`A7`、`EDG-503`：状态目录里记着 v1、manifest 声明 v2，旧状态原样保留。"""
+    """状态目录记着 v1 而 manifest 声明 v2 时，旧状态原样保留。"""
     write_plugin(tmp_path / "ext", "alpha", extra="state_version = 2")
     state_dir = tmp_path / "plugins" / "alpha"
     state_dir.mkdir(parents=True)
@@ -296,7 +296,7 @@ async def test_a_state_version_change_drops_the_plugin_and_keeps_the_state(
 
 
 async def test_setup_raising_rolls_the_whole_batch_back(tmp_path: Path) -> None:
-    """`EDG-103`：`boom` 在抛之前已经注册过一个工具，registry 里不许留下它。"""
+    """`boom` 在抛之前已经注册过一个工具，registry 里不许留下它。"""
     write_plugin(tmp_path / "ext", "boom", setup="explodes")
     instance = await boot(tmp_path, {"enabled": ["boom"]})
     try:
@@ -317,7 +317,7 @@ async def test_setup_raising_rolls_the_whole_batch_back(tmp_path: Path) -> None:
 
 
 async def test_one_broken_plugin_does_not_take_the_others_down(tmp_path: Path) -> None:
-    """`PLG-004`：不相干的插件照常加载。"""
+    """不相干的插件照常加载。"""
     write_plugin(tmp_path / "ext", "boom", setup="explodes")
     write_plugin(tmp_path / "ext", "gamma")
     instance = await boot(tmp_path, {"enabled": ["boom", "gamma"]})

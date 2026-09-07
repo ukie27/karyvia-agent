@@ -1,4 +1,4 @@
-"""入站归一化的验收（`MSG-004`、`MSG-002`、`EDG-201`，开发方案 `D34`）。
+"""入站归一化的验收。
 
 | 验收项 | 测试 |
 | --- | --- |
@@ -59,13 +59,13 @@ class TestGating:
 
     def test_the_group_gate_runs_before_dedup(self) -> None:
         """**顺序是行为**：群里没 @ 我的消息不该占用去重表的名额——一个热闹的群几分钟就能
-        把表冲干净，此后 WS 的重投会真的变成第二次副作用（`EDG-201`）。"""
+        把表冲干净，此后 WS 的重投会真的变成第二次副作用。"""
         probe = gate()
         assert normalize(raw(chat_type="group"), probe) is None
         assert probe.seen_count() == 0
 
     def test_a_duplicate_is_dropped(self) -> None:
-        """飞书的 WS 会重投。这是 `EDG-201` 在 Channel 侧的第一道防线。"""
+        """飞书的 WS 会重投。这是  在 Channel 侧的第一道防线。"""
         probe = gate()
         assert normalize(raw(), probe) is not None
         assert normalize(raw(), probe) is None
@@ -159,7 +159,7 @@ class TestNormalization:
         assert message.content == "/help"
 
     def test_platform_fields_live_under_their_own_namespace(self) -> None:
-        """`MSG-002`：平台私有字段只进 `metadata["feishu"]`，Kernel 不解读它。"""
+        """平台私有字段只进 `metadata["feishu"]`，Kernel 不解读它。"""
         message = normalize(raw(parent_id="om_parent"), gate())
         assert message is not None
         assert set(message.metadata) == {"feishu"}

@@ -1,4 +1,4 @@
-"""内建 shell 工具 `tools_shell`：`shell.exec`（技术方案 §8.2 的第 6 个）。
+"""内建 shell 工具 `tools_shell`：`shell.exec`。
 
 职责：作为本内建能力的公开门面，导出 `setup`（注册入口）、`ToolSpec` 与实现，
 以及配置与环境变量处理。
@@ -8,9 +8,9 @@
 **取消宽限期用尽时副作用是 `UNKNOWN`**：这是与 `tools_fs` 唯一一处语义差异——文件工具的
 失败全部发生在落盘之前（临时文件 + `os.replace`），因此它们一次 `UNKNOWN` 都不产出；
 而 `shell.exec` 的进程可能写了一半文件、改了一半配置，宽限期用尽后 Kernel 确实不知道
-外部世界变成什么样了（`EDG-407`）。
+外部世界变成什么样了。
 
-**`enabled_tool_names()` 是给装配根的**：与 `tools_fs` 同一条机制（`TOL-006`），只是这里
+**`enabled_tool_names` 是给装配根的**：与 `tools_fs` 同一条机制，只是这里
 只有一个工具名。装配根用它过滤 manifest 声明，`setup()` 用同一份设置决定注册谁。
 """
 

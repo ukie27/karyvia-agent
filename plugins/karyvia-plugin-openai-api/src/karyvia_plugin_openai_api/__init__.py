@@ -1,32 +1,12 @@
-"""官方插件 `openai-api`：把实例接到一个 OpenAI 兼容的 HTTP 接口上（开发方案 `D31`）。
+"""官方 OpenAI API 插件：把实例暴露为 OpenAI 兼容的 HTTP Channel。
 
-职责：声明一条 `CHANNEL` 能力，起一个只有三个端点的 HTTP 服务
-（`POST /v1/chat/completions`、`GET /v1/models`、`GET /health`），并把请求翻译成
-`InboundMessage`、把 `OutboundMessage` 翻译成 OpenAI 的响应体或 SSE 分片。
-不负责：执行 turn、管理会话历史、渲染终端（那三件分别是 `kernel/turn/`、
-会话存储能力与 `cli-entry` 的事）。
+职责：提供 chat completions、models 与 health 端点，在 HTTP/SSE 与 Karyvia 消息契约之间
+转换。不负责：执行 Turn、管理 Session 历史或终端渲染。
 
-**它是一个 Channel 而不是一条捷径**（`MSG-007`）。这条设计不是形式主义：出站增量只经
-`OrchestratorDeps.deliver` 按 `channel_id` 路由回注册过的 Channel，因此**流式响应只有
-Channel 拿得到**——`AgentInstance.submit()` 要等整条 turn 跑完才返回 `TurnReceipt`，
-用它做不出 SSE。`cli-entry` 在 `D23` 已经走过同一条路。
-
-**它取代的是被 `D31` 删掉的 `legacy/api/server.py`**，但不是移植：旧实现读的是
-`AgentLoop._last_usage` 这个私有属性、并且把整段请求历史当输入。这里两条都不做——
-历史归会话存储，用量走事件总线。
-
-**已知的诚实边界**，都在 docstring 与 README 里写着而不是留给用户发现：
-
-- **同一 conversation 的 turn 是串行的，不同 conversation 并发**（`D33` 之后）。装配根的
-  Channel 泵按 `conversation_id` 扇出：每个 conversation 一条 lane，lane 内严格按到达顺序
-  串行（`EDG-202`），lane 之间互不阻塞。因此**并发客户端只在打同一个 `conversation` 时才
-  排队**。`D31`–`D32` 期间它是完全串行的，那条能力回退已经消除。
-  同 conversation 内的串行正是下面 `SessionHub` 那套「最老等待者」关联仍然成立的前提。
-- **插件自己拥有监听端口**。宿主的 `ctx.net` 是出站 HTTP 服务，不负责监听；启用插件
-  就是信任它建立本地服务。
-- **端点鉴权不是进程隔离**。能连上这个端点的调用方就能驱动
-  实例上的全部工具，包括 `shell.exec`。默认只绑回环，且绑非回环地址时**必须**配
-  `api_key`，否则 `setup()` 直接以 `CONFIG_INVALID` 拒绝。
+插件必须作为 Channel 工作，因为流式增量只通过出站投递路径返回。同一 conversation 串行，
+不同 conversation 并发，保证响应关联稳定。会话历史由 SessionStore 管理，用量从事件总线
+聚合。插件自行拥有监听端口；非回环地址必须配置 API key。鉴权只控制端点访问，不构成进程
+或工具权限隔离。
 """
 
 from __future__ import annotations
@@ -95,7 +75,7 @@ MANIFEST: Final = PluginManifest(
 
 
 def setup(api: KaryviaAPI) -> None:
-    """注册 Channel。配置在这里校验一次，不拖到第一次请求（`D18` 的先例）。"""
+    """注册 Channel。配置在这里校验一次，不拖到第一次请求。"""
     settings = resolve_settings(api.ctx)
     secret = _optional_secret(api.ctx)
     if settings.requires_auth and secret is None:

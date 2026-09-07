@@ -1,4 +1,4 @@
-"""Anthropic Messages API 的**请求侧**线格式翻译（开发方案 `D32`）。
+"""Anthropic Messages API 的**请求侧**线格式翻译。
 
 职责：`ModelRequest` → `POST /messages` 请求体：system 提升、`tool_result` 折叠、消息序列
 规整、工具名与 `tool_use_id` 编码、`cache_control` 布点、thinking 四形态。
@@ -20,7 +20,7 @@
 - **`max_tokens` 是必填字段。** OpenAI 那边省略它意味着「用服务端默认」，这里没有这一档。
 
 **不移植 legacy 的四张按模型名版本号 gating 的表**（`_ADAPTIVE_ONLY_MIN_VERSIONS` 等）。
-`D19` 拒过同类的 slug 猜表，理由不变：表只会越滚越大，而用户换一个新模型要等我们发版。
+ 拒过同类的 slug 猜表，理由不变：表只会越滚越大，而用户换一个新模型要等我们发版。
 四种 thinking 形状因此由 `ThinkingSpec.mode` 直接选，运维改一行配置即可。
 """
 
@@ -71,12 +71,12 @@ __all__ = [
 MESSAGES_PATH: Final = "/messages"
 
 #: `ModelInfo.provider` 与 `OpaqueBlock.provider`：诊断里「这个回答是谁生成的」的答案，
-#: 也是 opaque 块的所有权标记（`D45`）。**定义在这里而不是 `settings.py`**：`settings`
+#: 也是 opaque 块的所有权标记。**定义在这里而不是 `settings.py`**：`settings`
 #: 已经 import 本模块，反向 import 会成环；而这个串本来就是线格式一侧的身份。
 #: `settings.py` 原样再导出它，既有引用一个没变。
 PROVIDER_NAME: Final = "anthropic"
 
-#: 两种要原样回传的思考块（`D45`）。`redacted_thinking` 的内容被供应商加密了——它同样
+#: 两种要原样回传的思考块。`redacted_thinking` 的内容被供应商加密了——它同样
 #: 必须回传，而且**只能**原样回传（我们连读都读不了）。`decode.py` 产出它们，
 #: `thinking_blocks()` 把它们编回线格式。
 THINKING_KINDS: Final[tuple[str, ...]] = ("thinking", "redacted_thinking")
@@ -229,7 +229,7 @@ def _append_block(turns: list[dict[str, JsonValue]], block: JsonValue) -> None:
 def encode_messages(
     messages: Sequence[ModelMessage],
 ) -> tuple[list[JsonValue], list[dict[str, JsonValue]]]:
-    """契约消息 → `(system 块, messages)`（`EDG-305`：投影可以变，持久化格式不跟着变）。
+    """契约消息 → `(system 块, messages)`（投影可以变，持久化格式不跟着变）。
 
     system 恒为**块数组**而不是字符串：`cache_control` 只能挂在块上，做成字符串就等于
     放弃在 system 上设断点。多条 system 消息变成多个 text 块，不拼成一个——拼接会让
@@ -255,7 +255,7 @@ def encode_messages(
             )
             continue
         if message.role is Role.ASSISTANT:
-            # **thinking 块必须排在最前面**（`D45`）：Anthropic 要求续写时把上一轮的
+            # **thinking 块必须排在最前面**：Anthropic 要求续写时把上一轮的
             # thinking 块原样放回同一条 assistant 轮的开头，顺序也要保持。
             blocks: list[JsonValue] = list(thinking_blocks(message.provider_blocks))
             if message.content:
@@ -268,14 +268,14 @@ def encode_messages(
 
 
 def thinking_blocks(blocks: Sequence[OpaqueBlock]) -> list[dict[str, JsonValue]]:
-    """`OpaqueBlock` → Anthropic 的 `thinking` / `redacted_thinking` 块（`D45`）。
+    """`OpaqueBlock` → Anthropic 的 `thinking` / `redacted_thinking` 块。
 
-    **不是自己产出的一律跳过**（`OpaqueBlock.owned_by`，`EDG-305`）：`payload` 的形状是私有
+    **不是自己产出的一律跳过**（`OpaqueBlock.owned_by`）：`payload` 的形状是私有
     的，别家的 `thinking` 块不是同一种东西，把它当成自己的塞进请求体换来的是一个 400。
     切换 Provider 之后同一段会话历史因此**不会**带着上一家的块跑。
 
     **没有 `signature` 的 `thinking` 块也跳过**：Anthropic 拒绝无签名的思考块，留一半比
-    不留更糟（那正是 `D32` 当初选择整块丢弃的理由，现在只作用在残缺的块上）。
+    不留更糟（那正是  当初选择整块丢弃的理由，现在只作用在残缺的块上）。
     `redacted_thinking` 例外——它的凭据在 `data` 里，本来就没有 `signature`。
 
     **不认识的 `kind` 跳过**：本插件只产出那两种，第三种只可能来自手改的历史或未来版本。

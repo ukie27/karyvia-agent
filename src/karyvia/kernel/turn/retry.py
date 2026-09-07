@@ -1,4 +1,4 @@
-"""模型请求重试：瞬时故障重发与空回复重发（技术方案 §6.2，需求 `MOD-003`、`TOL-002`）。
+"""模型请求重试：瞬时故障重发与空回复重发。
 
 职责：定义 `RetryPolicy` 与「这次失败该不该再来一次、等多久」的纯判定，并以一个包住
 `ModelProvider` 的 `RetryingModel` 兑现它——含「首个实质分片放行之后就不能重来」这条
@@ -58,7 +58,7 @@ __all__ = [
 ]
 
 #: 四项默认值。**`kernel/config/defaults.py` 有一份同名副本**（那一层不得 module-level
-#: import `kernel.turn`，`NFR-405` 的冷启动预算 300 ms），由
+#: import `kernel.turn`，既定冷启动预算 300 ms），由
 #: `test_retry_defaults_match_the_turn_package` 逐项钉住。
 #:
 #: `max_attempts` 是**总尝试次数含第一次**，因此 `1` 的含义是「不重试」——不需要再加
@@ -258,7 +258,7 @@ class RetryingModel:
                     for item in gate.admit(chunk):
                         yield item
             # 捕 Exception 而不是 BaseException：消费方中止会以 `GeneratorExit` 到达
-            # 这个 yield 点，那必须穿透（engine 的同一条理由）。
+            # 这个 yield 点，那必须穿透（engine 基于相同理由）。
             except Exception as raw:
                 if gate.opened:
                     raise

@@ -1,4 +1,4 @@
-"""错误契约测试（`D02`，需求 §10.7、`OBS-003`、`OBS-004`）。
+"""错误契约测试。
 
 核心验收：携带哨兵密钥构造 `KaryviaError` 后，`user_message`、`detail`、`repr`、`str`
 与 `args` 均不含哨兵值——脱敏发生在构造时，下游忘记处理也不会泄漏。
@@ -226,7 +226,7 @@ def test_secret_str_under_a_sensitive_key_still_yields_its_plaintext_for_scrubbi
 
 
 def test_secret_str_is_not_a_dataclass() -> None:
-    """做成 dataclass 会让 `dataclasses.asdict()` 把明文抖出来（`D11`）。"""
+    """做成 dataclass 会让 `dataclasses.asdict` 把明文抖出来。"""
     assert not dataclasses.is_dataclass(SecretStr)
 
 

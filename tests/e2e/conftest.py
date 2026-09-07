@@ -30,7 +30,7 @@ def _host_of(address: object) -> object:
 
 @pytest.fixture(autouse=True)
 def no_real_network(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
-    """出站连接与 DNS 解析只允许打到回环地址（`NFR-705`、`DST-003`）。"""
+    """出站连接与 DNS 解析只允许打到回环地址。"""
     real_connect = socket.socket.connect
     real_connect_ex = socket.socket.connect_ex
     real_getaddrinfo = socket.getaddrinfo

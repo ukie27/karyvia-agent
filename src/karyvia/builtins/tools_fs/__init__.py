@@ -1,16 +1,16 @@
 """内建文件工具 `tools_fs`：`fs.read` / `fs.write` / `fs.edit` / `fs.list` / `fs.grep`
-（技术方案 §8.2 的冻结清单，`shell.exec` 是 `D21`）。
+。
 
 职责：作为本内建能力的公开门面，导出 `setup`（注册入口）、五个 `ToolSpec` 与实现，
 以及配置与路径守卫。
 不负责：实现细节（在各子模块）、声明自己（manifest 在 `builtins/registry.py`，那是内建
 能力唯一的发现来源）、决定 workspace 根在哪（装配根经 `ctx.config["workspace"]` 交下来）。
 
-**这是 `NFR-302` 的唯一防线**：全部路径判定收在 `paths.WorkspaceGuard` 一处，逻辑校验 +
+**这是的唯一防线**：全部路径判定收在 `paths.WorkspaceGuard` 一处，逻辑校验 +
 realpath 校验缺一不可。它是应用级守卫而不是 OS 沙箱——TOCTOU 窗口如实写在那里。
 
-**`enabled_tool_names()` 是给装配根的**：`D16` 要求 manifest 声明的每一项都真的被注册，
-而 `TOL-006` 要求被禁用的工具从 registry 里消失。两者靠「声明与注册同源于同一份配置」
+**`enabled_tool_names` 是给装配根的**： 要求 manifest 声明的每一项都真的被注册，
+而  要求被禁用的工具从 registry 里消失。两者靠「声明与注册同源于同一份配置」
 调和，装配根用它过滤 manifest 声明，`setup()` 用同一份设置决定注册谁。
 """
 

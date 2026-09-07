@@ -10,14 +10,14 @@ readme = { file = "README.md", content-type = "text/markdown" }
 requires-python = ">=3.11"
 license = { text = "MIT" }
 # 插件只依赖 SDK 与契约（`R4`）。`aiohttp` 是**运行期可选**依赖：它只在
-# `ApiChannel.start()` 里被惰性 import，装了这个插件却没装 `aiohttp` 时给一句能照做的
+# `ApiChannel.start` 里被惰性 import，装了这个插件却没装 `aiohttp` 时给一句能照做的
 # 错误，而不是在导入期就炸掉整个实例。
 dependencies = ["karyvia>=0.3.0"]
 
 [project.optional-dependencies]
 server = ["aiohttp>=3.9.0,<4.0.0"]
 
-# 发现的唯一入口（技术方案 §7.1）。name 必须等于 manifest 里的 `id`。
+# 发现的唯一入口。name 必须等于 manifest 里的 `id`。
 [project.entry-points."karyvia.plugins"]
 openai-api = "karyvia_plugin_openai_api:MANIFEST"
 

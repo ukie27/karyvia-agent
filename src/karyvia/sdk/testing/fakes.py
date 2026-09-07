@@ -1,4 +1,4 @@
-"""公开测试夹具：Fake 能力实现与构造辅助（技术方案 §12.3）。
+"""公开测试夹具：Fake 能力实现与构造辅助。
 
 职责：提供可脚本化的 `FakeModelProvider`、`InMemorySessionStore`、`RecordingHook` 与
 `ManualCancel`，以及一组构造契约对象的小辅助。
@@ -89,7 +89,7 @@ class ManualCancel:
     """手动控制的 `CancelSignal`。
 
     `CancelSignal` 只有观测面，因此测试没法用它自己触发取消；这里补上 `request()`。
-    它不是 `D08` 的 `CancelToken`（那个还有 `child()` 与预算联动），只是最小的开关。
+    它不是 `CancelToken`（那个还有 `child` 与预算联动），只是最小的开关。
     """
 
     def __init__(self, *, code: ErrorCode = ErrorCode.CANCELLED_BY_USER) -> None:
@@ -117,7 +117,7 @@ class FakeModelProvider:
     序列则直接表达「第一轮要求调工具、第二轮给最终答案」。
 
     `stream()` 由同一条脚本派生分片，因此流式与非流式测试共用一份脚本——它们本就该
-    产生同样的语义结果（`MOD-005` 不允许 Provider 在两条路径上给出不同能力）。
+    产生同样的语义结果。
     """
 
     def __init__(
@@ -191,7 +191,7 @@ class InMemorySessionStore:
 
     刻意不用 `SessionKey` 本身作字典键（它可哈希，看上去更直接）：`storage_id()` 是
     已发布的持久化契约，让 Fake 也走一遍，任何破坏「不同 key 不撞同一个 id」的改动
-    在这里就会被撞出来，而不是等到真实存储上线（`EDG-203`）。
+    在这里就会被撞出来，而不是等到真实存储上线。
     """
 
     def __init__(self) -> None:

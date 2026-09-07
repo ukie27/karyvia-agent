@@ -1,10 +1,10 @@
-"""标识与关联契约（技术方案 §5.2、需求 `KER-010`、`EDG-203`、`OBS-001`）。
+"""标识与关联契约。
 
 职责：定义实例/turn/插件标识，以及结构化的 `SessionKey` 与贯穿一次 turn 的 `Correlation`；
 提供 `SessionKey` 的稳定、可逆、无碰撞编码 `storage_id()`。
 不负责：生成标识（`turn_id` 由 Kernel 分配）、决定会话如何存储、访问文件系统。
 
-`SessionKey` 是结构化对象而不是拼接字符串，这是 `EDG-203` 的根：不同用户、群组、
+`SessionKey` 是结构化对象而不是拼接字符串，这是的根：不同用户、群组、
 Channel 和项目不能因为「拼出来的串恰好一样」而共享同一份会话历史。`storage_id()`
 一旦发布即为持久化契约——已有实例的目录名和记录键都依赖它，改编码等于让历史会话失联。
 """
@@ -143,7 +143,7 @@ class SessionKey:
         ``SessionKey("a", "b:c")`` -> ``"a~b%3Ac~default"``
         ``SessionKey("a:b", "c")`` -> ``"a%3Ab~c~default"``
 
-        两者不同——这正是 `EDG-203` 要求的性质。发布后不得更改编码方式。
+        两者不同——这正是  要求的性质。发布后不得更改编码方式。
         """
         return _SEPARATOR.join(
             (
@@ -169,7 +169,7 @@ class SessionKey:
 
 @dataclass(frozen=True, slots=True)
 class Correlation:
-    """一次 turn 的关联标识（`KER-010`）。
+    """一次 turn 的关联标识。
 
     命令处理、模型调用、工具调用、持久化与事件发布共用同一个实例，因此单个 turn
     的执行过程可以按 `turn_id` 完整还原。subagent / 派生 turn 用 `derive()` 生成，

@@ -1,14 +1,14 @@
-"""内建文件工具 `tools_fs` 的验收（开发方案 `D20`）。
+"""内建文件工具 `tools_fs`当前行为。
 
 | 验收项 | 测试 |
 | --- | --- |
 | 通过 `ToolContract` 全部用例（每个工具一次） | `TestFsRead` … `TestFsGrep` |
-| Workspace 逃逸矩阵：符号链接 / `..` / 大小写 / 重解析点（`EDG-405`） | `TestWorkspaceEscape` |
-| 单工具禁用后模型可见列表同步消失（`TOL-006`） | `TestSingleToolDisable` |
-| 空 / 超大 / 二进制 / 损坏编码（`EDG-205`） | `TestContentEdgeCases` |
-| 结果超限截断并置 `truncated=True`（`TOL-003`） | `TestTruncation` |
-| 跨平台行为契约一致（`NFR-605`） | `TestCrossPlatformContract` |
-| 内建以普通 manifest + `setup(api)` 注册（`BAS-005`） | `TestRegistration` |
+| Workspace 逃逸矩阵：符号链接 / `..` / 大小写 / 重解析点 | `TestWorkspaceEscape` |
+| 单工具禁用后模型可见列表同步消失 | `TestSingleToolDisable` |
+| 空 / 超大 / 二进制 / 损坏编码 | `TestContentEdgeCases` |
+| 结果超限截断并置 `truncated=True` | `TestTruncation` |
+| 跨平台行为契约一致 | `TestCrossPlatformContract` |
+| 内建以普通 manifest + `setup(api)` 注册 | `TestRegistration` |
 
 三条写这些用例时的取舍：
 
@@ -94,7 +94,7 @@ def make_workspace(root: Path) -> Path:
     """铺一个有内容的 workspace：两个文本文件 + 一个子目录。"""
     root.mkdir(parents=True, exist_ok=True)
     # 一律 `write_bytes`：`write_text` 在 Windows 上会把 `\n` 翻成 `\r\n`，夹具本身就会
-    # 变成平台相关的，而这套用例要断言的恰好是字节级的跨平台一致（`NFR-605`）。
+    # 变成平台相关的，而这套用例要断言的恰好是字节级的跨平台一致。
     (root / "notes.txt").write_bytes(b"alpha\nbeta\ngamma\n")
     (root / "sub").mkdir(exist_ok=True)
     (root / "sub" / "code.py").write_bytes(b"def go():\n    return 1\n")
@@ -131,7 +131,7 @@ def try_symlink(link: Path, target: Path, *, directory: bool = False) -> None:
 def try_junction(link: Path, target: Path) -> None:
     """建一个 Windows 目录联接（重解析点）。
 
-    技术方案 §8.3 把重解析点单列为一类逃逸面，而 Windows 上创建**符号链接**需要开发者
+    重解析点是一类独立的路径逃逸面，而 Windows 上创建**符号链接**需要开发者
     模式或管理员权限——多数开发机与 CI 上 `try_symlink` 会 skip，那条最该跑的守卫就永远
     没跑过。目录联接不需要提权，走的又是同一条 `resolve()` 判定，因此它是这台机器上
     唯一能真正验到重解析点的途径。
@@ -313,7 +313,7 @@ class TestFsWrite(_FsToolContract):
         assert result.data is not None and result.data["overwritten"] is True
 
     async def test_a_rejected_write_leaves_no_trace(self, tmp_path: Path) -> None:
-        """越界写必须在落盘之前被挡住，`side_effect` 才谈得上如实（`EDG-401`）。"""
+        """越界写必须在落盘之前被挡住，`side_effect` 才谈得上如实。"""
         result = await run(make_tool(WriteTool, tmp_path), "fs.write", path="../x.txt", content="x")
         assert result.ok is False
         assert result.side_effect is SideEffect.NONE
@@ -385,11 +385,11 @@ class TestFsEdit(_FsToolContract):
         assert result.error.code is ErrorCode.PERSISTENCE_READ_FAILED
 
 
-# ------------------------------------------------------------------------ EDG-405
+# ------------------------------------------------------------------------
 
 
 class TestWorkspaceEscape:
-    """逃逸矩阵。这是 `NFR-302` 的唯一防线，因此每一类都单独立一条。"""
+    """逃逸矩阵。这是的唯一防线，因此每一类都单独立一条。"""
 
     def guard(self, root: Path) -> WorkspaceGuard:
         return WorkspaceGuard(root)
@@ -472,7 +472,7 @@ class TestWorkspaceEscape:
     def test_reserved_device_names_are_rejected_on_every_platform(
         self, tmp_path: Path, name: str
     ) -> None:
-        """两个平台一律拒绝——为它开一个平台分支就破坏了 `NFR-605`。"""
+        """两个平台一律拒绝——为它开一个平台分支就破坏了 。"""
         with pytest.raises(KaryviaError) as caught:
             self.guard(tmp_path).resolve(name)
         assert caught.value.code is ErrorCode.INPUT_MALFORMED
@@ -519,7 +519,7 @@ class TestWorkspaceEscape:
         assert "escape.txt" not in result.content
 
 
-# ------------------------------------------------------------------------ EDG-205
+# ------------------------------------------------------------------------
 
 
 class TestContentEdgeCases:
@@ -574,7 +574,7 @@ class TestContentEdgeCases:
         assert result.error.code is ErrorCode.INPUT_TOO_LARGE
 
 
-# ------------------------------------------------------------------------ TOL-003
+# ------------------------------------------------------------------------
 
 
 class TestTruncation:
@@ -615,7 +615,7 @@ class TestTruncation:
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
 
-# ------------------------------------------------------------------------ NFR-605
+# ------------------------------------------------------------------------
 
 
 class TestCrossPlatformContract:
@@ -658,7 +658,7 @@ class TestCrossPlatformContract:
         assert result.error.code is ErrorCode.INPUT_MALFORMED
 
 
-# ------------------------------------------------------------------------ TOL-006
+# ------------------------------------------------------------------------
 
 
 def context_with(**config: JsonValue) -> PluginContext:
@@ -695,6 +695,7 @@ class TestSingleToolDisable:
                 registered.append(spec.name)
 
         setup(RecordingApi())  # type: ignore[arg-type]
+
         assert registered == ["fs.read", "fs.edit", "fs.list", "fs.grep"]
 
     async def test_the_disabled_tool_is_absent_from_the_registry(self, tmp_path: Path) -> None:
@@ -724,7 +725,7 @@ class TestSingleToolDisable:
         assert names == ["fs.grep", "fs.list", "fs.read"]
 
     async def test_forgetting_the_filter_fails_loudly(self, tmp_path: Path) -> None:
-        """声明与注册必须同源。不过滤声明就是「声明了却没注册」，`D16` 会拒绝加载。"""
+        """声明与注册必须同源。不过滤声明就是「声明了却没注册」， 会拒绝加载。"""
         config: dict[str, JsonValue] = {
             CONFIG_WORKSPACE_KEY: str(tmp_path),
             CONFIG_DISABLE_KEY: ["fs.write"],
@@ -745,7 +746,7 @@ class TestSingleToolDisable:
 
 
 class TestRegistration:
-    """内建的落地形态：一份普通 manifest + 一个 `setup(api)`，没有第二条路（`BAS-005`）。"""
+    """内建的落地形态：一份普通 manifest + 一个 `setup(api)`，没有第二条路。"""
 
     def test_the_manifest_is_listed_as_a_builtin(self) -> None:
         assert TOOLS_FS in BUILTIN_MANIFESTS
@@ -813,7 +814,7 @@ class TestRegistration:
         assert caught.value.code is ErrorCode.CONFIG_INVALID
 
     def test_the_workspace_falls_back_to_the_private_state_dir(self, tmp_path: Path) -> None:
-        """没配 workspace 时不该悄悄用进程 cwd（`D23` 必须真的把它填上）。"""
+        """没配 workspace 时不该悄悄用进程 cwd。"""
         settings = resolve_settings(FakePluginContext(state_dir=tmp_path))
         assert settings.workspace == tmp_path
 
@@ -828,6 +829,7 @@ class TestRegistration:
                 del spec, handler
 
         setup(RecordingApi())  # type: ignore[arg-type]
+
         assert not target.exists()
 
 

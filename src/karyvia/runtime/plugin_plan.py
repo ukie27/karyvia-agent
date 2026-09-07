@@ -1,16 +1,16 @@
-"""外部插件的发现编排与加载计划：阶段 A 的产物（技术方案 §7.3 阶段 A）。
+"""外部插件的发现编排与加载计划：加载前校验 的产物。
 
-职责：驱动 `D25` 的发现并把结果发成事件；为 `PluginInventory.discovered` 的每一项补上
-`A5`（`config_schema` 校验）与 `A7`（`state_version` 与磁盘状态一致），再交给
-`kernel.plugins.plan_load_order()` 排出 `A4` 的拓扑序；产出一份有序的 manifest 清单与
+职责：驱动的发现并把结果发成事件；为 `PluginInventory.discovered` 的每一项补上
+`config_schema` 校验与 `state_version` 一致性检查，再交给
+`kernel.plugins.plan_load_order()` 排出依赖拓扑序；产出一份有序的 manifest 清单与
 失败清单，以及一份**修正过的**（落榜项已从 `discovered` 移进 `failures`）诊断清单。
-不负责：读 manifest 与判 id / 平台 / `sdk_range`（`D25` 的 `inventory.py`）、跑 `setup`
+不负责：读 manifest 与判 id / 平台 / `sdk_range`、跑 `setup`
 与注册（`wiring.py` → `kernel.plugins.load_into`，外部与内建同一条路）
 （`bootstrap.approve()` 是唯一调用点）。
 
 **这是 `R5` 的落点**，与 `inventory.py` / `wiring.py` / `plugin_context.py` 同一条理由：
 `PluginManifest` 在 `sdk/`，而 `R2` 禁止 `kernel/` import 它，因此「manifest → `PlanNode`」
-的翻译只能发生在唯一同时看得见两侧的这一层。分界线与 `D25` 完全相同：**加一种排序或
+的翻译只能发生在唯一同时看得见两侧的这一层。分界线与  完全相同：**加一种排序或
 校验机制改 `kernel/plugins/loader.py`，加一条 manifest 判定改这里。**
 
 **配置块由调用方交进来**（`config_for`），本模块不认识 `builtin_config_blocks()`：
@@ -51,7 +51,7 @@ __all__ = [
 
 @dataclass(frozen=True, slots=True)
 class ExternalPlan:
-    """阶段 A 对外部插件的完整结论。
+    """加载前校验 对外部插件的完整结论。
 
     `manifests` 已按拓扑序排好，可直接接到 `wire_capabilities(manifests=...)` 上；
     `failures` 与 `PluginInventory.failures` 同形，因此能被 `/plugins` 一视同仁地列出来
@@ -69,10 +69,10 @@ def discover_plugins(
     *,
     entry_points: EntryPointLister = lambda: (),
 ) -> PluginInventory:
-    """§10.1 步骤 3b：发现外部插件并把结果发成事件（`D25`）。
+    """§10.1 步骤 3b：发现外部插件并把结果发成事件。
 
     **发现不导入未启用的插件**：`plugins.enabled` 之外的候选连 manifest 都不会被读，
-    因此未启用的插件不产生任何导入开销（`NFR-401`、`DST-002`）。
+    因此未启用的插件不产生任何导入开销。
 
     候选只来自全局安装目录。实例配置只决定是否启用，不再承担代码发现与安装职责。
     """
@@ -109,13 +109,13 @@ def plan_plugins(
     state_dir_for: Callable[[str], Path],
     provided: Iterable[str] = (),
 ) -> tuple[ExternalPlan, PluginInventory]:
-    """§10.1 步骤 3c：跑阶段 A 的剩余三步，把结果发成事件（`D27`）。
+    """§10.1 步骤 3c：跑加载前校验 的剩余三步，把结果发成事件。
 
-    交回的第二项是**修正过的**清单：阶段 A 落榜的插件从 `discovered` 移到 `failures`，
+    交回的第二项是**修正过的**清单：加载前校验 落榜的插件从 `discovered` 移到 `failures`，
     因此 `/plugins` 印出来的「已发现」与真的会被加载的那一批一致——一个配置写错的插件
     显示成 `DISCOVERED` 会让用户以为它在跑。
 
-    **异常约定**：阶段 A 失败发成事件并记进清单，实例继续装配其余插件。
+    **异常约定**：加载前校验 失败发成事件并记进清单，实例继续装配其余插件。
     """
     plan = plan_external_plugins(
         inventory.discovered,
@@ -133,9 +133,9 @@ def plan_plugins(
 
 
 def correct_inventory(inventory: PluginInventory, plan: ExternalPlan) -> PluginInventory:
-    """把阶段 A 落榜的插件从 `discovered` 移进 `failures`。
+    """把加载前校验 落榜的插件从 `discovered` 移进 `failures`。
 
-    单独成函数是因为它有**两个**调用方：`plan_plugins()`（启动路径）与 `D29` 的
+    单独成函数是因为它有**两个**调用方：`plan_plugins`（启动路径）与的
     `runtime/inspect.py`（只读诊断路径）。
     两处各写一遍会让「已发现 = 真的会被加载的那一批」在其中一处慢慢失真。
     """
@@ -154,7 +154,7 @@ def plan_external_plugins(
     state_dir_for: Callable[[str], Path],
     provided: Iterable[str] = (),
 ) -> ExternalPlan:
-    """跑完阶段 A 的剩余三步，产出有序加载计划。
+    """跑完加载前校验 的剩余三步，产出有序加载计划。
 
     `config_for` 交出的是这个插件**最终**看到的配置块（派生默认值 + 用户写的那份），
     与 `setup()` 拿到的必须是同一份——校验一份、执行另一份等于没校验。

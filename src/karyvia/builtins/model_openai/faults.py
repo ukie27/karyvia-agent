@@ -1,4 +1,4 @@
-"""HTTP 状态码与 httpx 异常到 `KaryviaError` 的映射（`MOD-003`）。
+"""HTTP 状态码与 httpx 异常到 `KaryviaError` 的映射。
 
 职责：把「限流、超时、认证失败、上下文超限」等外部故障折成可分类、`retryable` 标注如实的
 `KaryviaError`；解析退避提示。
@@ -11,7 +11,7 @@
   好，而两者都是 429。靠供应商的 `error.code` 区分，未知 code 默认**可**重试——那是对
   用户更友好的一侧，且限速远比欠费常见。
 - **`detail` 不放 `error.message`。** 那段自由文本会回显用户的 prompt，也可能带着被原样
-  echo 回来的凭据。只放状态码与 `error.type` / `error.code`——先例是 `D13` 的「命令
+  echo 回来的凭据。只放状态码与 `error.type` / `error.code`——先例是的「命令
   handler 异常只留类型名不留消息」。`redact()` 是最后一道防线，不是把明文放进去的理由。
 """
 

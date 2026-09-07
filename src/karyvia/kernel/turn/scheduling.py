@@ -1,17 +1,16 @@
-"""工具调度：批次划分与批内并发执行（技术方案 §6.2，需求 `TOL-004`）。
+"""工具调度：批次划分与批内并发执行。
 
 职责：把一次响应的 `ToolCall` 序列按 `ToolSpec.concurrency` 切成批次，并按批执行，
 按**完成顺序**产出 `(ToolCall, ToolResult)`。
 不负责：构造 `ToolInvocation`、调用 Hook、截断结果、判预算、处理取消——全部在 `engine.py`
 的 `run_one` 回调里；本模块不认识 `CancelToken`，也不含 IO。
 
-**批次规则**（旧实现同一结论的新口径）：连续的 `Concurrency.PARALLEL` 调用合成一批并发执行；
+**批次规则**：连续的 `Concurrency.PARALLEL` 调用合成一批并发执行；
 `Concurrency.EXCLUSIVE` 与**未知工具**各自单独成批，充当屏障。因此工具之间的相对顺序永远被
 保留，`[a(P), b(P), c(E), d(P)]` 得到 `[[a, b], [c], [d]]`。
 
-⚠️ **与旧实现的口径差异**：旧实现按 `concurrency_safe`（≈ 只读且非独占）合批，新层按
-`ToolSpec.concurrency is PARALLEL`——而 `concurrency` 的默认值是 `PARALLEL`、`risk` 的默认值是
-`MUTATING`。**一个会写的工具如果忘了声明 `EXCLUSIVE`，新层会并发执行它，旧层不会。**
+调度只认 `ToolSpec.concurrency is PARALLEL`；`concurrency` 的默认值是 `PARALLEL`，而
+`risk` 的默认值是 `MUTATING`。**一个会写的工具如果忘了声明 `EXCLUSIVE`，就会被并发执行。**
 写内建工具与插件工具时，具有写入或进程副作用的一律要显式给出 `concurrency`。
 """
 

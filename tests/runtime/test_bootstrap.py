@@ -1,7 +1,7 @@
-"""`D23` 装配根：`bootstrap()` 的十步、必需能力校验与 `AgentInstance` 的生命周期。
+""" 装配根：`bootstrap` 的十步、必需能力校验与 `AgentInstance` 的生命周期。
 
 职责：验装配链本身——配置块怎么交到内建手上、`keep` 与 `setup()` 是否同源、必需能力
-缺失时是不是显式失败、`EDG-108` 的两条守卫、Channel 泵是否真的把 CLI 输入送进 turn、
+缺失时是不是显式失败、 的两条守卫、Channel 泵是否真的把 CLI 输入送进 turn、
 停止时锁是否释放。
 不负责：验单个内建的行为（`tests/builtins/`）、验 kernel 各机制（`tests/kernel/`）。
 
@@ -114,7 +114,7 @@ async def test_a_builtin_setup_failure_keeps_its_precise_error(tmp_path: Path) -
 
 
 async def test_a_broken_config_is_written_to_the_logs(tmp_path: Path) -> None:
-    """`EDG-501` 的后半句。这是 `write_config_error()` 唯一的调用点。"""
+    """ 的后半句。这是 `write_config_error` 唯一的调用点。"""
     tmp_path.mkdir(parents=True, exist_ok=True)
     (tmp_path / "config.json").write_text('{"turn": {"max_iterations": -1}}', encoding="utf-8")
     with pytest.raises(KaryviaError) as caught:
@@ -127,7 +127,7 @@ async def test_a_broken_config_is_written_to_the_logs(tmp_path: Path) -> None:
 
 
 async def test_the_original_config_file_is_never_rewritten(tmp_path: Path) -> None:
-    """`EDG-501` 的前半句：拒绝启动，且原文件一个字节都不改。"""
+    """ 的前半句：拒绝启动，且原文件一个字节都不改。"""
     tmp_path.mkdir(parents=True, exist_ok=True)
     raw = '{"turn": {"max_iterations": -1}}'
     (tmp_path / "config.json").write_text(raw, encoding="utf-8")
@@ -136,11 +136,12 @@ async def test_the_original_config_file_is_never_rewritten(tmp_path: Path) -> No
     assert (tmp_path / "config.json").read_text(encoding="utf-8") == raw
 
 
-# ------------------------------------------------------------------ 步骤 3：清单与 EDG-108
+  # ------------------------------------------------------------------ 步骤 3：清单与
+
 
 
 async def test_disabling_the_cli_entry_is_rejected(tmp_path: Path) -> None:
-    """`EDG-108`：配置试图禁用 CLI 入口时显式拒绝并说明原因。"""
+    """配置试图禁用 CLI 入口时显式拒绝并说明原因。"""
     write_config(tmp_path, plugins={"disable": ["cli-entry"]})
     with pytest.raises(KaryviaError) as caught:
         await _boot(tmp_path)
@@ -219,7 +220,7 @@ async def test_user_config_beats_the_derived_default(tmp_path: Path) -> None:
 async def test_disabling_one_tool_filters_both_the_declaration_and_the_registration(
     tmp_path: Path,
 ) -> None:
-    """`TOL-006`：`keep` 与 `setup()` 同源于同一份配置，否则 `finish()` 会当场报错。"""
+    """`keep` 与 `setup` 同源于同一份配置，否则 `finish` 会当场报错。"""
     write_config(tmp_path, plugins={"tools-fs": {"config": {"disable": ["fs.write", "fs.edit"]}}})
     instance = await _boot(tmp_path)
     try:
@@ -246,7 +247,7 @@ async def test_disabling_one_command_keeps_the_rest(tmp_path: Path) -> None:
 
 
 async def test_a_secret_reference_reaches_the_plugin(tmp_path: Path) -> None:
-    """`plugins.<id>.secrets` → `ctx.secret()` → `${VAR}`，明文不进配置文档（`CFG-003`）。"""
+    """`plugins.<id>.secrets` → `ctx.secret` → `${VAR}`，明文不进配置文档。"""
     write_config(
         tmp_path,
         plugins={"tools-fs": {"secrets": {"api_key": "${NM_TEST_TOKEN}"}}},
@@ -284,7 +285,7 @@ async def test_missing_required_capabilities_fail_the_start(
 
 
 async def test_a_missing_model_name_names_the_field(tmp_path: Path) -> None:
-    """「缺什么、去哪儿补」是启动错误的全部价值（`BAS-006` 的前身）。"""
+    """「缺什么、去哪儿补」是启动错误的全部价值（前身）。"""
     write_config(tmp_path, model={"provider": "fake"})
     with pytest.raises(KaryviaError) as caught:
         await _boot(tmp_path)
@@ -293,7 +294,7 @@ async def test_a_missing_model_name_names_the_field(tmp_path: Path) -> None:
 
 
 async def test_a_failing_cli_override_falls_back_to_the_builtin(tmp_path: Path) -> None:
-    """`EDG-108`/`BAS-010`：覆盖 CLI 的提供方没交出实现时强制回落，实例仍然有入口。"""
+    """/：覆盖 CLI 的提供方没交出实现时强制回落，实例仍然有入口。"""
     broken = PluginManifest(
         id="cli-broken",
         version="0.1.0",
@@ -468,7 +469,7 @@ def setup_optional_failure(api: KaryviaAPI) -> None:
 
 
 async def test_the_startup_sequence_is_traceable_through_events(tmp_path: Path) -> None:
-    """开发方案的验收：十步可通过事件序列逐步追踪。"""
+    """启动过程可通过事件序列逐步追踪。"""
     write_config(tmp_path)
     instance = await _boot(tmp_path)
     try:
@@ -481,7 +482,7 @@ async def test_the_startup_sequence_is_traceable_through_events(tmp_path: Path) 
     finally:
         await instance.stop()
     names = [event.name for event in instance.diagnostics.events.events()]
-    # `D28`：停止序列夹在两条实例事件之间——每个提供方停下来时各发一条
+    # ：停止序列夹在两条实例事件之间——每个提供方停下来时各发一条
     # `plugin.deactivated`，因此这里断言的是首尾与包含关系，不是末两条。
     stopping = names.index(EventName.INSTANCE_STOPPING)
     assert names[-1] is EventName.INSTANCE_STOPPED
@@ -489,7 +490,7 @@ async def test_the_startup_sequence_is_traceable_through_events(tmp_path: Path) 
 
 
 async def test_external_plugin_discovery_reaches_the_diagnostics(tmp_path: Path) -> None:
-    """`D25`：`plugins.enabled` 不是一个没人读的键——`/plugins` 列得出候选与原因。"""
+    """`plugins.enabled` 不是一个没人读的键——`/plugins` 列得出候选与原因。"""
     source = tmp_path / "ext"
     package = source / "acme"
     package.mkdir(parents=True)
@@ -508,14 +509,14 @@ async def test_external_plugin_discovery_reaches_the_diagnostics(tmp_path: Path)
         assert status.plugin_id == "acme"
         assert status.version == "2.0.0"
         assert status.capabilities == ("tool:acme.ping",)
-        # **发现不是加载**：`setup` 指向一个根本不存在的模块，实例照样起来了（`D27`）。
+        # **发现不是加载**：`setup` 指向一个根本不存在的模块，实例照样起来了。
         assert "acme.ping" not in [spec.name for spec in instance.deps.tool_specs]
     finally:
         await instance.stop()
 
 
 async def test_a_cli_turn_goes_through_the_channel_pump(tmp_path: Path) -> None:
-    """`MSG-007`：CLI 的输入是一条真的 `InboundMessage`，出站经同一条 `deliver` 回来。"""
+    """CLI 的输入是一条真的 `InboundMessage`，出站经同一条 `deliver` 回来。"""
     write_config(tmp_path)
     instance = await _boot(tmp_path)
     try:
@@ -530,7 +531,7 @@ async def test_a_cli_turn_goes_through_the_channel_pump(tmp_path: Path) -> None:
 
 
 async def test_history_lands_in_the_instance_sessions_directory(tmp_path: Path) -> None:
-    """`D17` 点名的那个坑：没把 `dir` 交下去，会话会写进插件私有目录。"""
+    """ 点名的那个坑：没把 `dir` 交下去，会话会写进插件私有目录。"""
     write_config(tmp_path)
     instance = await _boot(tmp_path)
     try:
@@ -558,7 +559,7 @@ def test_the_fake_model_manifest_keeps_the_real_shape() -> None:
     assert FAKE_MODEL_ID == "fake-model"
 
 
-# ------------------------------------------- 步骤 8 的第三项：长期记忆的召回（`D44`）
+# ------------------------------------------- 步骤 8 的第三项：长期记忆的召回
 
 
 async def test_no_memory_section_means_no_recall_at_all(tmp_path: Path) -> None:
@@ -575,7 +576,7 @@ async def test_no_memory_section_means_no_recall_at_all(tmp_path: Path) -> None:
 
 
 async def test_a_named_memory_backend_is_wired_into_the_orchestrator(tmp_path: Path) -> None:
-    """`D39` 留下的缺口在这里合上：注册一条 `MEMORY`、在配置里点名，它就真的接上了。
+    """ 留下的缺口在这里合上：注册一条 `MEMORY`、在配置里点名，它就真的接上了。
 
     这条断言的是**装配**；「记忆真的进了模型消息」在
     `tests/kernel/test_memory_recall.py` 里验（那一层看得见组装结果）。

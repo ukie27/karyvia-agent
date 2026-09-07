@@ -1,4 +1,4 @@
-"""可观测性：事件总线、脱敏与序列化、内建 sink、诊断查询（技术方案 §6.8）。
+"""可观测性：事件总线、脱敏与序列化、内建 sink、诊断查询。
 
 职责：re-export `redaction` / `bus` / `sinks` / `diagnostics` 四个模块的公开表面，
 使调用方只需要 `from karyvia.kernel.observability import ...` 一条导入路径。
@@ -7,7 +7,7 @@
 
 四个模块的分工是单向的：`bus` 用 `redaction`，`sinks` 用 `redaction`，
 `diagnostics` 用 `sinks`，反过来都不成立。Bus 不认识任何 sink——内建的两个 sink 也只是
-普通订阅者，这正是「Bus 只做扇出」（`OBS-005`）的可检验形态。
+普通订阅者，这正是「Bus 只做扇出」的可检验形态。
 """
 
 from __future__ import annotations

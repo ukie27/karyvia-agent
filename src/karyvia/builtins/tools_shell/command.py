@@ -1,9 +1,9 @@
-"""跨平台命令构造：命令串的形状校验与 POSIX argv（`EDG-404`、`NFR-605`）。
+"""跨平台命令构造：命令串的形状校验与 POSIX argv。
 
 职责：校验命令串的形状，并在 POSIX 上拼出 `<shell> -c <command>` 的 argv。
 不负责：执行与平台分派（`process.py`）、环境变量（`environ.py`）、cwd 判定（`paths.py`）。
 
-**两个平台的启动方式不同，但对外行为契约一致**（技术方案 §8.3）：同样的 `command` 参数
+**两个平台的启动方式不同，但对外行为契约一致**：同样的 `command` 参数
 产生同样的退出码语义、同样的输出截断规则、同样的超时行为。差别在于——
 
 - **POSIX**：`create_subprocess_exec(<shell>, "-c", <command>)`。shell 可配置。
@@ -24,7 +24,7 @@ PowerShell，只会让模型按 sh 语法写的命令以另一种方式失败。
 **不做命令内容的安全过滤**。legacy 的 `_guard_command` 维护了一张 `rm -rf` 之类的模式
 黑名单，本内建刻意不移植：模型能写出的绕过形式是无穷的（换行、变量展开、base64 管道），
 而一张挡不住的黑名单会让人以为挡住了。真正的边界是 workspace（cwd 限定）与
-`TOL-004` 的确认策略——`shell.exec` 因此是
+ 的确认策略——`shell.exec` 因此是
 `DESTRUCTIVE` + `EXCLUSIVE`。
 """
 

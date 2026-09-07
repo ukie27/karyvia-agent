@@ -1,4 +1,4 @@
-"""`web` 插件的端到端用例（开发方案 `D36`）：两件工具在**真实装配的实例**上跑一次 turn。
+"""`web` 插件的端到端用例：两件工具在**真实装配的实例**上跑一次 turn。
 
 职责：验「装上 web 插件之后，模型真的能搜、真的能抓，而抓的那一下真的过了 SSRF 守卫」。
 不负责：插件自身的线格式与纯函数（`plugins/karyvia-plugin-web/tests/`）、
@@ -13,7 +13,7 @@
 **`web.fetch` 打不到公网，这是刻意的。** `conftest.py` 的网络闸门只放行回环，而
 `GuardedHttpAccess` 恰恰**拒绝**回环——两条规则合起来意味着这套用例里没有任何地址是
 「既解析得到又允许访问」的。于是这里验的是那条真正值得验的路：**模型给一个内网地址，
-守卫把它挡下来，而实例照常继续**（`EDG-406`）。搜索那一侧不受影响：它直接用 httpx，
+守卫把它挡下来，而实例照常继续**。搜索那一侧不受影响：它直接用 httpx，
 被 `recorder` 换掉的传输层根本不做名字解析。
 """
 
@@ -155,7 +155,7 @@ async def test_the_model_can_search_and_gets_urls_back(
 async def test_a_private_address_is_refused_by_the_real_guard(
     instance_dir: Path, recorder: Recorder, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`EDG-406`：模型给一个内网地址，`ctx.net` 的守卫把它挡下来。
+    """模型给一个内网地址，`ctx.net` 的守卫把它挡下来。
 
     这是本插件走 `ctx.net` 而不是自建守卫的全部理由——判定在
     `runtime/access/net.py`，这里验的是那条路真的被走到了。**实例照常继续**：
@@ -200,7 +200,7 @@ async def test_a_missing_search_credential_does_not_take_fetch_down(
 async def test_neither_tool_is_registered_when_the_plugin_is_not_enabled(
     instance_dir: Path, tool: str
 ) -> None:
-    """`DST-002`：装上不等于启用。"""
+    """装上不等于启用。"""
     write_config(instance_dir, {})
 
     report = (await inspect_capabilities(instance_dir=instance_dir)).report

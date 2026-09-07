@@ -1,8 +1,8 @@
-"""首次运行的最小配置模板（`D24`，`EDG-506`、`BAS-006`）。
+"""首次运行的最小配置模板。
 
 职责：把「一份刚好能跑起来的 `config.json` 长什么样」组装成一个已自校验的文档 +
 它的 JSON 文本 + 它需要哪些环境变量（`${VAR}` 引用）。
-不负责：写盘（`runtime/first_run.py`——`kernel/config/` 全包一个字节都不写，`EDG-501`）、
+不负责：写盘（`runtime/first_run.py`——`kernel/config/` 全包一个字节都不写）、
 决定用哪个模型供应商（那是装配根的事，见下）、派生 JSON Schema（`json_schema.py`）。
 
 **本模块不认识任何具体内建**。模板需要一个模型名与一份 `plugins.<id>.secrets`，但
@@ -50,12 +50,11 @@ def render_json(document: Mapping[str, JsonValue]) -> str:
 class InitialConfig:
     """一份待写入的初始配置。构造它不碰磁盘，也不读环境变量。"""
 
-    #: 文档本体。持有 `${VAR}` **字面量**，明文自始至终不在这里（`CFG-003`）。
+    #: 文档本体。持有 `${VAR}` **字面量**，明文自始至终不在这里。
     document: Mapping[str, JsonValue]
     #: 要写进 `config.json` 的文本。
     text: str
-    #: 需要用户导出的环境变量名，按出现顺序去重。指引就是照它印的（`EDG-502`：
-    #: 只说变量名，不说值——这里根本没有值可说）。
+    #: 需要用户导出的环境变量名，按出现顺序去重。指引就是照它印的。
     required_env: tuple[str, ...]
 
 
@@ -69,7 +68,7 @@ def build_initial_config(
     """组装最小配置。
 
     `plugin_secrets` 形如 `{"model-openai": {"api_key": "${OPENAI_API_KEY}"}}`，落进
-    `plugins.<id>.secrets`——**不是** `plugins.<id>.config`（`D19`/`D23` 定死的分界：
+    `plugins.<id>.secrets`——**不是** `plugins.<id>.config`（/ 定死的分界：
     凭据是 `config` 的兄弟键，因此插件自己的配置块里没有可泄漏的东西）。
 
     `schema_ref` 给 `None` 即不写 `$schema`（`karyvia init` 之外的调用方不必接受那个文件）。

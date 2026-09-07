@@ -1,8 +1,8 @@
-"""`ToolExecutor` 的行为测试（`D14` 验收：§10.2 第 10 步、`EDG-407`、`EDG-104`）。
+"""`ToolExecutor` 的行为测试。
 
 | 组 | 验收内容 |
 | --- | --- |
-| A 准备 | 只读工具带幂等键（`EDG-402`） |
+| A 准备 | 只读工具带幂等键 |
 | B 校验 | 参数不合 schema → `ok=False` 且 `side_effect=NONE`，约定不抛 |
 | C 执行 | 正常返回原样交回；handler 逸出的异常折成 `UNKNOWN` |
 | D 宽限期 | 超时后请求取消并等宽限期；仍不回来 → `TIMEOUT_TOOL_CANCEL` + 孤儿登记 |
@@ -259,6 +259,7 @@ def test_tools_from_reads_registered_tools() -> None:
             CapabilityKind.TOOL,
             "fs.read",
             RegisteredTool(spec=spec(), handler=FakeToolHandler()),  # type: ignore[arg-type]
+
         )
     registry.freeze(registry.registrations)
 
@@ -294,6 +295,7 @@ async def test_tools_from_output_plugs_straight_into_the_executor() -> None:
             CapabilityKind.TOOL,
             "fs.read",
             RegisteredTool(spec=spec(), handler=FakeToolHandler()),  # type: ignore[arg-type]
+
         )
     registry.freeze(registry.registrations)
 

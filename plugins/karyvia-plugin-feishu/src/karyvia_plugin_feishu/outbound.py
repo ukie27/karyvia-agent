@@ -1,4 +1,4 @@
-"""契约 `OutboundMessage` → 飞书消息体（`MSG-003`、`MSG-005`、`EDG-304`，开发方案 `D34`）。
+"""契约 `OutboundMessage` → 飞书消息体。
 
 职责：**三选一的格式判定**、markdown → post 体、终态标记、超长回落分块。纯函数，零 IO。
 不负责：卡片元素构建（`cards.py`）、流式时机（`stream.py`）、真的发出去（`client.py`）。
@@ -58,7 +58,7 @@ POST_MAX_LEN: Final = 2000
 #: 留出卡片 JSON 的开销余量（legacy 原值）。
 FALLBACK_CHUNK_LEN: Final = 3500
 
-#: 非完整答案的标记（`EDG-304`）。与 `builtins/cli_entry/console.py` 的同名表逐字相同。
+#: 非完整答案的标记。与 `builtins/cli_entry/console.py` 的同名表逐字相同。
 TERMINAL_MARKERS: Final[Mapping[StreamState, str]] = {
     StreamState.CANCELLED: "[已中断：以上是中断前已产生的内容]",
     StreamState.FAILED: "[本轮失败]",
@@ -159,7 +159,7 @@ def attachment_lines(attachments: Sequence[AttachmentRef]) -> list[str]:
 def compose_body(content: str, attachments: Sequence[AttachmentRef], state: StreamState) -> str:
     """正文 + 附件行 + 终态标记，拼成最终要发的那段文本。
 
-    **标记与正文在同一段里**（`EDG-304`）：分开发会让被中断的半截答案孤零零留在上面，
+    **标记与正文在同一段里**：分开发会让被中断的半截答案孤零零留在上面，
     看起来像一个完整回答。
     """
     parts = [content] if content else []

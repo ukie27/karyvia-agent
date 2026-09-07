@@ -6,7 +6,7 @@
 **为什么工具与自动召回都要有。** 自动召回解决「模型想不起来去查」，工具解决「模型知道
 这件事值得记下来」——写入没有自动的路径可走，而参考实现里那条自动路径（Dream：定时
 让 LLM 读历史、增量改写长期记忆文件）在今天的机制下做不出来：`PluginContext` 没有发起
-模型调用的通道，定时触发要等 `D40`。这条如实写在 README 里。
+模型调用的通道，定时触发要等 。这条如实写在 README 里。
 
 **`SessionKey` 从 `invocation.correlation.session_key` 来。** 这是工具侧唯一的身份来源，
 也是这三条工具能服务 `session` / `workspace` 范围、而契约门面
@@ -63,7 +63,7 @@ REMEMBER_TOOL: Final = "memory.remember"
 RECALL_TOOL: Final = "memory.recall"
 FORGET_TOOL: Final = "memory.forget"
 
-#: 三条工具的名字。manifest 的声明与 `register()` 的注册都从这一份来——`D16` 的
+#: 三条工具的名字。manifest 的声明与 `register` 的注册都从这一份来—— 的
 #: 「声明 ⊆ 注册」在外部插件这里是严格相等，两处各写一遍迟早分叉。
 TOOL_NAMES: Final[tuple[str, ...]] = (REMEMBER_TOOL, RECALL_TOOL, FORGET_TOOL)
 
@@ -202,7 +202,7 @@ class _Tool:
                 side_effect=SideEffect.NONE,
                 error=error,
                 duration_ms=_elapsed_ms(started),
-                # 失败正文是本层自己写的文案，不含外部内容（`D42`）。
+                # 失败正文是本层自己写的文案，不含外部内容。
                 trust=TrustLevel.SYSTEM,
             )
         text, cut = _truncate(content, self._limit)
@@ -220,7 +220,7 @@ class _Tool:
     #: 成功时的副作用档位。只读工具是 `NONE`，写入与删除是 `OCCURRED`。
     side_effect: SideEffect = SideEffect.NONE
 
-    #: 成功时正文的可信度（`D42`）。默认不可信——`memory.recall` 交出的是**存进来的
+    #: 成功时正文的可信度。默认不可信——`memory.recall` 交出的是**存进来的
     #: 记录本身**，而写入侧统一按 `UNTRUSTED` 收（`record.from_fragment` 忽略调用方
     #: 声明的 trust），召回时改口说它可信就把那条判定作废了。两条写类工具的回执是自己
     #: 的话，各自声明 `SYSTEM`。

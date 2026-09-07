@@ -1,4 +1,4 @@
-"""Hook 调度：观察者并发隔离、拦截器顺序累积（技术方案 §6.6）。
+"""Hook 调度：观察者并发隔离、拦截器顺序累积。
 
 职责：把一组 `HookBinding` 归并成 `deps.HookDispatcher` 要的那**一个** `HookOutcome`——
 观察者并发执行、整批超时、失败一律隔离；拦截器按 `(priority, provider, name)` 顺序执行、
@@ -15,7 +15,7 @@
 观察者与拦截器的异常都被隔离并上报。拦截器只有返回合法的 `REJECT` / `BLOCK` 才能改变
 turn 结果，插件自身故障不能中断 turn。
 
-**顺序是 `(priority, provider, name)` 而不是注册顺序**（`CTX-002`）。前两项是 §6.6 的原文，
+**顺序是 `(priority, provider, name)` 而不是注册顺序**。前两项是 §6.6 的原文，
 末尾补 `name` 是因为同一个插件可以注册多个同优先级的 Hook——少了它，报告与行为都会随
 字典插入顺序漂移，`test_interceptor_order_is_deterministic` 也就断言不了什么。
 """
@@ -112,7 +112,7 @@ class HookBinding:
 
     @property
     def ref(self) -> CapabilityRef:
-        """诊断用的能力标识，挂到 `KaryviaError.capability` 上（`PLG-006`）。"""
+        """诊断用的能力标识，挂到 `KaryviaError.capability` 上。"""
         return CapabilityRef(kind=CapabilityKind.HOOK, name=self.name, provider=self.provider)
 
 
@@ -292,7 +292,7 @@ class HookRouter:
         """把 handler 逸出的异常折成一条可上报的错误。
 
         异常**消息**不进 detail，只留类型名：第三方 handler 的异常文本可能带着凭据
-        （`D13` 的 dispatcher 同一条规则，那里有哨兵测试）。
+        。
         """
         if isinstance(error, KaryviaError):
             return error

@@ -1,4 +1,4 @@
-"""插件 manifest：声明式的数据与校验（技术方案 §7.2，需求 `PLG-001`、`SDK-005`、`CMP-001`）。
+"""插件 manifest：声明式的数据与校验。
 
 职责：定义 `CapabilityDecl` / `PluginManifest` 两个数据类型及其校验
 规则，并提供把外部数据（`plugin.toml`、entry point 模块里的字面量）解析为 manifest 的
@@ -6,8 +6,8 @@
 不负责：发现插件、导入 `setup`、解析依赖拓扑；本模块不读文件、
 不访问网络、不碰全局状态。
 
-**导入本模块必须无副作用且廉价**（§7.2 硬约束）。阶段 A 校验要保持在毫秒级
-（`NFR-401`、`NFR-403`），所以这里只有类型定义与纯函数，没有任何 import 时执行的逻辑。
+**导入本模块必须无副作用且廉价**（§7.2 硬约束）。加载前校验 校验要保持在毫秒级
+，所以这里只有类型定义与纯函数，没有任何 import 时执行的逻辑。
 
 错误面刻意收窄成一种异常：
 
@@ -15,7 +15,7 @@
   截获 `ValueError` / `AssertionError`，其他异常原样穿透，这一点是有意利用的。
 - 结构错误（缺字段、类型不符、多余字段）由 pydantic 报 `ValidationError`；从外部数据
   进来的路径一律走 `parse_manifest()`，它把 `ValidationError` 转成带**字段路径**的
-  `KaryviaError(PLUGIN_MANIFEST_UNSUPPORTED)`。`CMP-001` 要的就是「列出字段路径而不是
+  `KaryviaError(PLUGIN_MANIFEST_UNSUPPORTED)`。 要的就是「列出字段路径而不是
   兜底猜测」。
 """
 
@@ -105,7 +105,7 @@ def _at_field(field: str) -> Generator[None, None, None]:
     `CapabilityRef`、`Plugin`、`parse_capability_target` 报的是 `INPUT_MALFORMED` 且只
     知道自己那个值，不知道它在 manifest 里叫什么。不转换的话，「manifest 校验失败一律是
     `PLUGIN_MANIFEST_UNSUPPORTED` 且带字段路径」这条承诺就有三个漏洞，而调用方要为它们
-    单独写分支（`CMP-001`）。原始 detail 挂在 `cause` 下，定位信息不丢。
+    单独写分支。原始 detail 挂在 `cause` 下，定位信息不丢。
     """
     try:
         yield
@@ -173,7 +173,7 @@ class CapabilityDecl(BaseModel):
     """一项能力声明（§7.2）。
 
     `kind` + `name` 定位能力，`overrides` 是**唯一**的覆盖来源——覆盖永不由加载顺序
-    决定（`EDG-102`）。`priority` 只对 MULTI 类能力（CONTEXT / HOOK）有意义，其余 kind
+    决定。`priority` 只对 MULTI 类能力（CONTEXT / HOOK）有意义，其余 kind
     的排序由 arity 语义决定，填了也不会被用来打破唯一性。
 
     **`namespace=True` 时 `name` 是前缀而不是能力名**：本条声明放行提供方注册
@@ -186,7 +186,7 @@ class CapabilityDecl(BaseModel):
     namespace 将这一机制推广到运行时才能获知名称的 MULTI_UNIQUE 能力。
 
     两条限制（`_check_namespace`）：只允许 arity 为 MULTI_UNIQUE 的 kind，且不得同时声明
-    `overrides`——一个前缀覆盖不到一个具体目标，`EDG-102` 的判定会无从进行。
+    `overrides`——一个前缀覆盖不到一个具体目标， 的判定会无从进行。
     """
 
     model_config = MANIFEST_MODEL_CONFIG
@@ -252,7 +252,7 @@ class CapabilityDecl(BaseModel):
 
         **不得与 `overrides` 并存**：`overrides` 指向一个具体的 `(提供方, 能力名)`，
         而一条声明能注册出任意多个名字——哪一个才是覆盖者无从判定，而静默挑一个正是
-        `EDG-102`「覆盖永不由加载顺序决定」要堵的路。
+        「覆盖永不由加载顺序决定」要堵的路。
         """
         if not self.namespace:
             return self
@@ -436,7 +436,7 @@ class PluginManifest(BaseModel):
 
     @property
     def sdk_compatible(self) -> bool:
-        """当前 SDK 是否落在 `sdk_range` 内（`SDK-005`）。不兼容即拒绝加载。"""
+        """当前 SDK 是否落在 `sdk_range` 内。不兼容即拒绝加载。"""
         return is_compatible(self.sdk_range)
 
     def matches_platform(self, platform: str | None = None) -> bool:
@@ -459,7 +459,7 @@ def parse_manifest(data: Mapping[str, object], *, origin: str) -> PluginManifest
     直接 `PluginManifest(...)` 也能用（插件作者在自己的模块里就该那样写），但那条路径
     上的结构错误是 pydantic 的 `ValidationError`。外部数据走本函数，调用方只需要处理
     `KaryviaError`：`detail.errors` 是 `[{"field": ..., "message": ...}]`，
-    `detail.origin` 说明这份数据来自哪个文件或 entry point（`CMP-001`）。
+    `detail.origin` 说明这份数据来自哪个文件或 entry point。
     """
     try:
         return PluginManifest.model_validate(dict(data))

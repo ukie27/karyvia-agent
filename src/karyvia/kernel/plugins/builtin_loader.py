@@ -1,4 +1,4 @@
-"""静态清单 bootstrap：把一批 `LoadRequest` 跑成注册（技术方案 §7.3 阶段 B）。
+"""静态清单 bootstrap：把一批 `LoadRequest` 跑成注册。
 
 职责：按顺序对每个请求开批次、调用方给的 Host 跑 `setup`、核对声明、提交或回滚；
 依赖在 setup 阶段失败时跳过其依赖者，并如实报告每个提供方的结果。
@@ -11,14 +11,14 @@
 模块做成一个**对 `LoadRequest` 泛化的 setup 运行器**，manifest 的翻译留给
 `runtime/wiring.py`。因此内建和外部插件共用同一个 setup 运行器，而不是各维护一份注册实现。
 
-**零请求是一等路径**（`PLG-007`、`EDG-101`）：未启用可选插件时仍应正常装配。因此
+**零请求是一等路径**：未启用可选插件时仍应正常装配。因此
 `load_into(registry, ())` 返回空元组
 并让 registry 保持可写可空，它有自己的测试，不是一条退化分支。
 
 提供方失败记进 `LoadOutcome.error`，并只跳过它的传递依赖者，不妨碍无关提供方继续加载。
 Runtime 再按提供方身份决定：外部插件进入诊断并隔离，宿主发布的内建基线错误直接中止。
 这个策略不来自 manifest，也不由插件作者控制。失败批次均已回滚，registry 不留半注册状态
-（`EDG-103`）。
+。
 """
 
 from __future__ import annotations

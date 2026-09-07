@@ -10,7 +10,7 @@
 看出来——与 `model_openai` 把 `wire.py` 拆出来是同一条分界线（碰不碰 IO）。
 
 **截断标记算在上限内**：先按最坏情况算能留多少字符，再用真实的 `shown` 渲染标记，
-因此返回值长度恒 ≤ 上限，且标记里报的数字与实际截出来的长度是同一个数（`D20` 的做法）。
+因此返回值长度恒 ≤ 上限，且标记里报的数字与实际截出来的长度是同一个数（做法）。
 """
 
 from __future__ import annotations
@@ -84,7 +84,7 @@ def _as_json(payload: object) -> str:
 def render_config(document: Mapping[str, JsonValue]) -> str:
     """完整配置文档。
 
-    **脱敏在这里是纵深防御而不是唯一防线**：`D11` 定死配置树自始至终持有 `${VAR}` 字面量，
+    **脱敏在这里是纵深防御而不是唯一防线**： 定死配置树自始至终持有 `${VAR}` 字面量，
     解析出的明文只在 `SecretMap` 里，因此这份文档「没有别的东西可泄漏」。仍然过一道
     `redact()`，因为「结构上不该有」与「确实没有」之间隔着每一个未来会改这条路径的人。
     """
@@ -112,7 +112,7 @@ def _rows(value: JsonValue | None) -> tuple[JsonValue, ...]:
 
 
 def render_capabilities(report: Mapping[str, JsonValue]) -> str:
-    """覆盖解析报告：生效 / 被覆盖 / 已禁用 / 冲突，每项标明提供方（`PLG-006`）。
+    """覆盖解析报告：生效 / 被覆盖 / 已禁用 / 冲突，每项标明提供方。
 
     **四段都印，哪怕是空的**：`failures` 为空是一条有价值的结论（这份配置能启动），
     只在非空时才提它会让用户不确定到底查没查。
@@ -134,7 +134,7 @@ def render_capabilities(report: Mapping[str, JsonValue]) -> str:
 def render_plugins(statuses: Sequence[Mapping[str, JsonValue]]) -> str:
     """每个插件的状态、版本与已注册能力。
 
-    **没有插件时说「没有插件」而不是印一个空表**：`EDG-101` 要求零插件是可用形态，
+    **没有插件时说「没有插件」而不是印一个空表**： 要求零插件是可用形态，
     用户看到的应当是一句确认，而不是一个让人怀疑查询失败了的空白。
     """
     if not statuses:

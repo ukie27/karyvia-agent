@@ -204,7 +204,7 @@ class TestCheckStatus:
         assert caught.value.retryable is False
 
     def test_the_response_body_never_reaches_the_detail(self) -> None:
-        """自由文本可能把回显的 API key 带出来（`D19` 的先例）。"""
+        """自由文本可能把回显的 API key 带出来。"""
         with pytest.raises(KaryviaError) as caught:
             check_status("tavily", 400)
         assert set(caught.value.detail) == {"provider", "status"}

@@ -190,7 +190,7 @@ async def test_recall_says_so_when_nothing_matches(store: MemoryStore) -> None:
 
 
 async def test_recall_result_is_declared_untrusted(store: MemoryStore) -> None:
-    """`D42` 起隔离由契约层完成（`fold_tool_result` 包成不可信数据块）。
+    """ 起隔离由契约层完成（`fold_tool_result` 包成不可信数据块）。
 
     原来这里断言的是一行自己加的提醒文字，而那**是提醒不是隔离**——存进来的内容本来就
     统一按 `UNTRUSTED` 收（`record.from_fragment` 忽略调用方声明的 trust），召回时若改口

@@ -1,4 +1,4 @@
-"""从 `SECTION_SPECS` 派生一份 JSON Schema（`D24`，`EDG-506`）。
+"""从 `SECTION_SPECS` 派生一份 JSON Schema。
 
 职责：把字段表翻译成一份 Draft 2020-12 的 JSON Schema 文档，供 `karyvia init` 写进实例目录、
 被生成的 `config.json` 用 `$schema` 引用，从而让编辑器给出补全与就地校验。
@@ -50,7 +50,7 @@ _KIND_SCHEMAS: Final[Mapping[FieldKind, Mapping[str, JsonValue]]] = {
 }
 
 #: `plugins` 小节里每个插件条目的形状（`kernel/config/plugin_blocks.py` 的可执行形态）。
-#: `config` 放任何键：逐字段校验用的是 manifest 自带的 `config_schema`（`D25` 阶段 A），
+#: `config` 放任何键：逐字段校验用的是 manifest 自带的 `config_schema`，
 #: 而编辑器在打开 `config.json` 时并不知道装了哪些插件。
 #: `secrets` 的值只能是字符串——那是 `${VAR}` 引用，不是嵌套结构。
 _PLUGIN_ENTRY_SCHEMA: Final[Mapping[str, JsonValue]] = {
@@ -67,7 +67,7 @@ def _field_schema(spec: FieldSpec) -> dict[str, JsonValue]:
     """一个字段的 schema 片段：类型 + 默认值 + 受限取值。
 
     `default` 写进去是为了编辑器把它显示成提示，**不是**为了让 schema 参与取默认值——
-    默认值的唯一来源仍是 `SECTION_SPECS`（`CFG-005` 的来源追踪依赖这一点）。
+    默认值的唯一来源仍是 `SECTION_SPECS`（来源追踪依赖这一点）。
 
     **元组要转成列表**：`STR_LIST` 字段的默认值在字段表里是 `()`，而 JSON 里没有元组。
     `json.dumps` 会替我们转，但那样这份文档就只在**序列化之后**才是合法的 JSON Schema，

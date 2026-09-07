@@ -1,4 +1,4 @@
-"""`feishu` 插件的配置读取与校验（`CFG-002`：插件只看得见自己那一块）。
+"""`feishu` 插件的配置读取与校验（插件只看得见自己那一块）。
 
 职责：把 `ctx.config` 校验成不可变的 `FeishuSettings`，并派生 `normalize.InboundGate`。
 全部校验在 `setup()` 时发生一次。
@@ -61,7 +61,7 @@ _DEFAULT_STREAM_EDIT_INTERVAL_MS: Final = 500
 _DEFAULT_REACT_EMOJI: Final = "THUMBSUP"
 
 #: 全部配置键。与 manifest 的 `CONFIG_SCHEMA` 由一条对照用例钉住——两处都「自洽」而对不上
-#: 时，一个写对了的配置会在阶段 A 被 schema 拒掉，而错误指向的是 schema 不是这里。
+#: 时，一个写对了的配置会在加载前校验 被 schema 拒掉，而错误指向的是 schema 不是这里。
 CONFIG_KEYS: Final[frozenset[str]] = frozenset(
     {
         "channel_id",
@@ -188,7 +188,7 @@ def resolve_settings(ctx: PluginContext) -> FeishuSettings:
     """把 `ctx.config` 校验成一份设置。
 
     **异常约定**：类型或取值不对抛 `CONFIG_INVALID`。校验在 `setup()` 时发生一次，
-    不拖到第一条消息（`D18` 的先例）。
+    不拖到第一条消息。
     """
     config = ctx.config
     return FeishuSettings(

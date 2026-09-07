@@ -6,7 +6,7 @@ Karyvia 的**覆盖内建能力**示例：用一个纯内存的 `SessionStore` �
 它演示 `echo-tool` 覆盖不到的三件事：
 
 1. **SINGLETON 能力的覆盖**：`session_store` 全实例只有一个生效实现，替换必须在 manifest
-   里显式写 `overrides = "builtin:jsonl"`。覆盖永不由加载顺序决定（`EDG-102`）。
+   里显式写 `overrides = "builtin:jsonl"`。覆盖永不由加载顺序决定。
 2. **覆盖关系是可见的**：`karyvia capabilities` 的「被覆盖」段会印出
    `session_store:jsonl ← builtin` 与覆盖它的 `session_store:memory ← plugin:session-memory`。
    静默替换用户的会话历史后端是这套设计明确要堵的路。

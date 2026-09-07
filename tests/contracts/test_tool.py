@@ -1,4 +1,4 @@
-"""工具契约测试（`D03`，需求 §10.5、`TOL-001`–`TOL-004`、`EDG-401`、`EDG-402`、`EDG-407`）。
+"""工具契约测试。
 
 两条不肯让步的规则各有一组用例：`side_effect` 没有默认值（构造点必须表态），
 `ok=False` 必须带 `error`（错误不得伪装成普通成功文本）。
@@ -66,7 +66,8 @@ def test_instances_are_frozen() -> None:
         result().ok = False
 
 
-# ------------------------------------------------------------------ ToolSpec / TOL-001
+  # ------------------------------------------------------------------ ToolSpec /
+
 
 
 @pytest.mark.parametrize("name", ["FS.Read", "fs-read", "1fs", "fs.", ".read", "fs read", ""])
@@ -114,14 +115,14 @@ def test_tool_call_rejects_non_json_arguments() -> None:
 
 
 def test_invocation_timeout_must_be_positive() -> None:
-    """`KER-009`：缺省配置下不存在无界执行路径，因此没有「永不超时」这个选项。"""
+    """缺省配置下不存在无界执行路径，因此没有「永不超时」这个选项。"""
     with pytest.raises(KaryviaError) as exc:
         ToolInvocation(ToolCall("c-1", "fs.read"), CORRELATION, timeout_ms=0)
     assert exc.value.code is ErrorCode.INPUT_MALFORMED
 
 
 def test_auto_retry_requires_idempotency_key() -> None:
-    """`EDG-402`：可能重复提交的工具要么带幂等键，要么禁止自动重试。"""
+    """可能重复提交的工具要么带幂等键，要么禁止自动重试。"""
     call = ToolCall("c-1", "fs.read")
     assert ToolInvocation(call, CORRELATION, 1000).auto_retry_allowed is False
     assert ToolInvocation(call, CORRELATION, 1000, idempotency_key="k-1").auto_retry_allowed
@@ -131,14 +132,14 @@ def test_auto_retry_requires_idempotency_key() -> None:
 
 
 def test_side_effect_has_no_default() -> None:
-    """必填三态：每个构造点都必须显式表态（`EDG-401`、`EDG-407`）。"""
+    """必填三态：每个构造点都必须显式表态。"""
     field = next(f for f in dataclasses.fields(ToolResult) if f.name == "side_effect")
     assert field.default is dataclasses.MISSING
     assert field.default_factory is dataclasses.MISSING
 
 
 def test_side_effect_unknown_is_a_first_class_state() -> None:
-    """取消宽限期用尽时写入的正是这个组合（技术方案 §6.4）。"""
+    """取消宽限期用尽时写入的正是这个组合。"""
     cancelled = result(
         ok=False,
         content="",
@@ -161,7 +162,7 @@ def test_success_must_not_carry_error() -> None:
 
 
 def test_oversized_content_is_rejected() -> None:
-    """`TOL-003`：截断在执行器侧完成，契约只拦「截断没做」。"""
+    """截断在执行器侧完成，契约只拦「截断没做」。"""
     with pytest.raises(KaryviaError) as exc:
         result(content="x" * (MAX_TOOL_RESULT_LENGTH + 1))
     assert exc.value.code is ErrorCode.INPUT_TOO_LARGE
@@ -196,7 +197,7 @@ def test_artifact_requires_media_type() -> None:
     assert exc.value.code is ErrorCode.INPUT_UNSUPPORTED_MEDIA
 
 
-# ------------------------------------------------- ToolResult.trust / `D42`、`EDG-306`
+# ------------------------------------------------- ToolResult.trust / 、
 
 
 def test_trust_defaults_to_untrusted() -> None:

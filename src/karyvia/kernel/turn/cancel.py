@@ -1,17 +1,17 @@
-"""取消：显式 `CancelToken` 与 6 个命名检查点（技术方案 §6.4、需求 `KER-007`、`EDG-206`）。
+"""取消：显式 `CancelToken` 与 6 个命名检查点。
 
 职责：定义可传播、可等待、幂等的 `CancelToken`，以及 turn 执行路径上 6 个命名检查点
 `Checkpoint`；把「取消原因」翻译成稳定错误码。
-不负责：决定何时取消（那是 CLI、Channel 与 `D14` 的 orchestrator）、保存已产生内容、
+不负责：决定何时取消（那是 CLI、Channel 与 orchestrator）、保存已产生内容、
 等待不可取消的工具——本模块不含 IO、不创建任务、不认识 session 与工具。
 
-**为什么不是 `asyncio.CancelledError`**（`KER-007`）：`CancelledError` 会在任意 await 点
-抛出，被取消的代码无从选择「先把已产生的文本存下来再退出」。而 `KER-007` 要求中断后
+**为什么不是 `asyncio.CancelledError`**：`CancelledError` 会在任意 await 点
+抛出，被取消的代码无从选择「先把已产生的文本存下来再退出」。而  要求中断后
 已产生的输出、已发生的副作用和历史状态**可判定**。显式令牌把「该停了」变成一个可查询、
 可等待的事实，退出点由 Kernel 在命名检查点上选定，因此每个检查点的善后语义可以写死、
 可以逐个测试。
 
-6 个检查点与中断后语义（技术方案 §6.4 表格，`D09`/`D14` 各自兑现善后动作）：
+6 个检查点与中断后语义：
 
 | # | `Checkpoint` | 归属 | 中断后语义 |
 | --- | --- | --- | --- |
@@ -47,26 +47,26 @@ __all__ = [
     "CheckpointOwner",
 ]
 
-#: 工具收到取消信号后的宽限期（技术方案 §6.4、§15 决策表第 7 行）。超时仍未返回则不再
-#: 等待，工具结果写成 `ok=False, side_effect=UNKNOWN`（`EDG-407`），后台任务登记到实例级
-#: 孤儿任务表（`EDG-104`）。等待与登记本身属于 `D09` 的工具调用路径，本模块只定义默认值：
+#: 工具收到取消信号后的宽限期。超时仍未返回则不再
+#: 等待，工具结果写成 `ok=False, side_effect=UNKNOWN`，后台任务登记到实例级
+#: 孤儿任务表。等待与登记本身属于的工具调用路径，本模块只定义默认值：
 #: 它是取消语义的一部分，不是预算项，因此不进 `TurnLimits` 的六项。
 DEFAULT_TOOL_CANCEL_GRACE_MS: Final = 2000
 
 
 class CheckpointOwner(StrEnum):
-    """检查点由谁执行。两层拆分（技术方案 §6.2）决定了这张表不能是自由文本。"""
+    """检查点由谁执行。两层拆分决定了这张表不能是自由文本。"""
 
     ENGINE = "engine"
     ORCHESTRATOR = "orchestrator"
 
 
 class Checkpoint(StrEnum):
-    """turn 执行路径上的 6 个命名检查点（技术方案 §6.4）。
+    """turn 执行路径上的 6 个命名检查点。
 
     取值即诊断信息：检查点抛出的 `KaryviaError.detail["checkpoint"]` 就是这里的字符串，
     「turn 在哪一步被打断」因此不依赖读日志上下文来猜。数量固定为 6——新增检查点意味着
-    新增一种善后语义，必须同时更新技术方案 §6.4 的表格与本模块的对照测试。
+    新增一种善后语义，必须同时更新契约测试和所有终态处理方。
     """
 
     BEFORE_CONTEXT = "before_context"
@@ -77,7 +77,7 @@ class Checkpoint(StrEnum):
     AFTER_TOOL_RESULT = "after_tool_result"
 
 
-#: 检查点归属。`D09` 的 engine 只实现 2/3/5/6，1/4 在 `D14` 的 orchestrator 边界上——
+#: 检查点归属。 的 engine 只实现 2/3/5/6，1/4 在 orchestrator 边界上——
 #: engine 不知道 context 从哪来，也不负责写 assistant 消息。
 CHECKPOINT_OWNERS: Final[Mapping[Checkpoint, CheckpointOwner]] = MappingProxyType(
     {
@@ -114,7 +114,7 @@ _CANCEL_MESSAGES: Final[Mapping[CancelReason, str]] = MappingProxyType(
 
 
 class CancelToken:
-    """一次 turn（或其子任务）的取消令牌（技术方案 §6.4）。
+    """一次 turn（或其子任务）的取消令牌。
 
     结构化满足 `contracts.protocols.CancelSignal`：能力实现拿到的是同一个对象，
     但它们只看得见 `requested` 与 `raise_if_requested()` 这个只读面。`request()` 与
@@ -122,7 +122,7 @@ class CancelToken:
 
     三条不变量：
 
-    - **`request()` 幂等**（`EDG-206`）。第一次的 `reason` 保留，重复请求不改变状态、
+    - **`request` 幂等**。第一次的 `reason` 保留，重复请求不改变状态、
       不重复传播、不产生新的观察事件。用户连按三次 Ctrl-C 与按一次的结果必须完全一致。
     - **取消只向下传播**。父令牌取消时全部后代立即取消；子令牌取消不影响父与兄弟。
       工具超时取消一个子 turn，不该顺手停掉外层对话。
@@ -146,11 +146,11 @@ class CancelToken:
 
     @property
     def reason(self) -> CancelReason | None:
-        """取消原因；未取消时为 `None`。重复请求时保持第一次的值（`EDG-206`）。"""
+        """取消原因；未取消时为 `None`。重复请求时保持第一次的值。"""
         return self._reason
 
     def request(self, reason: CancelReason = CancelReason.USER) -> None:
-        """请求取消，并向所有后代传播。幂等：已取消时直接返回（`EDG-206`）。"""
+        """请求取消，并向所有后代传播。幂等：已取消时直接返回。"""
         if self._reason is not None:
             return
         self._reason = reason
@@ -179,7 +179,7 @@ class CancelToken:
             raise self._to_error(self._reason, checkpoint=where)
 
     def child(self) -> CancelToken:
-        """派生子令牌，用于工具调用与子 turn（技术方案 §6.4）。
+        """派生子令牌，用于工具调用与子 turn。
 
         父令牌已取消时，新子令牌**出生即取消**并继承父的 `reason`——否则「取消后又派生了
         一个工具调用」会得到一个看起来正常的令牌，取消语义就有了一个静默的漏洞。
@@ -195,8 +195,8 @@ class CancelToken:
         """等待取消发生并返回原因；已取消则立即返回。
 
         取消必须**可等待**而不只是可轮询：不可取消的工具需要 Kernel 在
-        `DEFAULT_TOOL_CANCEL_GRACE_MS` 的宽限期内与取消赛跑（`EDG-407`），只有轮询的话
-        Kernel 只能寄希望于能力实现自觉检查——而 `EDG-407` 要处理的恰恰是不自觉的那些。
+        `DEFAULT_TOOL_CANCEL_GRACE_MS` 的宽限期内与取消赛跑，只有轮询的话
+        Kernel 只能寄希望于能力实现自觉检查——而  要处理的恰恰是不自觉的那些。
         """
         if self._reason is not None:
             return self._reason

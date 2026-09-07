@@ -1,14 +1,14 @@
-"""输入分流：命令与模型 turn（技术方案 §6.3，需求 `KER-006`、`CMD-002`、`CMD-003`）。
+"""输入分流：命令与模型 turn。
 
 职责：在进入 engine 之前决策一次——这条输入是命令（已处理 / 改写后继续）、普通模型
 turn，还是该被拒绝；并在启动期把命令名与别名的冲突查出来。
 不负责：执行 turn、组装上下文、分配 `turn_id`、发布任何事件、持久化。命令的具体实现是
-`builtins/commands_core/`（`D22`）与插件的事。
+`builtins/commands_core/`与插件的事。
 
-**本模块不认识 `EventBus`，也不构造 `Correlation`。** `KER-010` 要求命令即使不进模型也
-分配 `turn_id` 并发布 turn 事件，那件事整个由 `D14` 的 orchestrator 做：turn 事件只能有
+**本模块不认识 `EventBus`，也不构造 `Correlation`。**  要求命令即使不进模型也
+分配 `turn_id` 并发布 turn 事件，那件事整个由 orchestrator 做：turn 事件只能有
 一个发布点，否则「命令类 turn」与「模型类 turn」的事件序列会分别由两处维护，
-`OBS-002` 的按序重放随之出现两套口径。dispatcher 只回答「这条输入该怎么走」。
+ 的按序重放随之出现两套口径。dispatcher 只回答「这条输入该怎么走」。
 
 **只有以前缀开头才尝试解析**（§6.3 第一条）：普通聊天文本占绝大多数，为它们做参数解析
 是纯浪费；更要紧的是，任何「智能」匹配都会让用户的正常文本偶然变成命令。
@@ -59,7 +59,7 @@ class RegisteredCommand:
 
     registry 的 `payload` 是 `object`，谁注册谁定形状。把这个 dataclass 放在 dispatcher
     而不是 registry，是因为「命令长什么样」是分流的知识，不是登记的知识——registry 只搬运。
-    `D16` 的 Host 分派必须注册这个形状，`build_command_index()` 会当场核对。
+     的 Host 分派必须注册这个形状，`build_command_index` 会当场核对。
     """
 
     spec: CommandSpec
@@ -154,11 +154,11 @@ class CommandIndex:
 
 
 def build_command_index(registry: CapabilityRegistry) -> CommandIndex:
-    """从已冻结的 registry 建命令索引，**在启动期**把命名冲突查出来（`CMD-002`）。
+    """从已冻结的 registry 建命令索引，**在启动期**把命名冲突查出来。
 
     registry 的 MULTI_UNIQUE 只保证 `name` 在 kind 内唯一，别名撞车它看不见：两个插件各自
     注册 `/status` 和 `/st`、`/statistics` 和 `/st`，注册阶段一路绿灯，到调用期才由加载顺序
-    择一——那正是 `CMD-002` 禁止的。
+    择一——那正是  禁止的。
 
     **异常约定**：任一名字被两处占用抛 `PLUGIN_REGISTRATION_CONFLICT`；载荷不是
     `RegisteredCommand` 抛 `KERNEL_INVARIANT_VIOLATED`；registry 未冻结由 registry 自己抛。
@@ -229,7 +229,7 @@ def _rejected(error: KaryviaError, content: str = "") -> DispatchOutcome:
 class Dispatcher:
     """输入分流器。索引在启动期建好，`dispatch()` 在每条消息上跑一次。
 
-    索引不可变意味着「装了哪些命令」在实例生命周期内不变——这是 `CMD-002` 的另一面：
+    索引不可变意味着「装了哪些命令」在实例生命周期内不变——这是的另一面：
     如果命令集合能在运行期变，冲突就又变成了「取决于什么时候问」。
     """
 
@@ -261,10 +261,10 @@ class Dispatcher:
         correlation: Correlation,
         cancel: CancelSignal,
     ) -> DispatchOutcome:
-        """决策一次。**永不抛出命令实现的异常**（`CMD-003`）。
+        """决策一次。**永不抛出命令实现的异常**。
 
-        `correlation` 由调用方（`D14`）带着已分配的 `turn_id` 传入：命令处理、模型调用与
-        事件发布共用同一个关联标识，单个 turn 才能按 `turn_id` 完整还原（`KER-010`）。
+        `correlation` 由调用方带着已分配的 `turn_id` 传入：命令处理、模型调用与
+        事件发布共用同一个关联标识，单个 turn 才能按 `turn_id` 完整还原。
 
         **异常约定**：只在 Kernel 自身的不变量被破坏时抛。命令 handler 的任何异常都被折成
         `REJECTED` 结果——会话保持可用，进程不退出。
@@ -352,7 +352,7 @@ class Dispatcher:
         correlation: Correlation,
         cancel: CancelSignal,
     ) -> CommandResult:
-        """调用 handler，把任何逸出的异常折成 `REJECTED` 结果（`CMD-003`）。
+        """调用 handler，把任何逸出的异常折成 `REJECTED` 结果。
 
         `BaseException`（取消、`KeyboardInterrupt`）不在此列：那是进程级的停机信号，
         吞掉它会让 Ctrl-C 需要按两次。
@@ -373,7 +373,7 @@ class Dispatcher:
             )
         except Exception as exc:
             # **不放异常消息**：第三方命令的异常文本可能带着凭据或路径。类型名足以定位，
-            # 完整堆栈应当由 `D14` 记进事件而不是回给用户（`contracts/errors.py` 的口径）。
+            # 完整堆栈应当由  记进事件而不是回给用户（`contracts/errors.py` 的口径）。
             error = KaryviaError(
                 ErrorCode.KERNEL_UNEXPECTED,
                 f"命令 {self._prefix}{entry.spec.name} 执行失败。",

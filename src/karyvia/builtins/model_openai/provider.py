@@ -1,15 +1,15 @@
-"""内建 Model Provider：OpenAI 兼容 Chat Completions（技术方案 §8.1、§15 第 5 项）。
+"""内建 Model Provider：OpenAI 兼容 Chat Completions。
 
 职责：实现 `ModelProvider`（`describe` / `complete` / `stream`），管理 httpx 客户端与
 取消检查点；同时提供内建注册入口 `setup(api)`。
 不负责：线格式翻译（`wire.py`）、错误分类（`faults.py`）、配置校验（`settings.py`）、
-续写与重试策略（编排层，技术方案 §6.2.2）。
+续写与重试策略。
 
 四条决定了本模块形状的规则：
 
 - **凭据只从 `ctx.secret("api_key")` 来。** `SecretStr` 的明文只在拼 Authorization 头的
   那一行经 `reveal()` 取出，不进配置、不进
-  `detail`、不进事件（`MOD-002`、`CFG-003`）。`kernel/config/secrets.py::resolve_text`
+  `detail`、不进事件。`kernel/config/secrets.py::resolve_text`
   够不着（`R4` 禁止 `builtins/` import `kernel/`），接线由 Runtime 在 ctx 那侧完成。
 - **直接用 httpx 而不是 `ctx.net`。** `HttpAccess` 的 SSRF 守卫会拒绝私有网段，而本内建
   明确支持本地 vLLM / Ollama / LM Studio。资源门面是方便插件复用的受约束实现，不是
@@ -17,7 +17,7 @@
 - **本地端点关 keepalive、关代理。** Ollama / llama.cpp / vLLM 会在客户端 keepalive 到期
   前关掉空闲连接，不关就是每轮第一次调用必失败；而 `HTTP_PROXY` / `ALL_PROXY` 会把
   localhost 流量送进一个够不着它的代理。这两条都是真实端点上验证过的，不是防御性代码。
-- **流式中途失败必须先 `yield DONE(ERROR)` 再抛**（`protocols.py` 写死、`EDG-304`）。
+- **流式中途失败必须先 `yield DONE(ERROR)` 再抛**（`protocols.py` 写死）。
   `kernel/turn/folding.py` 据此把已收到的文本按 `interrupted=True` 落库，而不是把半截
   输出当成完整答案。
 """
@@ -71,7 +71,7 @@ __all__ = [
 CHAT_COMPLETIONS_PATH: Final = "/chat/completions"
 
 _STREAMING_UNSUPPORTED: Final = (
-    "配置未声明该模型支持流式，本 Provider 不会自行降级为一次性返回（MOD-005）。"
+    "配置未声明该模型支持流式，本 Provider 不会自行降级为一次性返回。"
 )
 _BAD_JSON_BODY: Final = "供应商返回的响应体不是合法 JSON。"
 _STREAM_STALLED: Final = "模型流式响应中断：超过空闲上限没有收到新分片。"
@@ -160,7 +160,7 @@ class OpenAIModelProvider:
     async def aclose(self) -> None:
         """释放底层连接池。
 
-        `ModelProvider` 协议里没有生命周期钩子，因此这不是契约的一部分——由 `D23` 的
+        `ModelProvider` 协议里没有生命周期钩子，因此这不是契约的一部分——由的
         装配根在实例停止时调用。多次调用安全。
         """
         client = self._client
@@ -186,7 +186,7 @@ class OpenAIModelProvider:
     # -------------------------------------------------------------------- 契约方法
 
     def describe(self, model_id: str) -> ModelInfo:
-        """声明该模型的能力与窗口（`MOD-001`）。
+        """声明该模型的能力与窗口。
 
         **异常约定**：`models` 白名单非空且不含该模型时抛 `CAPABILITY_MISSING`。
         **取消语义**：同步方法，不涉及取消；且**不发网络请求**——它在预算推导路径上。
@@ -231,7 +231,7 @@ class OpenAIModelProvider:
 
         **异常约定**：同 `complete()`；**已经 yield 过分片后再失败，必须先 yield 一个
         `DONE(ERROR)` 再抛**，让消费方把已收到的文本按 `interrupted=True` 落库
-        （`EDG-304`）。配置未声明 `streaming` 时抛 `CAPABILITY_MISSING`，不自行降级。
+        。配置未声明 `streaming` 时抛 `CAPABILITY_MISSING`，不自行降级。
         **取消语义**：每产出一片前检查 `cancel`；已 yield 的分片由调用方保留。
         """
         info = self._settings.describe(request.model_id)

@@ -1,13 +1,13 @@
-"""内建 Context Provider `context_basic` 的验收（开发方案 `D18`）。
+"""内建 Context Provider `context_basic`当前行为。
 
 | 验收项 | 测试 |
 | --- | --- |
 | 通过 `ContextProviderContract` 全部用例 | `TestBasicContextProvider` |
-| 无 Memory / 检索插件时组装正常完成（`CTX-006`、`EDG-307`） | `TestUsableWithoutPlugins` |
-| trust 分级与放置位置（`CMD-005`） | `TestTrustPlacement` |
-| 片段提示值与最终消息结构计量分离（`CTX-010`） | `TestTokenEstimate` |
+| 无 Memory / 检索插件时组装正常完成 | `TestUsableWithoutPlugins` |
+| trust 分级与放置位置 | `TestTrustPlacement` |
+| 片段提示值与最终消息结构计量分离 | `TestTokenEstimate` |
 | 配置校验：类型、数组写法、自相矛盾的组合 | `TestSettings` |
-| 内建以普通 manifest + `setup(api)` 注册（`BAS-005`） | `TestRegistration` |
+| 内建以普通 manifest + `setup(api)` 注册 | `TestRegistration` |
 
 两条写这些用例时的取舍：
 
@@ -140,7 +140,8 @@ class TestBasicContextProvider(ContextProviderContract):
         return make_provider()
 
 
-# ------------------------------------------------------------------- CTX-006 / EDG-307
+  # -------------------------------------------------------------------  /
+
 
 
 class TestUsableWithoutPlugins:
@@ -148,12 +149,12 @@ class TestUsableWithoutPlugins:
 
     async def test_an_empty_session_still_yields_system_instructions(self) -> None:
         fragments = await provide(make_provider(), SessionSnapshot(session_key=KEY))
-        assert fragments, "空会话必须仍有系统指令，否则 CTX-006 不成立"
+        assert fragments, "空会话必须仍有系统指令，否则  不成立"
         assert fragments[0].content == BASELINE_INSTRUCTIONS
         assert fragments[0].trust is TrustLevel.SYSTEM
 
     async def test_assembly_completes_with_no_other_providers(self) -> None:
-        """`EDG-307`：未安装 Memory 插件不得产生缺失依赖错误。"""
+        """未安装 Memory 插件不得产生缺失依赖错误。"""
         assembled = await assemble_with(make_provider(), SessionSnapshot(session_key=KEY))
         assert assembled.messages[0].role is Role.SYSTEM
         assert BASELINE_INSTRUCTIONS in assembled.messages[0].content
@@ -195,7 +196,8 @@ class TestUsableWithoutPlugins:
         assert [item.kind for item in fragments] == [FragmentKind.SYSTEM]
 
 
-# --------------------------------------------------------------------------- CMD-005
+  # ---------------------------------------------------------------------------
+
 
 
 class TestTrustPlacement:
@@ -209,7 +211,7 @@ class TestTrustPlacement:
         assert operator.may_act_as_instruction is False
 
     async def test_operator_instructions_stay_out_of_the_system_message(self) -> None:
-        """`CMD-005` 的落地检查：配置文本不得取得系统指令级别的优先级。"""
+        """当前实现检查：配置文本不得取得系统指令级别的优先级。"""
         assembled = await assemble_with(
             make_provider(instructions="你只说中文。"), snapshot_with("a")
         )
@@ -222,7 +224,7 @@ class TestTrustPlacement:
         )
 
     async def test_every_fragment_declares_the_builtin_source(self) -> None:
-        """`CTX-001`：诊断里「这段是谁塞进来的」必须查得到。"""
+        """诊断里「这段是谁塞进来的」必须查得到。"""
         fragments = await provide(make_provider(instructions="x"), snapshot_with("a"))
         assert {item.source for item in fragments} == {FRAGMENT_SOURCE}
         assert len(fragments) == 3
@@ -239,17 +241,18 @@ class TestTrustPlacement:
         assert all(item.as_model_text() == item.content for item in fragments)
 
     def test_the_baseline_teaches_the_model_the_untrusted_marker(self) -> None:
-        """包裹只有在模型认得那句前缀时才有意义（`EDG-306`）。"""
+        """包裹只有在模型认得那句前缀时才有意义。"""
         assert UNTRUSTED_DATA_PREFIX in BASELINE_INSTRUCTIONS
 
     async def test_the_provider_does_not_replay_history_itself(self) -> None:
-        """历史由组装器重放（`EDG-305`）；再贡献一份就是把同一段对话讲两遍。"""
+        """历史由组装器重放；再贡献一份就是把同一段对话讲两遍。"""
         fragments = await provide(make_provider(), snapshot_with("独一无二的历史内容"))
         assert all("独一无二的历史内容" not in item.content for item in fragments)
         assert all(item.kind is not FragmentKind.HISTORY for item in fragments)
 
 
-# --------------------------------------------------------------------------- CTX-003
+  # ---------------------------------------------------------------------------
+
 
 
 class TestTokenEstimate:
@@ -359,7 +362,7 @@ class TestSettings:
 
 
 class TestRegistration:
-    """内建的落地形态：一份普通 manifest + 一个 `setup(api)`，没有第二条路（`BAS-005`）。"""
+    """内建的落地形态：一份普通 manifest + 一个 `setup(api)`，没有第二条路。"""
 
     def test_the_manifest_is_listed_as_a_builtin(self) -> None:
         assert CONTEXT_BASIC in BUILTIN_MANIFESTS

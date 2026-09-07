@@ -9,7 +9,7 @@
 的做法是在测试文件第 11 行写
 `pytest.importorskip("mcp")`，CI 没装依赖时整棵树静默全跳。
 
-**平台 SDK 对象在 `to_remote_tool()` 之后就不存在了**（`MSG-004` 的同一条精神）：
+**平台 SDK 对象在 `to_remote_tool` 之后就不存在了**（同一条精神）：
 判定与归一化只认识这里的 frozen dataclass。
 """
 

@@ -1,4 +1,4 @@
-"""错误契约：分类、稳定错误码与构造时脱敏的 `KaryviaError`（技术方案 §5.2、需求 §10.7）。
+"""错误契约：分类、稳定错误码与构造时脱敏的 `KaryviaError`。
 
 职责：定义 `ErrorCategory` 的 11 个取值、集中登记的 `ErrorCode` 常量表，以及在**构造时**
 完成脱敏的 `KaryviaError`；同时提供供 `events.py` 复用的纯函数 `redact` / `scrub`。
@@ -44,7 +44,7 @@ __all__ = [
 
 
 class ErrorCategory(StrEnum):
-    """诊断分类（`OBS-004`）。11 个取值全部落地，不允许再加「其他」这种兜底项。"""
+    """诊断分类。11 个取值全部落地，不允许再加「其他」这种兜底项。"""
 
     INVALID_INPUT = "invalid_input"
     CONFIG = "config"
@@ -137,15 +137,15 @@ CODE_CATEGORIES: Final[Mapping[ErrorCode, ErrorCategory]] = MappingProxyType(
         ErrorCode.INPUT_TOO_LARGE: ErrorCategory.INVALID_INPUT,
         ErrorCode.INPUT_UNSUPPORTED_MEDIA: ErrorCategory.INVALID_INPUT,
         # 「这个会话正忙」不是「你的消息太大」：前者的补救是等一会儿再发或改并发策略，
-        # 后者的补救是把消息改短。复用 INPUT_TOO_LARGE 会让 `EDG-202` 的队列满与
-        # `EDG-205` 的大文本在诊断里长得一模一样（`D13`）。
+        # 后者的补救是把消息改短。复用 INPUT_TOO_LARGE 会让的队列满与
+        #的大文本在诊断里长得一模一样。
         ErrorCode.INPUT_SESSION_BUSY: ErrorCategory.INVALID_INPUT,
         ErrorCode.CONFIG_INVALID: ErrorCategory.CONFIG,
         ErrorCode.CONFIG_UNKNOWN_FIELD: ErrorCategory.CONFIG,
         ErrorCode.CONFIG_SECRET_MISSING: ErrorCategory.CONFIG,
         ErrorCode.CONFIG_FILE_CORRUPT: ErrorCategory.CONFIG,
         # 「另一个实例正在跑」不是「你的配置写错了」：前者的补救是关掉那个进程或换实例目录，
-        # 后者的补救是改文件。复用 CONFIG_INVALID 会让 `EDG-507` 无法单独断言（`D10`）。
+        # 后者的补救是改文件。复用 CONFIG_INVALID 会让  无法单独断言。
         ErrorCode.CONFIG_INSTANCE_LOCKED: ErrorCategory.CONFIG,
         ErrorCode.CAPABILITY_MISSING: ErrorCategory.CAPABILITY_MISSING,
         ErrorCode.CAPABILITY_AMBIGUOUS: ErrorCategory.CAPABILITY_MISSING,
@@ -155,21 +155,21 @@ CODE_CATEGORIES: Final[Mapping[ErrorCode, ErrorCategory]] = MappingProxyType(
         ErrorCode.PERMISSION_PATH_OUTSIDE_WORKSPACE: ErrorCategory.PERMISSION_DENIED,
         # `turn_start` 拦截器返回 REJECT：这是一次**策略性拒绝**，不是插件故障。
         # 复用 PLUGIN_HOOK_FAILED 会把「插件按规则挡下了这次 turn」记成「插件坏了」，
-        # 而两者的补救完全不同（改策略 vs 修插件）。先例是 `D13` 的 INPUT_SESSION_BUSY（`D14`）。
+        # 而两者的补救完全不同（改策略 vs 修插件）。先例是 INPUT_SESSION_BUSY。
         ErrorCode.PERMISSION_TURN_REJECTED: ErrorCategory.PERMISSION_DENIED,
         ErrorCode.PLUGIN_SDK_INCOMPATIBLE: ErrorCategory.INCOMPATIBLE,
         ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED: ErrorCategory.INCOMPATIBLE,
         ErrorCode.TIMEOUT_MODEL_REQUEST: ErrorCategory.TIMEOUT,
         ErrorCode.TIMEOUT_TOOL_CALL: ErrorCategory.TIMEOUT,
         # 「宽限期到了工具还没回来」与「工具按时超时并干净返回」是两件事：前者的
-        # `side_effect` 只能是 UNKNOWN 且协程已被登记为孤儿任务（`EDG-407`、`EDG-104`），
-        # 后者仍是一次有结论的调用。共用一个码就查不出哪些 turn 留下了在跑的副作用（`D14`）。
+        # `side_effect` 只能是 UNKNOWN 且协程已被登记为孤儿任务，
+        # 后者仍是一次有结论的调用。共用一个码就查不出哪些 turn 留下了在跑的副作用。
         ErrorCode.TIMEOUT_TOOL_CANCEL: ErrorCategory.TIMEOUT,
         ErrorCode.TIMEOUT_HOOK: ErrorCategory.TIMEOUT,
-        # `ctx.net` 的出网超时（`D26`）。不复用 `TIMEOUT_TOOL_CALL`：发请求的可能是 Channel
+        # `ctx.net` 的出网超时。不复用 `TIMEOUT_TOOL_CALL`：发请求的可能是 Channel
         # 或 Hook，把它记成「某个工具超时了」会让诊断指向一个根本没被调用的工具。
         ErrorCode.TIMEOUT_HTTP_REQUEST: ErrorCategory.TIMEOUT,
-        # 插件停止超时（`D28`、`EDG-104`）。不复用 `PLUGIN_LOAD_FAILED`：那是「它没能起来」，
+        # 插件停止超时。不复用 `PLUGIN_LOAD_FAILED`：那是「它没能起来」，
         # 而这里是「它起来了、但没能在期限内停下」——后者留下的是仍在跑的后台任务，
         # 排查动作（看插件的 spawn_task 有没有吞掉 CancelledError）完全不同。
         ErrorCode.TIMEOUT_PLUGIN_STOP: ErrorCategory.TIMEOUT,
@@ -177,7 +177,7 @@ CODE_CATEGORIES: Final[Mapping[ErrorCode, ErrorCategory]] = MappingProxyType(
         ErrorCode.CANCELLED_BY_USER: ErrorCategory.CANCELLED,
         ErrorCode.CANCELLED_BY_BUDGET: ErrorCategory.CANCELLED,
         # 实例关闭导致的取消：既不是用户按下 Ctrl-C，也不是撞上预算，
-        # 混进上面两个码会让「谁停掉了这个 turn」在诊断里不可判定（`D08`）。
+        # 混进上面两个码会让「谁停掉了这个 turn」在诊断里不可判定。
         ErrorCode.CANCELLED_BY_SHUTDOWN: ErrorCategory.CANCELLED,
         ErrorCode.EXTERNAL_MODEL_PROVIDER: ErrorCategory.EXTERNAL_SERVICE,
         ErrorCode.EXTERNAL_MODEL_CONTEXT_OVERFLOW: ErrorCategory.EXTERNAL_SERVICE,
@@ -185,7 +185,7 @@ CODE_CATEGORIES: Final[Mapping[ErrorCode, ErrorCategory]] = MappingProxyType(
         # 同上：插件经 `ctx.net` 打出去的请求失败了。复用 `EXTERNAL_MODEL_PROVIDER` 会把
         # 一次 webhook 故障记到模型供应商头上。
         ErrorCode.EXTERNAL_HTTP_REQUEST: ErrorCategory.EXTERNAL_SERVICE,
-        # 一个外部工具服务器（MCP server 一类）出了问题（`D38-B`）。它既不是 HTTP
+        # 一个外部工具服务器（MCP server 一类）出了问题。它既不是 HTTP
         # 专属——stdio 传输一个字节的 HTTP 都没有——也不该混进 `EXTERNAL_CHANNEL`：
         # 后者说的是「消息发不出去」，而这里说的是「一次工具调用没能给出结论」。
         ErrorCode.EXTERNAL_TOOL_SERVER: ErrorCategory.EXTERNAL_SERVICE,
@@ -226,9 +226,9 @@ _IMMUTABLE_MESSAGE: Final = "SecretStr 不可变"
 class SecretStr:
     """密钥的包装类型：默认渲染为 `MASK`，明文只能经 `reveal()` 取出。
 
-    落在 `contracts/errors.py` 而不是 `sdk/api.py`（`D11` 从后者迁来）：`${VAR}` 的解析
+    落在 `contracts/errors.py` 而不是 `sdk/api.py`：`${VAR}` 的解析
     结果在 `kernel/config/secrets.py` 里产生，而 `R2` 禁止 `kernel/` import `sdk/`——与
-    `D05` 把 `CliEntry` 下沉到 `contracts/` 是同一条理由。落在本模块又是因为掩码、
+     把 `CliEntry` 下沉到 `contracts/` 是同一条理由。落在本模块又是因为掩码、
     `redact()` 与它本就是同一件事的三个面：`_redact_value` 认得它，明文因此会进入
     `scrub()` 的密文集合，被顺手拼进消息里的凭据也擦得掉。
 
@@ -471,7 +471,7 @@ class KaryviaError(Exception):
     构造即完成脱敏：`user_message`、`detail` 与 `repr` 都不再含密文，因此把它扔给
     任何 sink、日志或模型可见文本都是安全的，脱敏不依赖下游是否记得处理。
 
-    `capability` 指向出错的能力（`D04` 补齐）。它只在 `TYPE_CHECKING` 下导入——
+    `capability` 指向出错的能力。它只在 `TYPE_CHECKING` 下导入——
     `capability.py` 运行时依赖本模块，反向导入会成环——因此这里不做形状校验：
     `CapabilityRef` 自己在构造时已经校验过，再验一遍只会在错误路径上多一个出错点。
     """
@@ -546,7 +546,7 @@ class KaryviaError(Exception):
     def capability(self) -> CapabilityRef | None:
         """出错的能力；与具体能力无关的错误（如配置解析）为 None。
 
-        `PLG-006` 要求诊断能标明每项能力由内建还是插件提供，这个字段是那条信息在错误
+         要求诊断能标明每项能力由内建还是插件提供，这个字段是那条信息在错误
         路径上的载体：`ref.provider` 直接回答「是谁的问题」。
         """
         return self._capability

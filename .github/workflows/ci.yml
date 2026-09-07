@@ -42,13 +42,13 @@ jobs:
       - name: Install
         run: pip install -e ".[dev]"
 
-      # 插件经 entry point 被发现，因此必须真的装进环境（D30 的两个示例、D31 的官方
-      # openai-api、D32 的 anthropic、D34 的 feishu、D36-D38 的
-      # web / mcp、D39 的 memory、D40 的 cron）。tests/e2e/ 的第一条用例会在
+      # 插件经 entry point 被发现，因此必须真的装进环境（两个示例、 的官方
+      # openai-api、 的 anthropic、 的 feishu、- 的
+      # web / mcp、 的 memory、 的 cron）。tests/e2e/ 的第一条用例会在
       # 没装时明确报出来。
       # **这张清单漏一个就是 CI 红**：`testpaths` 收集整个 `plugins/`，而每棵测试树都
       # `import karyvia_plugin_<id>`——没装就是收集期 ModuleNotFoundError，
-      # 不是「少跑几个用例」。加官方插件时必须同时加这里（D40 发现 D36 起漏了五个）。
+      # 不是「少跑几个用例」。加官方插件时必须同时加这里。
       # **--no-deps 是刻意的**：平台 SDK（lark-oapi / mcp）因此不在 CI
       # 环境里，而那三个插件的测试树仍须全绿——这正是「只有一两个模块接触 SDK」换来的
       # 东西。cron 的 tzdata 同理：它整棵测试树都不依赖时区数据库。

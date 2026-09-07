@@ -1,4 +1,4 @@
-"""六项预算与账本的测试（`D08` 验收：逐项行为、可配置性、默认值、无界执行路径）。
+"""六项预算与账本的测试。
 
 | 验收项 | 测试 |
 | --- | --- |
@@ -7,12 +7,11 @@
 | 6 项预算逐项：可配置性 | `test_every_limit_is_configurable` |
 | 缺省配置下不存在无界执行路径 | `test_default_limits_terminate_a_runaway_model` |
 
-默认值与 `LIMIT_OUTCOMES` 以**字面量**断言：这两张表是技术方案 §6.4 表格的可执行形态，
-从实现反推等于让文档漂移无声通过。
+默认值与 `LIMIT_OUTCOMES` 以**字面量**断言，防止开箱行为和终态映射被意外改动。
 
-`test_default_limits_terminate_a_runaway_model` 里的循环是 `D09` engine 主循环的**骨架**
+`test_default_limits_terminate_a_runaway_model` 里的循环是  engine 主循环的**骨架**
 （check -> begin_iteration -> 模型 -> 记工具调用），engine 尚未存在，因此这里证明的是
-「按这个骨架用账本，缺省配置必然有限步终止」。`D09` 落地后由 `tests/kernel/test_engine.py`
+「按这个骨架用账本，缺省配置必然有限步终止」。 落地后由 `tests/kernel/test_engine.py`
 在真正的引擎上重跑同一条性质。
 """
 
@@ -272,7 +271,7 @@ def test_tool_result_breach_does_not_end_the_turn() -> None:
 
 
 def test_tool_timeout_breach_does_not_end_the_turn() -> None:
-    """单工具超时只让那一次调用失败，turn 继续（技术方案 §6.4 触发行为列）。"""
+    """单工具超时只让那一次调用失败，turn 继续。"""
     breach = LimitBreach(LimitKind.TOOL_TIMEOUT_MS, 120_000, 130_000)
     assert breach.terminal_status is None
 
@@ -312,7 +311,7 @@ def test_context_budget_falls_back_when_model_is_silent() -> None:
 
 
 def test_contradictory_model_declaration_raises() -> None:
-    """`MOD-005`：不得静默降级。整个窗口都留给输出，模型就没有地方读输入了。"""
+    """不得静默降级。整个窗口都留给输出，模型就没有地方读输入了。"""
     model = ModelInfo("m", "p", context_window_tokens=4_096, max_output_tokens=4_096)
     with pytest.raises(KaryviaError) as excinfo:
         TurnLimits().resolve_context_max_tokens(model)
@@ -352,7 +351,7 @@ def test_ledger_defaults_to_default_limits() -> None:
 
 
 def test_two_ledgers_do_not_share_counters() -> None:
-    """并发 turn 共享同一份计数是把计数器塞进配置对象的必然后果（`KER-008`）。"""
+    """并发 turn 共享同一份计数是把计数器塞进配置对象的必然后果。"""
     limits = TurnLimits()
     first, second = BudgetLedger(limits), BudgetLedger(limits)
     first.begin_iteration()
@@ -360,15 +359,15 @@ def test_two_ledgers_do_not_share_counters() -> None:
 
 
 # --------------------------------------------------------------------------------------
-# 缺省配置下不存在无界执行路径（KER-009）
+# 缺省配置下不存在无界执行路径
 # --------------------------------------------------------------------------------------
 
 
 def test_default_limits_terminate_a_runaway_model() -> None:
     """永远返回 tool_call 的模型，必须在有限步内以 `STOPPED_BY_LIMIT` 终止。
 
-    循环体是 `D09` engine 主循环的骨架；此处证明的是「按这个骨架用账本，缺省配置必然
-    有限步终止」，`D09` 落地后在真正的引擎上重跑同一条性质。
+    循环体是  engine 主循环的骨架；此处证明的是「按这个骨架用账本，缺省配置必然
+    有限步终止」， 落地后在真正的引擎上重跑同一条性质。
     """
     ledger = BudgetLedger()  # 全部缺省。
     status: TurnStatus | None = None
