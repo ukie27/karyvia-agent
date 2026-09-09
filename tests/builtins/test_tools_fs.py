@@ -36,6 +36,7 @@ from karyvia.builtins.tools_fs import (
     CONFIG_MAX_MATCHES_KEY,
     CONFIG_MAX_READ_BYTES_KEY,
     CONFIG_MAX_RESULT_CHARS_KEY,
+    CONFIG_SKILL_ROOTS_KEY,
     CONFIG_WORKSPACE_KEY,
     EDIT_SPEC,
     GREP_SPEC,
@@ -774,6 +775,7 @@ class TestRegistration:
             CONFIG_MAX_RESULT_CHARS_KEY,
             CONFIG_MAX_ENTRIES_KEY,
             CONFIG_MAX_MATCHES_KEY,
+            CONFIG_SKILL_ROOTS_KEY,
         }
         assert TOOLS_FS.config_schema["additionalProperties"] is False
 

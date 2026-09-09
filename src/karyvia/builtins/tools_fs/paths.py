@@ -1,7 +1,8 @@
-"""Workspace 路径守卫：把模型给的路径串判成一个边界内的绝对路径。
+"""Workspace 与只读 Skill 挂载的路径守卫。
 
 职责：`WorkspaceGuard`——解析、双重校验（逻辑 + realpath）、渲染回相对显示路径，以及
-越界与形状非法两类拒绝。
+越界与形状非法两类拒绝。Skill 只增加显式 `@skills/<name>/...` 读取边界，不改变
+workspace 的写入边界。
 不负责：读写文件（`readers.py` / `writers.py`）、决定 workspace 根在哪（配置交下来，
 见 `settings.py`）。
 
@@ -30,7 +31,9 @@ from typing import Final
 
 from karyvia.contracts import ErrorCode, KaryviaError
 
-__all__ = ["RESERVED_DEVICE_NAMES", "WorkspaceGuard"]
+__all__ = ["RESERVED_DEVICE_NAMES", "SKILL_PATH_PREFIX", "WorkspaceGuard"]
+
+SKILL_PATH_PREFIX: Final = "@skills/"
 
 #: Windows 的保留设备名。它们能通过 containment 校验（`workspace/CON` 看起来完全正常）
 #: 却根本不是文件——打开它会连上控制台或空设备。两个平台一律拒绝而不是只在 Windows 上
@@ -69,10 +72,11 @@ class WorkspaceGuard:
     是个符号链接而每次都重新解析出不同结果。
     """
 
-    __slots__ = ("_root",)
+    __slots__ = ("_root", "_skill_roots")
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, skill_roots: tuple[Path, ...] = ()) -> None:
         self._root = Path(root).resolve()
+        self._skill_roots = tuple(Path(item).resolve() for item in skill_roots)
 
     @property
     def root(self) -> Path:
@@ -99,15 +103,20 @@ class WorkspaceGuard:
             )
         self._reject_reserved_names(raw)
 
+        mounted = self._resolve_skill_path(raw)
+        if mounted is not None:
+            return mounted
+
         candidate = Path(raw)
         if not candidate.is_absolute():
             candidate = self._root / candidate
 
         logical = Path(os.path.normpath(candidate))
-        if not _within(logical, self._root):
+        allowed_root = self._allowed_root(logical)
+        if allowed_root is None:
             raise self._outside(raw)
         real = logical.resolve()
-        if not _within(real, self._root):
+        if not _within(real, allowed_root):
             raise self._outside(raw)
         return real
 
@@ -117,9 +126,12 @@ class WorkspaceGuard:
         工具产出里一律用它而不是绝对路径：两个平台给出同一个串，顺带也不把
         宿主机目录结构送进上下文。根自身渲染成 `"."`。
         """
-        try:
+        if _within(path, self._root):
             relative = path.relative_to(self._root)
-        except ValueError:
+            text = relative.as_posix()
+            return text if text and text != "." else "."
+        mounted = self._mounted_relative(path)
+        if mounted is None:
             # 只可能是调用方把一个没过 `resolve()` 的路径递进来了——那是本包内部的
             # 编程错误，不是用户输入问题。
             raise KaryviaError(
@@ -127,8 +139,75 @@ class WorkspaceGuard:
                 "渲染了一个不在 workspace 内的路径。",
                 detail={"root": str(self._root)},
             ) from None
-        text = relative.as_posix()
-        return text if text and text != "." else "."
+        return mounted
+
+    def ensure_writable(self, path: Path) -> None:
+        """Skill 挂载只读；写工具仍只能修改 workspace。"""
+        if not _within(path, self._root):
+            raise KaryviaError(
+                ErrorCode.PERMISSION_DENIED,
+                "Skill 挂载是只读的。",
+                detail={"path": self.relative(path)},
+            )
+
+    def is_skill_entry(self, path: Path) -> bool:
+        """是否为某个挂载 Skill 的入口 `SKILL.md`。"""
+        for root in self._skill_roots:
+            if not _within(path, root):
+                continue
+            relative = path.relative_to(root)
+            return len(relative.parts) == 2 and relative.parts[1] == "SKILL.md"
+        return False
+
+    def _resolve_skill_path(self, raw: str) -> Path | None:
+        normalized = raw.replace("\\", "/")
+        if not normalized.startswith(SKILL_PATH_PREFIX):
+            return None
+        parts = normalized[len(SKILL_PATH_PREFIX) :].split("/")
+        if not parts or any(part in {"", ".", ".."} for part in parts):
+            raise self._outside(raw)
+        skill, rest = parts[0], parts[1:]
+        for container in self._skill_roots:
+            logical_root = container / skill
+            root = logical_root.resolve()
+            if not _within(root, container):
+                continue
+            if not root.is_dir() or not (root / "SKILL.md").is_file():
+                continue
+            logical = Path(os.path.normpath(root.joinpath(*rest)))
+            if not _within(logical, root):
+                raise self._outside(raw)
+            real = logical.resolve()
+            if not _within(real, root):
+                raise self._outside(raw)
+            return real
+        raise KaryviaError(
+            ErrorCode.PERSISTENCE_READ_FAILED,
+            "Skill 不存在或未启用。",
+            detail={"path": raw},
+        )
+
+    def _allowed_root(self, path: Path) -> Path | None:
+        if _within(path, self._root):
+            return self._root
+        for container in self._skill_roots:
+            for skill in container.iterdir() if container.is_dir() else ():
+                root = skill.resolve()
+                if (
+                    _within(root, container)
+                    and (root / "SKILL.md").is_file()
+                    and _within(path, root)
+                ):
+                    return root
+        return None
+
+    def _mounted_relative(self, path: Path) -> str | None:
+        for container in self._skill_roots:
+            if not _within(path, container):
+                continue
+            relative = path.relative_to(container).as_posix()
+            return f"{SKILL_PATH_PREFIX}{relative}"
+        return None
 
     def _reject_reserved_names(self, raw: str) -> None:
         for part in Path(raw).parts:

@@ -32,6 +32,7 @@ __all__ = [
     "CONFIG_MAX_OUTPUT_CHARS_KEY",
     "CONFIG_PASS_ENV_KEY",
     "CONFIG_SHELL_KEY",
+    "CONFIG_SKILL_ROOTS_KEY",
     "CONFIG_TIMEOUT_KEY",
     "CONFIG_WORKSPACE_KEY",
     "DEFAULT_MAX_OUTPUT_CHARS",
@@ -53,6 +54,7 @@ CONFIG_MAX_OUTPUT_CHARS_KEY: Final = "max_output_chars"
 CONFIG_PASS_ENV_KEY: Final = "pass_env"
 CONFIG_ENV_KEY: Final = "env"
 CONFIG_SHELL_KEY: Final = "shell"
+CONFIG_SKILL_ROOTS_KEY: Final = "skill_roots"
 
 #: 单次命令执行的默认超时（毫秒）。实际生效值还要与 `ToolInvocation.timeout_ms` 取较小者
 #: ——Kernel 那一侧已经把 turn 剩余预算压进去了（见 `process.effective_timeout_ms`）。
@@ -189,6 +191,7 @@ class ShellToolSettings:
         "_max_output_chars",
         "_pass_env",
         "_shell",
+        "_skill_roots",
         "_timeout_ms",
         "_workspace",
     )
@@ -203,6 +206,7 @@ class ShellToolSettings:
         pass_env: tuple[str, ...],
         env: Mapping[str, str],
         shell: str,
+        skill_roots: tuple[Path, ...] = (),
     ) -> None:
         self._workspace = workspace
         self._disabled = disabled
@@ -211,6 +215,7 @@ class ShellToolSettings:
         self._pass_env = pass_env
         self._env = env
         self._shell = shell
+        self._skill_roots = skill_roots
 
     @property
     def workspace(self) -> Path:
@@ -246,6 +251,10 @@ class ShellToolSettings:
         return self._shell
 
     @property
+    def skill_roots(self) -> tuple[Path, ...]:
+        return self._skill_roots
+
+    @property
     def enabled(self) -> bool:
         """本次该注册 `shell.exec` 吗。"""
         return not self._disabled
@@ -277,7 +286,20 @@ def resolve_settings(ctx: PluginContext) -> ShellToolSettings:
         pass_env=_read_name_list(config, CONFIG_PASS_ENV_KEY),
         env=_read_env_overrides(config),
         shell=_read_shell(config),
+        skill_roots=_read_skill_roots(config),
     )
+
+
+def _read_skill_roots(config: Mapping[str, JsonValue]) -> tuple[Path, ...]:
+    value = config.get(CONFIG_SKILL_ROOTS_KEY)
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, str):
+        raise _invalid("「skill_roots」必须是字符串数组。", key=CONFIG_SKILL_ROOTS_KEY)
+    roots = [Path(item).expanduser() for item in value if isinstance(item, str) and item.strip()]
+    if len(roots) != len(value):
+        raise _invalid("「skill_roots」的每一项都必须是非空字符串。", key=CONFIG_SKILL_ROOTS_KEY)
+    return tuple(roots)
 
 
 def enabled_tool_names(config: Mapping[str, JsonValue]) -> tuple[str, ...]:

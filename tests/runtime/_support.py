@@ -90,7 +90,7 @@ FAKE_MODEL: PluginManifest = PluginManifest(
     capabilities=(CapabilityDecl(kind=CapabilityKind.MODEL, name="fake"),),
 )
 
-#: 真实内建清单，模型换成 Fake。其余六份**原封不动**。
+#: 真实内建清单，模型换成 Fake。其余九份**原封不动**。
 TEST_MANIFESTS: tuple[PluginManifest, ...] = tuple(
     FAKE_MODEL if manifest.id == "model-openai" else manifest for manifest in BUILTIN_MANIFESTS
 )

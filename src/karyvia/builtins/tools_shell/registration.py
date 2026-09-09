@@ -38,4 +38,6 @@ def setup(api: KaryviaAPI) -> None:
     settings = resolve_settings(api.ctx)
     if not settings.enabled:
         return
-    api.register_tool(EXEC_SPEC, ShellExecutor(CwdGuard(settings.workspace), settings))
+    api.register_tool(
+        EXEC_SPEC, ShellExecutor(CwdGuard(settings.workspace, settings.skill_roots), settings)
+    )

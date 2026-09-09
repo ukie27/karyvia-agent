@@ -1,4 +1,4 @@
-"""cwd 边界守卫：把 `cwd` 参数判成 workspace 内的一个目录。
+"""cwd 边界守卫：接受 workspace 或已启用的 Skill 挂载目录。
 
 职责：`CwdGuard`——解析、双重校验（逻辑 + realpath）、渲染回相对显示路径。
 不负责：执行命令（`process.py`）、
@@ -24,18 +24,21 @@
 **这是应用级守卫，不是 OS 沙箱**：校验与随后 `create_subprocess_exec` 使用该 cwd 之间存在
 TOCTOU 窗口——目标可以在这期间被换成一个指向根外的符号链接。更要紧的是，**守住 cwd 并不
 等于守住命令能碰到的文件**：一条 `cat /etc/shadow` 用的是绝对路径，与 cwd 无关。cwd 边界
-限制的是「命令默认在哪里落地」。更严格的控制是不启用该工具，或使用独立宿主 / 部署沙箱；
-这里如实写明，不假装挡得住。
+限制的是「命令默认在哪里落地」，也不会阻止命令修改 Skill 目录。更严格的控制是不启用该
+工具，或使用独立宿主 / 部署沙箱；这里如实写明，不假装挡得住。
 """
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
+from typing import Final
 
 from karyvia.contracts import ErrorCode, KaryviaError
 
-__all__ = ["CwdGuard"]
+__all__ = ["SKILL_PATH_PREFIX", "CwdGuard"]
+
+SKILL_PATH_PREFIX: Final = "@skills/"
 
 
 def _key(path: Path | str) -> str:
@@ -63,10 +66,11 @@ class CwdGuard:
     是个符号链接而每次都重新解析出不同结果。
     """
 
-    __slots__ = ("_root",)
+    __slots__ = ("_root", "_skill_roots")
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, skill_roots: tuple[Path, ...] = ()) -> None:
         self._root = Path(root).resolve()
+        self._skill_roots = tuple(Path(item).resolve() for item in skill_roots)
 
     @property
     def root(self) -> Path:
@@ -91,15 +95,20 @@ class CwdGuard:
                 ErrorCode.INPUT_MALFORMED, "cwd 不得包含 NUL 字节。", detail={"cwd": "<binary>"}
             )
 
+        mounted = self._resolve_skill_path(raw)
+        if mounted is not None:
+            return mounted
+
         candidate = Path(raw)
         if not candidate.is_absolute():
             candidate = self._root / candidate
 
         logical = Path(os.path.normpath(candidate))
-        if not _within(logical, self._root):
+        allowed_root = self._allowed_root(logical)
+        if allowed_root is None:
             raise self._outside(raw)
         real = logical.resolve()
-        if not _within(real, self._root):
+        if not _within(real, allowed_root):
             raise self._outside(raw)
         return real
 
@@ -109,9 +118,12 @@ class CwdGuard:
         工具产出里一律用它而不是绝对路径：两个平台给出同一个串，顺带也不把
         宿主机目录结构送进上下文。根自身渲染成 `"."`。
         """
-        try:
+        if _within(path, self._root):
             relative = path.relative_to(self._root)
-        except ValueError:
+            text = relative.as_posix()
+            return text if text and text != "." else "."
+        mounted = self._mounted_relative(path)
+        if mounted is None:
             # 只可能是调用方把一个没过 `resolve()` 的路径递进来了——那是本包内部的
             # 编程错误，不是用户输入问题。
             raise KaryviaError(
@@ -119,8 +131,54 @@ class CwdGuard:
                 "渲染了一个不在 workspace 内的路径。",
                 detail={"root": str(self._root)},
             ) from None
-        text = relative.as_posix()
-        return text if text and text != "." else "."
+        return mounted
+
+    def _resolve_skill_path(self, raw: str) -> Path | None:
+        normalized = raw.replace("\\", "/")
+        if not normalized.startswith(SKILL_PATH_PREFIX):
+            return None
+        parts = normalized[len(SKILL_PATH_PREFIX) :].split("/")
+        if not parts or not parts[0] or any(part in {"", ".", ".."} for part in parts):
+            raise self._outside(raw)
+        skill, rest = parts[0], parts[1:]
+        for container in self._skill_roots:
+            root = (container / skill).resolve()
+            if not _within(root, container):
+                continue
+            if not root.is_dir() or not (root / "SKILL.md").is_file():
+                continue
+            logical = Path(os.path.normpath(root.joinpath(*rest)))
+            if not _within(logical, root):
+                raise self._outside(raw)
+            real = logical.resolve()
+            if not _within(real, root):
+                raise self._outside(raw)
+            return real
+        raise KaryviaError(
+            ErrorCode.PERSISTENCE_READ_FAILED,
+            "Skill 不存在或未启用。",
+            detail={"cwd": raw},
+        )
+
+    def _allowed_root(self, path: Path) -> Path | None:
+        if _within(path, self._root):
+            return self._root
+        for container in self._skill_roots:
+            for skill in container.iterdir() if container.is_dir() else ():
+                root = skill.resolve()
+                if (
+                    _within(root, container)
+                    and (root / "SKILL.md").is_file()
+                    and _within(path, root)
+                ):
+                    return root
+        return None
+
+    def _mounted_relative(self, path: Path) -> str | None:
+        for container in self._skill_roots:
+            if _within(path, container):
+                return f"{SKILL_PATH_PREFIX}{path.relative_to(container).as_posix()}"
+        return None
 
     def _outside(self, raw: str) -> KaryviaError:
         return KaryviaError(

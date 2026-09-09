@@ -114,9 +114,16 @@ karyvia run -p "用一句话介绍你自己"
 > /config
 ```
 
-零配置下已经可用的内建能力有六件：会话存储、上下文组装、OpenAI 兼容模型、
+零配置下已经可用的内建能力还包括 Skill 目录：会话存储、上下文组装、OpenAI 兼容模型、
 文件工具（`fs.read` / `write` / `edit` / `list` / `grep`）、shell 工具（`shell.exec`）、
 命令集（`/help` `/config` `/session` `/plugins` `/capabilities` `/cancel`）。
+
+用户级 Skill 直接放在 `~/.karyvia/skills/<name>/SKILL.md`。Agent 会先看到所有 Skill 的
+`name`、`description` 与 `@skills/<name>/SKILL.md`，任务匹配时再用 `fs.read` 读取完整指令，
+并可用 `shell.exec`、`cwd: "@skills/<name>"` 原地运行 `scripts/`；不会把 Skill 包复制进
+workspace。workspace 级 Skill 默认不信任，只有显式配置
+`plugins.skills-basic.config.workspace_enabled=true` 后才读取
+`<workspace>/.karyvia/skills/<name>/SKILL.md`。Skill 挂载对文件写工具是只读的。
 
 ## 5. 装一个官方插件
 

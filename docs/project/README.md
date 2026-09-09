@@ -34,9 +34,11 @@ Karyvia 已经具备一套可运行、受架构守卫约束的 Agent Kernel 骨�
 
 ### 默认与可选能力
 
-九个内建能力包：JSONL Session、基础 Context、Turn 内上下文压缩、OpenAI-compatible Model、
-文件读写工具、文件投递工具、Shell 工具、核心命令和 CLI 入口。`file.send` 只把 workspace 文件附加到当前回复，
-实际上传仍由 Channel 完成。
+十个内建能力包：JSONL Session、基础 Context、Skill 目录、Turn 内上下文压缩、
+OpenAI-compatible Model、文件读写工具、文件投递工具、Shell 工具、核心命令和 CLI 入口。
+Skill 只在 Context 中暴露精简元数据，正文与配套资源通过既有文件/Shell 工具从
+`@skills/<name>/...` 原地按需访问，不复制到 workspace。`file.send` 只把 workspace 文件附加到
+当前回复，实际上传仍由 Channel 完成。
 
 七个官方独立插件：OpenAI API、Anthropic、Feishu、Web、MCP、Memory、Cron。
 插件安装方式与当前清单见 [`../getting-started.md`](../getting-started.md)。

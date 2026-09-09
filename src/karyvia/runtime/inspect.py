@@ -197,6 +197,7 @@ async def inspect_capabilities(
             PluginRuntime(),
             env,
             resources.contexts,
+            home=home,
             external_ids=[manifest.id for manifest in plan.manifests],
         )
     finally:
@@ -266,6 +267,7 @@ async def open_session_store(
             PluginRuntime(),
             env,
             resources.contexts,
+            home=home,
             external_ids=[manifest.id for manifest in external],
         )
         wiring.report.raise_if_failed()

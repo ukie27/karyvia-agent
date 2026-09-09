@@ -214,6 +214,7 @@ producer ── bus.publish(name, correlation, payload, error)
 | 新工具 | `TOOL` 插件和 `PluginContext` 资源服务 | 把 Runtime/Kernel 私有对象交给插件 |
 | 发送 workspace 文件 | `file.send` → `ToolResult.attachments` → Channel | 让工具直接调用平台 SDK |
 | 新 Context 来源 | `CONTEXT` 能力 | 把产品 prompt 写死在 Context Builder |
+| 新 Skill 来源 | `CONTEXT` 元数据 + 既有文件/Shell 工具 | 新增 Skill 能力种类、激活状态或专用读取工具 |
 | 新上下文压缩策略 | `TURN_COMPACTOR` 能力 | 把算法写进 Engine 或让插件读写 Session |
 | 新 Memory 后端 | `MEMORY` 能力 | 把存储策略塞进 Session Store |
 | 新命令 | `COMMAND` 能力 | 给 Runtime CLI/Dispatcher 写内建特例 |

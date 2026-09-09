@@ -269,7 +269,7 @@ async def _wait_for_a_live_turn(instance: AgentInstance) -> None:
 #: `context-compact-basic`（Turn 内请求压缩）与 `model-openai` 是必需能力的唯一
 #: 提供方，禁用它们等于要一个不能正常回答的实例；
 #: `cli-entry` 由  显式拒绝，见下一条用例。
-DISABLEABLE = ("tools-fs", "tools-file", "tools-shell", "commands-core")
+DISABLEABLE = ("skills-basic", "tools-fs", "tools-file", "tools-shell", "commands-core")
 
 
 def _write_config(instance_dir: Path, document: dict[str, object]) -> None:

@@ -252,6 +252,7 @@ async def _build_instance(
         runtime,
         env,
         resources.contexts,
+        home=home,
         external_ids=external_ids,
     )
     if cli_entry_from(wiring.registry) is None and any(
@@ -276,6 +277,7 @@ async def _build_instance(
             runtime,
             env,
             resources.contexts,
+            home=home,
             builtin_cli_only=True,
             external_ids=external_ids,
         )

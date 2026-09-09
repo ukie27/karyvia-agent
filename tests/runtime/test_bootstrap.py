@@ -5,7 +5,7 @@
 停止时锁是否释放。
 不负责：验单个内建的行为（`tests/builtins/`）、验 kernel 各机制（`tests/kernel/`）。
 
-**Fake 只换模型这一项**（`_support.TEST_MANIFESTS`）：其余六份 manifest 与生产完全一致，
+**Fake 只换模型这一项**（`_support.TEST_MANIFESTS`）：其余九份 manifest 与生产完全一致，
 因此这套用例真的走了一遍 `session_jsonl` 写盘、`tools_fs` 建守卫、`commands_core` 读
 `ctx.instance` 的那条路。往里再多换一个 Fake，这套用例就退化成 `tests/kernel/` 的重复。
 """
@@ -163,7 +163,15 @@ async def test_the_cli_stays_usable_with_every_disableable_builtin_off(tmp_path:
     """§16.1 第 5 条：把能关的内建全关掉，CLI 仍然可用。"""
     write_config(
         tmp_path,
-        plugins={"disable": ["tools-fs", "tools-file", "tools-shell", "commands-core"]},
+        plugins={
+            "disable": [
+                "skills-basic",
+                "tools-fs",
+                "tools-file",
+                "tools-shell",
+                "commands-core",
+            ]
+        },
     )
     instance = await _boot(tmp_path)
     try:
@@ -178,13 +186,14 @@ async def test_the_cli_stays_usable_with_every_disableable_builtin_off(tmp_path:
 
 
 async def test_each_builtin_gets_its_own_config_block(tmp_path: Path) -> None:
-    """九份内建共用一个 `Builtin()` ProviderId，配置块**只能**按 manifest 索引。"""
+    """十份内建共用一个 `Builtin()` ProviderId，配置块**只能**按 manifest 索引。"""
     write_config(tmp_path)
     instance = await _boot(tmp_path)
     try:
         blocks = {ctx.plugin_id: dict(ctx.config) for ctx in instance.contexts}
         assert blocks["session-jsonl"]["dir"] == str(instance.layout.sessions_dir)
         assert blocks["tools-fs"]["workspace"] == str(instance.config.workspace_root)
+        assert blocks["skills-basic"]["roots"]
         assert "dir" not in blocks["tools-fs"]
     finally:
         await instance.stop()
@@ -201,6 +210,40 @@ async def test_derived_blocks_hand_down_what_builtins_cannot_know(tmp_path: Path
         assert derived["commands-core"]["prefix"] == "!"
         assert derived["cli-entry"]["instance_id"] == instance.layout.root.name
         assert derived["tools-shell"]["workspace"] == str(instance.config.workspace_root)
+    finally:
+        await instance.stop()
+
+
+async def test_skill_roots_are_shared_with_existing_tools_and_workspace_is_opt_in(
+    tmp_path: Path,
+) -> None:
+    home = tmp_path / "home"
+    write_config(
+        tmp_path,
+        plugins={"skills-basic": {"config": {"workspace_enabled": True}}},
+    )
+    instance = await _boot(tmp_path, env={"KARYVIA_HOME": str(home)})
+    try:
+        blocks = {ctx.plugin_id: dict(ctx.config) for ctx in instance.contexts}
+        expected = [
+            str(instance.config.workspace_root / ".karyvia" / "skills"),
+            str(home / "skills"),
+        ]
+        assert blocks["skills-basic"]["roots"] == expected
+        assert blocks["tools-fs"]["skill_roots"] == expected
+        assert blocks["tools-shell"]["skill_roots"] == expected
+    finally:
+        await instance.stop()
+
+
+async def test_disabling_skill_provider_also_removes_tool_mounts(tmp_path: Path) -> None:
+    write_config(tmp_path, plugins={"disable": ["skills-basic"]})
+    instance = await _boot(tmp_path)
+    try:
+        blocks = {ctx.plugin_id: dict(ctx.config) for ctx in instance.contexts}
+        assert "skills-basic" not in blocks
+        assert blocks["tools-fs"]["skill_roots"] == []
+        assert blocks["tools-shell"]["skill_roots"] == []
     finally:
         await instance.stop()
 

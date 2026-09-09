@@ -54,7 +54,7 @@ def setup(api: KaryviaAPI) -> None:
     `mkdir(parents=True)`），因此 `karyvia capabilities` 这类只读命令不会在磁盘上留下痕迹。
     """
     settings = resolve_settings(api.ctx)
-    guard = WorkspaceGuard(settings.workspace)
+    guard = WorkspaceGuard(settings.workspace, settings.skill_roots)
     for name in settings.enabled:
         spec, factory = TOOL_FACTORIES[name]
         api.register_tool(spec, factory(guard, settings))

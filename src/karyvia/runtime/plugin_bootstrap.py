@@ -11,10 +11,18 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Collection, Mapping, Sequence
 from pathlib import Path
 
-from karyvia.builtins import cli_entry, commands_core, session_jsonl, tools_fs, tools_shell
+from karyvia.builtins import (
+    cli_entry,
+    commands_core,
+    session_jsonl,
+    skills_basic,
+    tools_fs,
+    tools_shell,
+)
 from karyvia.builtins.registry import BUILTIN_MANIFESTS
 from karyvia.contracts import (
     Builtin,
@@ -63,16 +71,49 @@ _FILTERED_KINDS = (CapabilityKind.TOOL, CapabilityKind.COMMAND)
 
 
 def builtin_config_blocks(
-    config: KaryviaConfig, layout: InstanceLayout, workspace: Path
+    config: KaryviaConfig,
+    layout: InstanceLayout,
+    workspace: Path,
+    env: Mapping[str, str] | None = None,
+    home: Path | None = None,
 ) -> dict[str, dict[str, JsonValue]]:
     """返回只有组装根能推导出的内建配置默认值。"""
+    skill_roots: list[Path] = []
+    if "skills-basic" not in config.plugins.disable:
+        skill_roots.append(_global_skills_root(layout, env, home))
+        workspace_enabled = config.plugins.entry("skills-basic").config.get(
+            "workspace_enabled", False
+        )
+        if workspace_enabled is True:
+            skill_roots.insert(0, workspace / ".karyvia" / "skills")
+    rendered_roots = [str(path) for path in skill_roots]
     return {
         "session-jsonl": {session_jsonl.CONFIG_DIRECTORY_KEY: str(layout.sessions_dir)},
-        "tools-fs": {tools_fs.CONFIG_WORKSPACE_KEY: str(workspace)},
-        "tools-shell": {tools_shell.CONFIG_WORKSPACE_KEY: str(workspace)},
+        "skills-basic": {skills_basic.CONFIG_ROOTS_KEY: rendered_roots},
+        "tools-fs": {
+            tools_fs.CONFIG_WORKSPACE_KEY: str(workspace),
+            tools_fs.CONFIG_SKILL_ROOTS_KEY: rendered_roots,
+        },
+        "tools-shell": {
+            tools_shell.CONFIG_WORKSPACE_KEY: str(workspace),
+            tools_shell.CONFIG_SKILL_ROOTS_KEY: rendered_roots,
+        },
         "commands-core": {commands_core.CONFIG_PREFIX_KEY: config.routing.command_prefix},
         "cli-entry": {cli_entry.CONFIG_INSTANCE_ID_KEY: layout.root.name},
     }
+
+
+def _global_skills_root(
+    layout: InstanceLayout, env: Mapping[str, str] | None, home: Path | None
+) -> Path:
+    """从实例布局定位 Karyvia home；显式实例目录使用标准用户级 home。"""
+    parents = layout.root.parents
+    if len(parents) >= 2 and layout.root.parent.name == "instances":
+        return parents[1] / "skills"
+    source = os.environ if env is None else env
+    explicit = source.get("KARYVIA_HOME") if home is None else None
+    base = Path(explicit).expanduser() if explicit else (home or Path.home()) / ".karyvia"
+    return base / "skills"
 
 
 def config_block_for(
@@ -171,6 +212,7 @@ async def wire_all(
     env: Mapping[str, str] | None,
     contexts: list[RuntimePluginContext],
     *,
+    home: Path | None = None,
     builtin_cli_only: bool = False,
     external_ids: Collection[str] = (),
 ) -> Wiring:
@@ -179,7 +221,7 @@ async def wire_all(
     外部插件失败保留在 ``Wiring.outcomes``，由诊断呈现并继续装配。内建清单是宿主自己
     发布的基线，不属于第三方故障隔离边界；其 setup 失败时保留原始错误并终止启动。
     """
-    derived = builtin_config_blocks(config, layout, workspace)
+    derived = builtin_config_blocks(config, layout, workspace, env, home)
     keep = capability_filter(config, derived)
     external = set(external_ids)
 

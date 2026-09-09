@@ -26,6 +26,7 @@ from karyvia.contracts import (
     ToolInvocation,
     ToolResult,
     ToolSpec,
+    TrustLevel,
 )
 
 from .base import (
@@ -50,13 +51,17 @@ _FILE_ENTRY: Final = "{path}\t{size} bytes"
 READ_SPEC: Final = ToolSpec(
     name="fs.read",
     description=(
-        "读取 workspace 内一个文本文件的内容。可用 start_line / max_lines 读取片段。"
+        "读取 workspace 或已启用 @skills/<name>/... 挂载中的文本文件。"
+        "可用 start_line / max_lines 读取片段。"
         "二进制文件会被拒绝而不是返回乱码；超长内容会被截断并标注。"
     ),
     parameters={
         "type": "object",
         "properties": {
-            "path": {"type": "string", "description": "workspace 内的文件路径。"},
+            "path": {
+                "type": "string",
+                "description": "workspace 内路径，或已启用的 @skills/<name>/... 路径。",
+            },
             "start_line": {
                 "type": "integer",
                 "minimum": 1,
@@ -80,7 +85,8 @@ READ_SPEC: Final = ToolSpec(
 LIST_SPEC: Final = ToolSpec(
     name="fs.list",
     description=(
-        "列出 workspace 内一个目录的条目。目录以 / 结尾，文件附字节数；"
+        "列出 workspace 或已启用 @skills/<name>/... 挂载中的目录。"
+        "目录以 / 结尾，文件附字节数；"
         "结果按路径排序，条目过多时截断并标注。"
     ),
     parameters={
@@ -89,7 +95,7 @@ LIST_SPEC: Final = ToolSpec(
             "path": {
                 "type": "string",
                 "default": ".",
-                "description": "workspace 内的目录路径，省略表示 workspace 根。",
+                "description": "workspace 内目录或 @skills/<name>/...；省略表示 workspace 根。",
             },
             "recursive": {
                 "type": "boolean",
@@ -145,6 +151,11 @@ class ReadTool(FsTool):
                 "lossy": lossy,
             },
             truncated=oversized or end_line < len(lines) or start_line > 1,
+            trust=(
+                TrustLevel.SYSTEM
+                if self._guard.is_skill_entry(target)
+                else TrustLevel.UNTRUSTED
+            ),
         )
 
     def _read_bytes(self, target: Path) -> tuple[bytes, bool]:

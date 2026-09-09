@@ -36,6 +36,7 @@ __all__ = [
     "CONFIG_MAX_MATCHES_KEY",
     "CONFIG_MAX_READ_BYTES_KEY",
     "CONFIG_MAX_RESULT_CHARS_KEY",
+    "CONFIG_SKILL_ROOTS_KEY",
     "CONFIG_WORKSPACE_KEY",
     "DEFAULT_MAX_ENTRIES",
     "DEFAULT_MAX_MATCHES",
@@ -52,6 +53,7 @@ TOOL_NAMES: Final[tuple[str, ...]] = ("fs.read", "fs.write", "fs.edit", "fs.list
 
 #: 六个配置键。manifest 的 `config_schema` 与这里必须一致，由测试对照。
 CONFIG_WORKSPACE_KEY: Final = "workspace"
+CONFIG_SKILL_ROOTS_KEY: Final = "skill_roots"
 CONFIG_DISABLE_KEY: Final = "disable"
 CONFIG_MAX_READ_BYTES_KEY: Final = "max_read_bytes"
 CONFIG_MAX_RESULT_CHARS_KEY: Final = "max_result_chars"
@@ -100,6 +102,7 @@ class FsToolSettings:
         "_max_matches",
         "_max_read_bytes",
         "_max_result_chars",
+        "_skill_roots",
         "_workspace",
     )
 
@@ -112,6 +115,7 @@ class FsToolSettings:
         max_result_chars: int,
         max_entries: int,
         max_matches: int,
+        skill_roots: tuple[Path, ...] = (),
     ) -> None:
         self._workspace = workspace
         self._disabled = disabled
@@ -119,6 +123,7 @@ class FsToolSettings:
         self._max_result_chars = max_result_chars
         self._max_entries = max_entries
         self._max_matches = max_matches
+        self._skill_roots = skill_roots
 
     @property
     def workspace(self) -> Path:
@@ -145,6 +150,11 @@ class FsToolSettings:
     @property
     def max_matches(self) -> int:
         return self._max_matches
+
+    @property
+    def skill_roots(self) -> tuple[Path, ...]:
+        """按优先级排列的 Skill 容器目录。"""
+        return self._skill_roots
 
     @property
     def enabled(self) -> tuple[str, ...]:
@@ -227,7 +237,20 @@ def resolve_settings(ctx: PluginContext) -> FsToolSettings:
         max_matches=_read_positive_int(
             config, CONFIG_MAX_MATCHES_KEY, default=DEFAULT_MAX_MATCHES
         ),
+        skill_roots=_read_skill_roots(config),
     )
+
+
+def _read_skill_roots(config: Mapping[str, JsonValue]) -> tuple[Path, ...]:
+    value = config.get(CONFIG_SKILL_ROOTS_KEY)
+    if value is None:
+        return ()
+    if not isinstance(value, Sequence) or isinstance(value, str):
+        raise _invalid("「skill_roots」必须是字符串数组。", key=CONFIG_SKILL_ROOTS_KEY)
+    roots = [Path(item).expanduser() for item in value if isinstance(item, str) and item.strip()]
+    if len(roots) != len(value):
+        raise _invalid("「skill_roots」的每一项都必须是非空字符串。", key=CONFIG_SKILL_ROOTS_KEY)
+    return tuple(roots)
 
 
 def enabled_tool_names(config: Mapping[str, JsonValue]) -> tuple[str, ...]:

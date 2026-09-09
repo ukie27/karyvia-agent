@@ -25,7 +25,7 @@ from .content import (
     normalize_newlines,
     truncate,
 )
-from .paths import RESERVED_DEVICE_NAMES, WorkspaceGuard
+from .paths import RESERVED_DEVICE_NAMES, SKILL_PATH_PREFIX, WorkspaceGuard
 from .readers import LIST_SPEC, READ_SPEC, ListTool, ReadTool
 from .registration import TOOL_FACTORIES, setup
 from .search import GREP_SPEC, MAX_PATTERN_LENGTH, GrepTool
@@ -35,6 +35,7 @@ from .settings import (
     CONFIG_MAX_MATCHES_KEY,
     CONFIG_MAX_READ_BYTES_KEY,
     CONFIG_MAX_RESULT_CHARS_KEY,
+    CONFIG_SKILL_ROOTS_KEY,
     CONFIG_WORKSPACE_KEY,
     DEFAULT_MAX_ENTRIES,
     DEFAULT_MAX_MATCHES,
@@ -54,6 +55,7 @@ __all__ = [
     "CONFIG_MAX_MATCHES_KEY",
     "CONFIG_MAX_READ_BYTES_KEY",
     "CONFIG_MAX_RESULT_CHARS_KEY",
+    "CONFIG_SKILL_ROOTS_KEY",
     "CONFIG_WORKSPACE_KEY",
     "DEFAULT_MAX_ENTRIES",
     "DEFAULT_MAX_MATCHES",
@@ -66,6 +68,7 @@ __all__ = [
     "READ_SPEC",
     "REPLACEMENT_CHAR",
     "RESERVED_DEVICE_NAMES",
+    "SKILL_PATH_PREFIX",
     "TOOL_FACTORIES",
     "TOOL_NAMES",
     "WRITE_SPEC",

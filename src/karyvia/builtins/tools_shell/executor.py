@@ -70,7 +70,8 @@ EXEC_SPEC: Final = ToolSpec(
         "在 workspace 内执行一条 shell 命令并返回退出码、stdout 与 stderr。"
         "POSIX 上交给 sh -c，Windows 上交给 cmd.exe /c。"
         "非零退出码是正常产出而不是错误；输出过长时截断并标注。"
-        "命令默认在 workspace 根执行，可用 cwd 指定根内的子目录。"
+        "命令默认在 workspace 根执行；cwd 也可指定已启用的 @skills/<name>，"
+        "以原地运行 Skill 自带脚本。"
     ),
     parameters={
         "type": "object",
@@ -83,7 +84,7 @@ EXEC_SPEC: Final = ToolSpec(
             "cwd": {
                 "type": "string",
                 "default": ".",
-                "description": "工作目录，相对 workspace 根。省略表示根本身；越界会被拒绝。",
+                "description": "workspace 内目录或已启用的 @skills/<name>/...；省略为根。",
             },
         },
         "required": ["command"],

@@ -50,7 +50,8 @@ _MATCH_LINE: Final = "{path}:{line}: {text}"
 GREP_SPEC: Final = ToolSpec(
     name="fs.grep",
     description=(
-        "在 workspace 内按 Python 正则搜索文本文件，返回 路径:行号: 内容。"
+        "在 workspace 或已启用 @skills/<name>/... 挂载中按 Python 正则搜索文本文件，"
+        "返回 路径:行号: 内容。"
         "可用 glob 限定文件名；二进制文件自动跳过；匹配过多时截断并标注。"
     ),
     parameters={
@@ -64,7 +65,7 @@ GREP_SPEC: Final = ToolSpec(
             "path": {
                 "type": "string",
                 "default": ".",
-                "description": "搜索起点，省略表示 workspace 根。可以是文件或目录。",
+                "description": "搜索起点；可用 workspace 或 @skills/<name>/... 路径。",
             },
             "glob": {
                 "type": "string",

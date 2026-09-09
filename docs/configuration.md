@@ -28,6 +28,10 @@
 `KARYVIA_HOME` 可以改变数据根本身；它直接指向原本的 `~/.karyvia/` 这一层，命名
 实例仍统一放在其 `instances/` 子目录。
 
+全局 Skill 位于 `<KARYVIA_HOME>/skills/<name>/`，其中入口必须是 `SKILL.md`。它不属于某个
+实例，也不会在启动时复制或物化到 workspace；启用的 Skill 通过受控虚拟路径
+`@skills/<name>/...` 交给现有文件和 Shell 工具访问。
+
 选实例的三种方式，优先级从高到低：
 
 | 方式 | 例子 |
@@ -172,6 +176,25 @@ Session 的等待上限。保留旧字段会按未知配置拒绝启动，避免
 
 插件代码不属于实例配置。安装、更新和卸载由全局 `karyvia plugins` 命令管理，文件直接位于
 `~/.karyvia/`；实例只保存启用、禁用、配置和状态。
+
+内建 `skills-basic` 默认扫描全局 `<KARYVIA_HOME>/skills/`，并把每个 Skill 的元数据加入
+Agent Context。workspace 级目录 `<workspace>/.karyvia/skills/` 默认不启用；需要由实例拥有者
+显式写入：
+
+```json
+{
+  "plugins": {
+    "skills-basic": {
+      "config": {"workspace_enabled": true}
+    }
+  }
+}
+```
+
+把 `skills-basic` 加入 `plugins.disable` 会同时撤掉元数据与 `@skills/` 工具挂载。每个
+`SKILL.md` 必须使用 UTF-8，并以 YAML frontmatter 声明与目录同名的 `name` 及非空
+`description`。Agent 只在启动上下文中获得这些精简元数据，正文、`references/`、`assets/`
+和 `scripts/` 都按需原地读取或执行；不会创建缓存副本。
 
 ### `hooks` —— Hook 分发超时
 

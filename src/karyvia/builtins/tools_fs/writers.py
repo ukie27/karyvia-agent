@@ -195,6 +195,7 @@ class WriteTool(_WritingTool):
                 detail={"argument": "content", "actual_type": type(content).__name__},
             )
         target = self._guard.resolve(require_str(arguments, "path"))
+        self._guard.ensure_writable(target)
 
         cancel.raise_if_requested()
         existed = target.exists()
@@ -231,6 +232,7 @@ class EditTool(_WritingTool):
             )
         replace_all = optional_bool(arguments, "replace_all", False)
         target = self._guard.resolve(require_str(arguments, "path"))
+        self._guard.ensure_writable(target)
 
         cancel.raise_if_requested()
         current = await asyncio.to_thread(self._read_existing, target)

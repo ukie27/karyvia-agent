@@ -4,6 +4,6 @@
 shell 工具、核心命令），走与插件完全相同的注册路径。
 不负责：享受任何插件拿不到的特权，也不被 kernel 直接引用。
 
-当前默认能力包括 JSONL Session、基础 Context、OpenAI-compatible Model、文件与 Shell
-工具、核心命令和 CLI 入口。它们随主包发行只是安装策略，不构成架构特权。
+当前默认能力包括 JSONL Session、基础 Context、Skill 目录、OpenAI-compatible Model、文件
+与 Shell 工具、核心命令和 CLI 入口。它们随主包发行只是安装策略，不构成架构特权。
 """

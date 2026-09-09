@@ -32,6 +32,7 @@ __all__ = [
     "CONTEXT_COMPACT_BASIC",
     "MODEL_OPENAI",
     "SESSION_JSONL",
+    "SKILLS_BASIC",
     "TOOLS_FS",
     "TOOLS_FILE",
     "TOOLS_SHELL",
@@ -93,6 +94,31 @@ CONTEXT_BASIC: Final = PluginManifest(
                 "type": "boolean",
                 "default": True,
                 "description": "是否附上当前时间、会话身份与历史条数这几项运行时事实。",
+            },
+        },
+        "additionalProperties": False,
+    },
+)
+
+#: Agent Skills 目录。只贡献精简元数据；完整内容仍由既有文件与 Shell 工具按需访问。
+SKILLS_BASIC: Final = PluginManifest(
+    id="skills-basic",
+    version="0.1.0",
+    sdk_range=">=5.0.0,<6.0.0",
+    setup="karyvia.builtins.skills_basic:setup",
+    capabilities=(CapabilityDecl(kind=CapabilityKind.CONTEXT, name="skills"),),
+    config_schema={
+        "type": "object",
+        "properties": {
+            "roots": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "按启动优先级排列的 Skill 容器目录，由 Runtime 注入。",
+            },
+            "workspace_enabled": {
+                "type": "boolean",
+                "default": False,
+                "description": "是否信任并启用 workspace/.karyvia/skills 下的 Skill。",
             },
         },
         "additionalProperties": False,
@@ -244,6 +270,11 @@ TOOLS_FS: Final = PluginManifest(
                 "description": "全部路径解析的根。缺省时使用本插件的私有状态目录；"
                 "装配根会把配置里的 workspace.root 填在这里。",
             },
+            "skill_roots": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "可通过 @skills/<name>/... 访问的受控 Skill 容器。",
+            },
             "disable": {
                 "type": "array",
                 "items": {"type": "string"},
@@ -320,6 +351,11 @@ TOOLS_SHELL: Final = PluginManifest(
                 "type": "string",
                 "description": "命令的默认 cwd，也是 cwd 参数必须落在其内的根。"
                 "缺省时使用本插件的私有状态目录；装配根会把配置里的 workspace.root 填在这里。",
+            },
+            "skill_roots": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "可作为 @skills/<name> cwd 的受控 Skill 容器。",
             },
             "disable": {
                 "type": "array",
@@ -472,6 +508,7 @@ CLI_ENTRY: Final = PluginManifest(
 BUILTIN_MANIFESTS: Final[tuple[PluginManifest, ...]] = (
     SESSION_JSONL,
     CONTEXT_BASIC,
+    SKILLS_BASIC,
     CONTEXT_COMPACT_BASIC,
     MODEL_OPENAI,
     TOOLS_FS,
