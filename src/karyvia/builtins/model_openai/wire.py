@@ -6,7 +6,11 @@
 `settings.py` / `faults.py`）——**本模块不做任何 IO**，因此每一条线格式规则都能被单独一条
 用例逐字节钉住。
 
-三件在真实端点上被反复验证、写错就是 400 或静默丢数据的事：
+四件在真实端点上被反复验证、写错就是 400 或静默丢数据的事：
+
+- **Kernel 点分工具名不能直接进入线格式。** OpenAI-compatible 接口不接受名称中的点号；
+  发送时改成保留语义的短横线名称，响应时必须按本次请求的映射恢复，不能根据模型返回值
+  猜测内部工具名。
 
 - **`index` 是流式 tool_call 的身份键，不是 `id`。** 并行调用交错到达，`id` 与
   `function.name` **只在首片**出现，后续片只有 `{"index": 0, "function": {"arguments": …}}`。
@@ -23,6 +27,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from collections.abc import Mapping, Sequence
@@ -51,6 +56,7 @@ __all__ = [
     "SSE_DONE",
     "StreamDecoder",
     "ToolCallAccumulator",
+    "ToolNameMap",
     "build_payload",
     "decode_response",
     "decode_stop_reason",
@@ -100,11 +106,102 @@ _CACHED_TOKEN_PATHS: Final[tuple[tuple[str, ...], ...]] = (
 _BAD_TOOL_CALL: Final = "模型返回的工具调用不符合契约。"
 _BAD_ARGUMENTS: Final = "模型返回的工具调用参数不是合法的 JSON 对象。"
 _BAD_RESPONSE_SHAPE: Final = "供应商响应的形状不符合 OpenAI Chat Completions。"
+_UNKNOWN_WIRE_TOOL: Final = "模型返回了本次请求未声明的工具名。"
+
+#: OpenAI function.name 的上限比部分兼容端点更严格；取 64 可同时覆盖两边。
+_WIRE_TOOL_NAME_MAX_LENGTH: Final = 64
 
 
 def _external(message: str, **detail: object) -> KaryviaError:
     """本模块唯一的抛出形态：坏数据来自外部服务，不是用户也不是 Kernel 的错。"""
     return KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, message, detail=detail)
+
+
+class ToolNameMap:
+    """一次请求内 Kernel 工具名与供应商线格式名称的双向映射。
+
+    Kernel 用点分名称表达命名空间，但 OpenAI-compatible 接口只接受字母、数字、下划线和
+    短横线。Kernel 名称自身不允许短横线，因此 ``.`` → ``-`` 既保留语义又不会与另一个
+    合法 Kernel 名称碰撞。过长名称保留前缀并附稳定摘要；真正的反向恢复始终查表，不根据
+    外部字符串猜测。
+    """
+
+    __slots__ = ("_canonical_to_wire", "_wire_to_callable")
+
+    def __init__(
+        self,
+        canonical_to_wire: Mapping[str, str],
+        wire_to_callable: Mapping[str, str],
+    ) -> None:
+        self._canonical_to_wire = dict(canonical_to_wire)
+        self._wire_to_callable = dict(wire_to_callable)
+
+    @classmethod
+    def for_request(cls, request: ModelRequest) -> ToolNameMap:
+        """覆盖工具声明与历史调用；只有本次声明的工具允许从响应映回 Kernel。"""
+        callable_names = {spec.name for spec in request.tools}
+        ordered_names = list(dict.fromkeys(spec.name for spec in request.tools))
+        ordered_names.extend(
+            name
+            for name in dict.fromkeys(
+                call.name for message in request.messages for call in message.tool_calls
+            )
+            if name not in callable_names
+        )
+
+        canonical_to_wire: dict[str, str] = {}
+        used: dict[str, str] = {}
+        for canonical in ordered_names:
+            wire = cls._wire_name(canonical, used)
+            canonical_to_wire[canonical] = wire
+            used[wire] = canonical
+        return cls(
+            canonical_to_wire,
+            {
+                canonical_to_wire[name]: name
+                for name in callable_names
+                if name in canonical_to_wire
+            },
+        )
+
+    @staticmethod
+    def _wire_name(canonical: str, used: Mapping[str, str]) -> str:
+        semantic = canonical.replace(".", "-")
+        if len(semantic) <= _WIRE_TOOL_NAME_MAX_LENGTH and semantic not in used:
+            return semantic
+
+        digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+        suffix = f"-{digest}"
+        candidate = f"{semantic[: _WIRE_TOOL_NAME_MAX_LENGTH - len(suffix)]}{suffix}"
+        if candidate not in used or used[candidate] == canonical:
+            return candidate
+
+        # 摘要碰撞极不现实，但线格式名称必须确定地保持唯一，不能靠概率维护调用对应关系。
+        ordinal = 1
+        while True:
+            suffix = f"-{digest}-{ordinal}"
+            candidate = f"{semantic[: _WIRE_TOOL_NAME_MAX_LENGTH - len(suffix)]}{suffix}"
+            if candidate not in used or used[candidate] == canonical:
+                return candidate
+            ordinal += 1
+
+    def encode(self, canonical: str) -> str:
+        """将 Kernel 名称写入请求；缺席表示请求结构没有被完整纳入映射。"""
+        try:
+            return self._canonical_to_wire[canonical]
+        except KeyError as exc:
+            raise KaryviaError(
+                ErrorCode.KERNEL_INVARIANT_VIOLATED,
+                "模型请求中的工具名没有对应的线格式映射。",
+                detail={"name": canonical},
+            ) from exc
+
+    def decode_callable(self, wire: str) -> str:
+        """只接受本次 request.tools 声明过的别名，拒绝模型臆造或调用旧工具。"""
+        try:
+            return self._wire_to_callable[wire]
+        except KeyError as exc:
+            raise _external(_UNKNOWN_WIRE_TOOL, name=wire) from exc
 
 
 def strip_lone_surrogates(text: str) -> str:
@@ -121,7 +218,7 @@ def strip_lone_surrogates(text: str) -> str:
 # ------------------------------------------------------------------------------ 请求编码
 
 
-def _encode_tool_calls(calls: Sequence[ToolCall]) -> list[JsonValue]:
+def _encode_tool_calls(calls: Sequence[ToolCall], tool_names: ToolNameMap) -> list[JsonValue]:
     """assistant 消息上的 `tool_calls`。
 
     `arguments` **始终**是 JSON 对象字符串：契约里它是已解析的 `Mapping`，而线格式要的是
@@ -132,7 +229,7 @@ def _encode_tool_calls(calls: Sequence[ToolCall]) -> list[JsonValue]:
             "id": call.call_id,
             "type": "function",
             "function": {
-                "name": call.name,
+                "name": tool_names.encode(call.name),
                 "arguments": json.dumps(dict(call.arguments), ensure_ascii=False),
             },
         }
@@ -140,7 +237,9 @@ def _encode_tool_calls(calls: Sequence[ToolCall]) -> list[JsonValue]:
     ]
 
 
-def encode_messages(messages: Sequence[ModelMessage]) -> list[JsonValue]:
+def encode_messages(
+    messages: Sequence[ModelMessage], tool_names: ToolNameMap
+) -> list[JsonValue]:
     """把契约消息投影成 OpenAI 线格式（投影可以变，持久化格式不跟着变）。
 
     **带 `tool_calls` 的 assistant 消息 `content` 必须是 `null`**：多个兼容网关会拒绝
@@ -151,7 +250,7 @@ def encode_messages(messages: Sequence[ModelMessage]) -> list[JsonValue]:
         item: dict[str, JsonValue] = {"role": message.role.value}
         if message.role is Role.ASSISTANT and message.tool_calls:
             item["content"] = None
-            item["tool_calls"] = _encode_tool_calls(message.tool_calls)
+            item["tool_calls"] = _encode_tool_calls(message.tool_calls, tool_names)
         else:
             item["content"] = strip_lone_surrogates(message.content)
         if message.tool_call_id is not None:
@@ -160,13 +259,13 @@ def encode_messages(messages: Sequence[ModelMessage]) -> list[JsonValue]:
     return encoded
 
 
-def encode_tools(tools: Sequence[ToolSpec]) -> list[JsonValue]:
+def encode_tools(tools: Sequence[ToolSpec], tool_names: ToolNameMap) -> list[JsonValue]:
     """工具声明。`parameters` 已经是 JSON Schema，原样透传。"""
     return [
         {
             "type": "function",
             "function": {
-                "name": spec.name,
+                "name": tool_names.encode(spec.name),
                 "description": spec.description,
                 "parameters": spec.parameters,
             },
@@ -178,6 +277,7 @@ def encode_tools(tools: Sequence[ToolSpec]) -> list[JsonValue]:
 def build_payload(
     request: ModelRequest,
     *,
+    tool_names: ToolNameMap | None = None,
     max_tokens_field: str = MAX_TOKENS_FIELD,
     supports_temperature: bool = True,
     default_max_output_tokens: int,
@@ -189,9 +289,10 @@ def build_payload(
     `supports_temperature=False` 时 `temperature` 被**省略而不是钳到某个值**：推理模型
     对这个字段直接 400，而替用户挑一个温度是在替它改采样行为。
     """
+    names = tool_names or ToolNameMap.for_request(request)
     payload: dict[str, JsonValue] = {
         "model": request.model_id,
-        "messages": encode_messages(request.messages),
+        "messages": encode_messages(request.messages, names),
     }
     params = request.params
     if params.temperature is not None and supports_temperature:
@@ -205,7 +306,7 @@ def build_payload(
     payload[max_tokens_field] = params.max_output_tokens or default_max_output_tokens
     # 没有工具时两个键都省掉：只发 `tool_choice` 会让若干网关直接 400。
     if request.tools:
-        payload["tools"] = encode_tools(request.tools)
+        payload["tools"] = encode_tools(request.tools, names)
         payload["tool_choice"] = "auto"
     if stream:
         payload["stream"] = True
@@ -313,7 +414,9 @@ def _decode_arguments(text: str) -> Mapping[str, JsonValue]:
     return cast("Mapping[str, JsonValue]", parsed)
 
 
-def _finalize(pending: Sequence[_PendingCall]) -> tuple[tuple[ToolCall, ...], int]:
+def _finalize(
+    pending: Sequence[_PendingCall], tool_names: ToolNameMap
+) -> tuple[tuple[ToolCall, ...], int]:
     """定案：补齐缺失/重复的 `call_id`，解析参数，构造 `ToolCall`。
 
     返回补救次数，由调用方写进 `provider_metadata`——补了什么必须查得到。
@@ -331,7 +434,11 @@ def _finalize(pending: Sequence[_PendingCall]) -> tuple[tuple[ToolCall, ...], in
         seen.add(call_id)
         try:
             calls.append(
-                ToolCall(call_id=call_id, name=item.name, arguments=_decode_arguments(item.arguments))
+                ToolCall(
+                    call_id=call_id,
+                    name=tool_names.decode_callable(item.name),
+                    arguments=_decode_arguments(item.arguments),
+                )
             )
         except KaryviaError as exc:
             if exc.code is ErrorCode.EXTERNAL_MODEL_PROVIDER:
@@ -349,10 +456,11 @@ class ToolCallAccumulator:
     而漏了之后唯一还站得住的相关性就是数组顺序。
     """
 
-    __slots__ = ("_pending",)
+    __slots__ = ("_pending", "_tool_names")
 
-    def __init__(self) -> None:
+    def __init__(self, tool_names: ToolNameMap) -> None:
         self._pending: dict[int, _PendingCall] = {}
+        self._tool_names = tool_names
 
     def absorb(self, deltas: Sequence[JsonValue]) -> None:
         """并入一个分片里的全部 tool_call 增量。"""
@@ -370,10 +478,12 @@ class ToolCallAccumulator:
     def finish(self) -> tuple[tuple[ToolCall, ...], int]:
         """按 `index` 升序定案。返回 `(调用, 补救次数)`。"""
         ordered = [self._pending[key] for key in sorted(self._pending)]
-        return _finalize(ordered)
+        return _finalize(ordered, self._tool_names)
 
 
-def _decode_message_tool_calls(message: Mapping[str, JsonValue]) -> tuple[tuple[ToolCall, ...], int]:
+def _decode_message_tool_calls(
+    message: Mapping[str, JsonValue], tool_names: ToolNameMap
+) -> tuple[tuple[ToolCall, ...], int]:
     raw = message.get("tool_calls")
     if not isinstance(raw, Sequence) or isinstance(raw, str | bytes):
         return (), 0
@@ -383,7 +493,7 @@ def _decode_message_tool_calls(message: Mapping[str, JsonValue]) -> tuple[tuple[
         if isinstance(item, Mapping):
             call.absorb(item)
         pending.append(call)
-    return _finalize(pending)
+    return _finalize(pending, tool_names)
 
 
 def _metadata(body: Mapping[str, JsonValue], repairs: int) -> dict[str, JsonValue]:
@@ -398,7 +508,9 @@ def _metadata(body: Mapping[str, JsonValue], repairs: int) -> dict[str, JsonValu
     return meta
 
 
-def decode_response(body: Mapping[str, JsonValue], *, model_id: str) -> ModelResponse:
+def decode_response(
+    body: Mapping[str, JsonValue], *, model_id: str, tool_names: ToolNameMap
+) -> ModelResponse:
     """非流式响应体 → `ModelResponse`。
 
     **内容过滤是 HTTP 200 上的正常响应**，走 `StopReason.CONTENT_FILTER` 而不是异常
@@ -409,7 +521,7 @@ def decode_response(body: Mapping[str, JsonValue], *, model_id: str) -> ModelRes
         raise _external(_BAD_RESPONSE_SHAPE, field="choices")
     choice = _as_mapping(choices[0], where="choices[0]")
     message = _as_mapping(choice.get("message", {}), where="choices[0].message")
-    tool_calls, repairs = _decode_message_tool_calls(message)
+    tool_calls, repairs = _decode_message_tool_calls(message, tool_names)
     raw_content = message.get("content")
     return ModelResponse(
         model_id=model_id,
@@ -442,10 +554,14 @@ class StreamDecoder:
     而不是「取最后一片的」。
     """
 
-    calls: ToolCallAccumulator = field(default_factory=ToolCallAccumulator)
+    tool_names: ToolNameMap
     finish_reason: str = ""
     usage: TokenUsage = field(default_factory=TokenUsage)
     _meta: dict[str, JsonValue] = field(default_factory=dict)
+    calls: ToolCallAccumulator = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.calls = ToolCallAccumulator(self.tool_names)
 
     def push(self, event: Mapping[str, JsonValue]) -> tuple[ModelChunk, ...]:
         """并入一个 SSE 分片，产出它带来的**文本**增量。

@@ -56,6 +56,7 @@ from karyvia.builtins.model_openai import (
     PROVIDER_NAME,
     SECRET_NAME,
     OpenAIModelProvider,
+    ToolNameMap,
     build_payload,
     decode_response,
     decode_usage,
@@ -82,6 +83,7 @@ from karyvia.contracts import (
     ModelChunk,
     ModelMessage,
     ModelRequest,
+    ModelResponse,
     ProviderId,
     Role,
     SamplingParams,
@@ -182,6 +184,24 @@ def make_request(
     )
 
 
+def make_tool(name: str) -> ToolSpec:
+    return ToolSpec(name=name, description=f"工具 {name}", parameters={"type": "object"})
+
+
+def encode_for(messages: Sequence[ModelMessage]) -> list[JsonValue]:
+    request = make_request(messages=messages)
+    return encode_messages(request.messages, ToolNameMap.for_request(request))
+
+
+def decode_body(body: Mapping[str, JsonValue], *tool_names: str) -> ModelResponse:
+    request = make_request(tools=tuple(make_tool(name) for name in tool_names))
+    return decode_response(
+        body,
+        model_id=MODEL_ID,
+        tool_names=ToolNameMap.for_request(request),
+    )
+
+
 async def collect(
     provider: OpenAIModelProvider,
     request: ModelRequest,
@@ -222,26 +242,27 @@ class TestRequestEncoding:
     def test_assistant_with_tool_calls_sends_null_content(self) -> None:
         """多个兼容网关拒绝「正文与 tool_calls 同时非空」的 assistant 消息。"""
         call = ToolCall(call_id="c1", name="fs.read", arguments={"path": "a.txt"})
-        encoded = encode_messages(
+        encoded = encode_for(
             (ModelMessage(role=Role.ASSISTANT, content="思考中", tool_calls=(call,)),)
         )
         assert encoded[0]["content"] is None
         assert encoded[0]["tool_calls"][0]["id"] == "c1"
+        assert encoded[0]["tool_calls"][0]["function"]["name"] == "fs-read"
 
     def test_tool_call_arguments_are_always_an_object_string(self) -> None:
         """契约里 arguments 是 Mapping，线格式要字符串；空参数的地板值是 "{}"。"""
         call = ToolCall(call_id="c1", name="fs.list")
-        encoded = encode_messages((ModelMessage(role=Role.ASSISTANT, tool_calls=(call,)),))
+        encoded = encode_for((ModelMessage(role=Role.ASSISTANT, tool_calls=(call,)),))
         assert encoded[0]["tool_calls"][0]["function"]["arguments"] == "{}"
 
     def test_tool_messages_carry_their_call_id(self) -> None:
-        encoded = encode_messages(
+        encoded = encode_for(
             (ModelMessage(role=Role.TOOL, content="done", tool_call_id="c1"),)
         )
         assert encoded[0] == {"role": "tool", "content": "done", "tool_call_id": "c1"}
 
     def test_system_and_user_messages_round_trip(self) -> None:
-        encoded = encode_messages(
+        encoded = encode_for(
             (
                 ModelMessage(role=Role.SYSTEM, content="你是助手"),
                 ModelMessage(role=Role.USER, content="你好"),
@@ -263,7 +284,30 @@ class TestRequestEncoding:
         )
         payload = build_payload(make_request(tools=(spec,)), default_max_output_tokens=100)
         assert payload["tool_choice"] == "auto"
+        assert payload["tools"][0]["function"]["name"] == "fs-read"
         assert payload["tools"][0]["function"]["parameters"] == spec.parameters
+
+    def test_tool_names_keep_namespace_meaning_on_the_wire(self) -> None:
+        request = make_request(tools=(make_tool("shell.exec"), make_tool("file.send")))
+        payload = build_payload(request, default_max_output_tokens=100)
+        assert [item["function"]["name"] for item in payload["tools"]] == [
+            "shell-exec",
+            "file-send",
+        ]
+
+    def test_history_and_declarations_use_the_same_wire_name(self) -> None:
+        call = ToolCall(call_id="c1", name="fs.read", arguments={"path": "a.txt"})
+        request = make_request(
+            messages=(
+                ModelMessage(role=Role.ASSISTANT, tool_calls=(call,)),
+                ModelMessage(role=Role.TOOL, content="内容", tool_call_id="c1"),
+                ModelMessage(role=Role.USER, content="继续"),
+            ),
+            tools=(make_tool("fs.read"),),
+        )
+        payload = build_payload(request, default_max_output_tokens=100)
+        assert payload["tools"][0]["function"]["name"] == "fs-read"
+        assert payload["messages"][0]["tool_calls"][0]["function"]["name"] == "fs-read"
 
     def test_max_completion_tokens_replaces_max_tokens(self) -> None:
         """gpt-5、o1/o3/o4 只认后者，发错就是 400。"""
@@ -306,7 +350,7 @@ class TestRequestEncoding:
         Windows 控制台粘贴文本而失败，且错误信息指不到原因。"""
         dirty = "你好\ud800世界"
         assert strip_lone_surrogates(dirty) == "你好世界"
-        encoded = encode_messages((ModelMessage(role=Role.USER, content=dirty),))
+        encoded = encode_for((ModelMessage(role=Role.USER, content=dirty),))
         assert encoded[0]["content"].encode("utf-8")
 
     def test_clean_text_passes_through_unchanged(self) -> None:
@@ -319,7 +363,7 @@ class TestRequestEncoding:
 
 class TestResponseDecoding:
     def test_plain_text_response(self) -> None:
-        response = decode_response(chat_body(content="你好"), model_id=MODEL_ID)
+        response = decode_body(chat_body(content="你好"))
         assert response.content == "你好"
         assert response.stop_reason is StopReason.END_TURN
         assert response.is_complete_answer
@@ -338,20 +382,19 @@ class TestResponseDecoding:
         self, finish_reason: str, expected: StopReason
     ) -> None:
         calls: Sequence[JsonValue] = (
-            [{"id": "c1", "function": {"name": "fs.read", "arguments": "{}"}}]
+            [{"id": "c1", "function": {"name": "fs-read", "arguments": "{}"}}]
             if expected is StopReason.TOOL_CALLS
             else []
         )
-        response = decode_response(
-            chat_body(finish_reason=finish_reason, tool_calls=calls), model_id=MODEL_ID
+        response = decode_body(
+            chat_body(finish_reason=finish_reason, tool_calls=calls),
+            *(("fs.read",) if expected is StopReason.TOOL_CALLS else ()),
         )
         assert response.stop_reason is expected
 
     def test_content_filter_is_a_normal_response_not_an_exception(self) -> None:
         """过滤掉的输出不是完整答案，但它也不是一次失败的调用。"""
-        response = decode_response(
-            chat_body(content="", finish_reason="content_filter"), model_id=MODEL_ID
-        )
+        response = decode_body(chat_body(content="", finish_reason="content_filter"))
         assert response.stop_reason is StopReason.CONTENT_FILTER
         assert not response.is_complete_answer
 
@@ -359,11 +402,11 @@ class TestResponseDecoding:
         body = chat_body(
             finish_reason="tool_calls",
             tool_calls=[
-                {"id": "c1", "function": {"name": "fs.read", "arguments": '{"path": "a"}'}},
-                {"id": "c2", "function": {"name": "fs.list", "arguments": "{}"}},
+                {"id": "c1", "function": {"name": "fs-read", "arguments": '{"path": "a"}'}},
+                {"id": "c2", "function": {"name": "fs-list", "arguments": "{}"}},
             ],
         )
-        response = decode_response(body, model_id=MODEL_ID)
+        response = decode_body(body, "fs.read", "fs.list")
         assert [call.call_id for call in response.tool_calls] == ["c1", "c2"]
         assert response.tool_calls[0].arguments == {"path": "a"}
 
@@ -373,20 +416,20 @@ class TestResponseDecoding:
         body = chat_body(
             finish_reason="tool_calls",
             tool_calls=[
-                {"id": "same", "function": {"name": "fs.read", "arguments": "{}"}},
-                {"id": "same", "function": {"name": "fs.list", "arguments": "{}"}},
+                {"id": "same", "function": {"name": "fs-read", "arguments": "{}"}},
+                {"id": "same", "function": {"name": "fs-list", "arguments": "{}"}},
             ],
         )
-        response = decode_response(body, model_id=MODEL_ID)
+        response = decode_body(body, "fs.read", "fs.list")
         assert len({call.call_id for call in response.tool_calls}) == 2
         assert response.provider_metadata["repaired_tool_call_ids"] == 1
 
     def test_missing_call_id_is_repaired(self) -> None:
         body = chat_body(
             finish_reason="tool_calls",
-            tool_calls=[{"function": {"name": "fs.read", "arguments": "{}"}}],
+            tool_calls=[{"function": {"name": "fs-read", "arguments": "{}"}}],
         )
-        response = decode_response(body, model_id=MODEL_ID)
+        response = decode_body(body, "fs.read")
         assert response.tool_calls[0].call_id
         assert response.provider_metadata["repaired_tool_call_ids"] == 1
 
@@ -397,17 +440,27 @@ class TestResponseDecoding:
             tool_calls=[{"id": "c1", "function": {"name": "FS-Read!", "arguments": "{}"}}],
         )
         with pytest.raises(KaryviaError) as caught:
-            decode_response(body, model_id=MODEL_ID)
+            decode_body(body, "fs.read")
         assert caught.value.category is ErrorCategory.EXTERNAL_SERVICE
+
+    def test_an_undeclared_but_well_formed_wire_tool_is_rejected(self) -> None:
+        body = chat_body(
+            finish_reason="tool_calls",
+            tool_calls=[{"id": "c1", "function": {"name": "shell-exec", "arguments": "{}"}}],
+        )
+        with pytest.raises(KaryviaError) as caught:
+            decode_body(body, "fs.read")
+        assert caught.value.code is ErrorCode.EXTERNAL_MODEL_PROVIDER
+        assert caught.value.detail["name"] == "shell-exec"
 
     def test_unparsable_arguments_fail_loudly(self) -> None:
         """`json_repair` 是仓库依赖，但用它意味着拿一份猜出来的参数去产生真实副作用。"""
         body = chat_body(
             finish_reason="tool_calls",
-            tool_calls=[{"id": "c1", "function": {"name": "fs.read", "arguments": "{not json"}}],
+            tool_calls=[{"id": "c1", "function": {"name": "fs-read", "arguments": "{not json"}}],
         )
         with pytest.raises(KaryviaError) as caught:
-            decode_response(body, model_id=MODEL_ID)
+            decode_body(body, "fs.read")
         assert caught.value.code is ErrorCode.EXTERNAL_MODEL_PROVIDER
 
     @pytest.mark.parametrize(
@@ -433,13 +486,13 @@ class TestResponseDecoding:
 
     def test_a_malformed_body_is_an_external_error(self) -> None:
         with pytest.raises(KaryviaError) as caught:
-            decode_response({"choices": []}, model_id=MODEL_ID)
+            decode_body({"choices": []})
         assert caught.value.category is ErrorCategory.EXTERNAL_SERVICE
 
     def test_provider_metadata_only_carries_normalized_json(self) -> None:
         body = chat_body()
         body["system_fingerprint"] = "fp_1"
-        response = decode_response(body, model_id=MODEL_ID)
+        response = decode_body(body)
         assert response.provider_metadata["id"] == "chatcmpl-1"
         assert response.provider_metadata["system_fingerprint"] == "fp_1"
 
@@ -467,8 +520,8 @@ class TestStreaming:
         stream = sse(
             [
                 {"choices": [{"delta": {"tool_calls": [
-                    {"index": 0, "id": "c1", "function": {"name": "fs.read", "arguments": ""}},
-                    {"index": 1, "id": "c2", "function": {"name": "fs.list", "arguments": ""}},
+                    {"index": 0, "id": "c1", "function": {"name": "fs-read", "arguments": ""}},
+                    {"index": 1, "id": "c2", "function": {"name": "fs-list", "arguments": ""}},
                 ]}}]},
                 {"choices": [{"delta": {"tool_calls": [
                     {"index": 0, "function": {"arguments": '{"pa'}},
@@ -481,7 +534,10 @@ class TestStreaming:
             ]
         )
         provider = make_provider(lambda _: httpx.Response(200, text=stream))
-        chunks = await collect(provider, make_request(stream=True))
+        chunks = await collect(
+            provider,
+            make_request(stream=True, tools=(make_tool("fs.read"), make_tool("fs.list"))),
+        )
         calls = [c.tool_call for c in chunks if c.kind is ChunkKind.TOOL_CALL]
         assert [call.call_id for call in calls] == ["c1", "c2"]
         assert calls[0].name == "fs.read"
@@ -494,7 +550,7 @@ class TestStreaming:
         stream = sse(
             [
                 {"choices": [{"delta": {"tool_calls": [
-                    {"index": 0, "id": "c1", "function": {"name": "fs.read", "arguments": '{"a": 1}'}},
+                    {"index": 0, "id": "c1", "function": {"name": "fs-read", "arguments": '{"a": 1}'}},
                 ]}}]},
                 {"choices": [{"delta": {"tool_calls": [
                     {"index": 0, "function": {"arguments": ""}},
@@ -503,7 +559,7 @@ class TestStreaming:
             ]
         )
         provider = make_provider(lambda _: httpx.Response(200, text=stream))
-        chunks = await collect(provider, make_request(stream=True))
+        chunks = await collect(provider, make_request(stream=True, tools=(make_tool("fs.read"),)))
         call = next(c.tool_call for c in chunks if c.kind is ChunkKind.TOOL_CALL)
         assert call.arguments == {"a": 1}
 
@@ -512,14 +568,17 @@ class TestStreaming:
         stream = sse(
             [
                 {"choices": [{"delta": {"tool_calls": [
-                    {"id": "c1", "function": {"name": "fs.read", "arguments": "{}"}},
-                    {"id": "c2", "function": {"name": "fs.list", "arguments": "{}"}},
+                    {"id": "c1", "function": {"name": "fs-read", "arguments": "{}"}},
+                    {"id": "c2", "function": {"name": "fs-list", "arguments": "{}"}},
                 ]}}]},
                 {"choices": [{"delta": {}, "finish_reason": "tool_calls"}]},
             ]
         )
         provider = make_provider(lambda _: httpx.Response(200, text=stream))
-        chunks = await collect(provider, make_request(stream=True))
+        chunks = await collect(
+            provider,
+            make_request(stream=True, tools=(make_tool("fs.read"), make_tool("fs.list"))),
+        )
         assert [c.tool_call.call_id for c in chunks if c.kind is ChunkKind.TOOL_CALL] == ["c1", "c2"]
 
     async def test_the_trailing_usage_chunk_has_no_choices(self) -> None:

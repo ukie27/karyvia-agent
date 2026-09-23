@@ -54,6 +54,7 @@ from .settings import CAPABILITY_NAME, SECRET_NAME, OpenAISettings, resolve_sett
 from .wire import (
     SSE_DONE,
     StreamDecoder,
+    ToolNameMap,
     build_payload,
     decode_response,
     parse_sse_data,
@@ -172,10 +173,13 @@ class OpenAIModelProvider:
         budget = request.timeout_ms or self._settings.request_timeout_ms
         return httpx.Timeout(budget / 1000)
 
-    def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, JsonValue]:
+    def _payload(
+        self, request: ModelRequest, tool_names: ToolNameMap, *, stream: bool
+    ) -> dict[str, JsonValue]:
         entry = self._settings.entry_for(request.model_id)
         return build_payload(
             request,
+            tool_names=tool_names,
             max_tokens_field=entry.max_tokens_field,
             supports_temperature=entry.supports_temperature,
             default_max_output_tokens=entry.max_output_tokens,
@@ -202,7 +206,8 @@ class OpenAIModelProvider:
         **取消语义**：进入网络调用前检查一次；调用期间被取消时不返回半份响应。
         """
         cancel.raise_if_requested()
-        payload = self._payload(request, stream=False)
+        tool_names = ToolNameMap.for_request(request)
+        payload = self._payload(request, tool_names, stream=False)
         client = self._ensure_client()
         try:
             response = await client.post(
@@ -222,7 +227,7 @@ class OpenAIModelProvider:
         body = _safe_json(response.text)
         if not isinstance(body, Mapping):
             raise KaryviaError(ErrorCode.EXTERNAL_MODEL_PROVIDER, _BAD_JSON_BODY)
-        return decode_response(body, model_id=request.model_id)
+        return decode_response(body, model_id=request.model_id, tool_names=tool_names)
 
     async def stream(
         self, request: ModelRequest, cancel: CancelSignal
@@ -243,9 +248,10 @@ class OpenAIModelProvider:
             )
         cancel.raise_if_requested()
         emitted = False
-        decoder = StreamDecoder()
+        tool_names = ToolNameMap.for_request(request)
+        decoder = StreamDecoder(tool_names)
         try:
-            async for chunk in self._iter_stream(request, cancel, decoder):
+            async for chunk in self._iter_stream(request, cancel, decoder, tool_names):
                 emitted = True
                 yield chunk
         except KaryviaError:
@@ -258,10 +264,14 @@ class OpenAIModelProvider:
             yield chunk
 
     async def _iter_stream(
-        self, request: ModelRequest, cancel: CancelSignal, decoder: StreamDecoder
+        self,
+        request: ModelRequest,
+        cancel: CancelSignal,
+        decoder: StreamDecoder,
+        tool_names: ToolNameMap,
     ) -> AsyncIterator[ModelChunk]:
         """SSE 读取循环。把 httpx 异常与空闲超时都折成 `KaryviaError`。"""
-        payload = self._payload(request, stream=True)
+        payload = self._payload(request, tool_names, stream=True)
         client = self._ensure_client()
         idle = self._settings.stream_idle_timeout_ms / 1000
         try:

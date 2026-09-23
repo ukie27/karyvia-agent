@@ -20,6 +20,7 @@
 | 查层次、主链路与代码所有权 | [`project/architecture-map.md`](./project/architecture-map.md) |
 | 查某类改动需要修改哪些位置 | [`project/change-guide.md`](./project/change-guide.md) |
 | 判断稳定边界与未来设计闸门 | [`project/evolution-boundaries.md`](./project/evolution-boundaries.md) |
+| 查看后续开发计划 | [`project/development-plan.md`](./project/development-plan.md) |
 | 参考项目的阅读规范 | [`references/README.md`](./references/README.md) |
 | 写一个插件 | [`plugin-development.md`](./plugin-development.md) |
 | 理解插件信任边界 | [`plugin-development.md`](./plugin-development.md#6-资源服务与信任边界) |
