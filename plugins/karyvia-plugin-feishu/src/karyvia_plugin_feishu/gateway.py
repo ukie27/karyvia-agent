@@ -49,7 +49,7 @@ from .normalize import RawInbound
 
 __all__ = ["MISSING_SDK_FIX", "FeishuGateway", "event_to_raw"]
 
-MISSING_SDK_FIX: Final = "pip install 'karyvia-plugin-feishu[gateway]'"
+MISSING_SDK_FIX: Final = "karyvia plugins install <插件来源>（不要使用 --no-deps）"
 
 _MISSING_SDK: Final = "飞书 Channel 需要 lark-oapi，但当前环境里没有装。"
 _CONNECT_FAILED: Final = "无法连接飞书 WebSocket 长连接。"

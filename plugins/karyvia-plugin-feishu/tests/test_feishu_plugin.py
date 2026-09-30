@@ -398,7 +398,7 @@ class TestSdkBoundary:
             _import_lark("feishu")
         assert excinfo.value.code is ErrorCode.EXTERNAL_CHANNEL
         assert excinfo.value.detail["fix"] == MISSING_SDK_FIX
-        assert "pip install" in MISSING_SDK_FIX
+        assert "karyvia plugins install" in MISSING_SDK_FIX
 
     async def test_closing_a_gateway_that_never_connected_is_safe(self) -> None:
         gateway = FeishuGateway(

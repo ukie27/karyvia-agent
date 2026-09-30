@@ -28,12 +28,18 @@ import 兄弟模块，依赖规则 `R4` 就成了空话。官方插件与第三�
 | `karyvia-plugin-memory/` | `memory` | `MEMORY:jsonl` + `CONTEXT:memory` + 三条 `TOOL:memory.*` + `COMMAND:memory` —— 跨 Session 的长期记忆（JSONL 存储 + 关键词召回，零新依赖） |  |
 | `karyvia-plugin-cron/` | `cron` | `CHANNEL:cron` + 三条 `TOOL:cron.*` + `COMMAND:cron` —— 定时任务：到点自己开一条 turn，结果回到创建它的那个会话（自写 cron 解析，零新依赖） |  |
 
-**它们必须真的装进环境才会被发现**（entry point 没有第二条路）：
+**它们必须真的装进环境才会被发现**（entry point 没有第二条路）。普通安装会自动解析插件
+依赖；飞书插件需要这样安装：
+
+```bash
+karyvia plugins install plugins/karyvia-plugin-feishu
+```
+
+如果开发环境已经自行提供平台依赖，其他插件可以按需使用 `--no-deps`：
 
 ```bash
 pip install --no-deps -e plugins/karyvia-plugin-openai-api
 pip install --no-deps -e plugins/karyvia-plugin-anthropic
-pip install --no-deps -e plugins/karyvia-plugin-feishu
 pip install --no-deps -e plugins/karyvia-plugin-web
 pip install --no-deps -e plugins/karyvia-plugin-mcp
 pip install --no-deps -e plugins/karyvia-plugin-memory

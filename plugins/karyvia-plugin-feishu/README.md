@@ -6,9 +6,17 @@ Karyvia 官方插件：**飞书 / Lark Channel**。收消息、跑 turn、用 Ca
 ## 安装与启用
 
 ```bash
-pip install 'karyvia-plugin-feishu[gateway]'   # gateway extra 带上 lark-oapi
+# 从已发布的插件包安装：会自动安装 lark-oapi。
+karyvia plugins install karyvia-plugin-feishu  # 自动安装 lark-oapi
 karyvia plugins enable feishu
 karyvia serve
+```
+
+如果是在 Karyvia 源码仓库中安装本地插件，命令改用本地路径。安装器会校验当前虚拟环境中的
+宿主 `karyvia`，并自动安装插件自己的运行依赖：
+
+```bash
+karyvia plugins install ./plugins/karyvia-plugin-feishu
 ```
 
 装上不等于启用（`plugins.enabled` 是唯一闸门），改完配置要重启实例。
@@ -129,10 +137,11 @@ Secret 两条：`app_id`、`app_secret`，缺任一即 `CONFIG_INVALID` 并指�
 ## 开发
 
 ```bash
+# 运行插件测试时可以跳过平台 SDK；生产安装不要使用 --no-deps。
 pip install --no-deps -e plugins/karyvia-plugin-feishu
 python -m pytest plugins/karyvia-plugin-feishu -q
 ```
 
-**绝大多数用例不需要装 `lark-oapi`**：`gateway.py` 与 `client.py` 是仅有的两个接触 SDK 的
-模块（有一条 AST 用例钉住这件事），其余全是纯函数或对 Protocol 编程。`tests/conftest.py`
-有一条 autouse 的网络闸门盯着「一个 socket 都不开」。
+`lark-oapi` 是插件的必需运行依赖，但插件仍保持惰性导入：`gateway.py` 与 `client.py` 是仅有
+的两个接触 SDK 的模块（有一条 AST 用例钉住这件事），其余全是纯函数或对 Protocol 编程。
+测试使用假平台并有一条 autouse 网络闸门，验证「一个 socket 都不开」。

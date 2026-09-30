@@ -160,9 +160,11 @@ my-plugin = "karyvia_plugin_my_plugin:MANIFEST"
 不产生任何导入开销」的实现方式，不是一条要人遵守的纪律。
 
 Runtime 只读取由 `karyvia` 写入全局安装目录的 entry point 记录，不扫描整个 Python 环境，也不从
-实例配置读取代码路径。开发中的本地包同样交给 `karyvia plugins install <本地路径>`；修改后用
-`karyvia plugins update <id>` 重新构建。实例的 `plugins/` 目录只保存状态，不保存代码。默认安装
-会记录解析出的全部 Python 发行包版本，并拒绝与其他已安装插件形成同名包多版本；如果使用
+实例配置读取代码路径。已发布的插件包交给 `karyvia plugins install <包名>`；开发中的本地包
+交给 `karyvia plugins install <本地路径>`，修改后用 `karyvia plugins update <id>` 重新构建。
+安装器会验证当前 Python 环境提供的宿主 `karyvia`，不要求它已经发布到包索引；插件自己的
+第三方依赖仍会自动安装到插件根。实例的 `plugins/` 目录只保存状态，不保存代码。默认安装
+会记录插件根中解析出的第三方 Python 发行包版本，并拒绝与其他已安装插件形成同名包多版本；如果使用
 `--no-deps`，则明确表示依赖由运行 `karyvia` 的 Python 环境统一提供。
 
 manifest 的 `dependencies` 表示其他插件的逻辑依赖。依赖必须先全局安装；被其他插件依赖的

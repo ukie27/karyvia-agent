@@ -1,7 +1,7 @@
 """全局插件安装目录与实例登记。
 
 职责：定义 ``~/.karyvia/`` 下由插件管理器拥有的路径，持久化已安装插件、其逻辑依赖
-与已解析 Python 发行包集合，并在全局插件变更前确认没有实例正在运行。
+与插件根中已解析的 Python 发行包集合，并在全局插件变更前确认没有实例正在运行。
 不负责：解析插件 manifest、决定实例启用哪些插件、执行插件代码。
 
 全局数据直接放在 Karyvia home 下，不增加一层 ``global/``。插件代码与实例状态分开：
@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -21,10 +22,13 @@ import tempfile
 from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from importlib.metadata import distributions
+from importlib.metadata import PackageNotFoundError, distributions
+from importlib.metadata import distribution as find_distribution
 from pathlib import Path
 from typing import Final, cast
 
+from packaging.markers import default_environment
+from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 
 from karyvia.builtins.registry import BUILTIN_MANIFESTS
@@ -52,6 +56,8 @@ __all__ = [
 _HOME_DIRNAME: Final = ".karyvia"
 _CATALOG_VERSION: Final = 2
 _BUILTIN_PLUGIN_IDS: Final = frozenset(manifest.id for manifest in BUILTIN_MANIFESTS)
+_HOST_DISTRIBUTION: Final = canonicalize_name("karyvia")
+_EXTRAS_SUFFIX: Final = re.compile(r"\[([^\]]+)\]$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,9 +228,10 @@ class GlobalPluginHome:
 
         这里只加入字符串路径，不执行 ``.pth``，也不导入模块；未启用插件仍然没有代码
         执行。真正读取 manifest 仍受 ``plugins.enabled`` 控制。其他后端以后由各自的执行桥
-        接入，不能把它们误当成 Python 路径。默认安装记录了每个根中的完整发行包集合，并在
-        发布前拒绝跨根版本冲突，因此这里的顺序不再决定第三方依赖版本。显式 ``--no-deps``
-        的插件只含自身发行包，其余依赖由启动 ``karyvia`` 的 Python 环境负责。
+        接入，不能把它们误当成 Python 路径。默认安装记录了每个根中的第三方发行包集合，并在
+        发布前拒绝跨根版本冲突，因此这里的顺序不再决定第三方依赖版本。宿主 ``karyvia``
+        由运行它的 Python 环境提供，不复制进每个插件根；显式 ``--no-deps`` 的插件则还要求
+        其余依赖也由该环境负责。
         """
         rows = tuple(item for item in self.catalog() if item.backend == "python")
         for item in reversed(rows):
@@ -443,13 +450,31 @@ def _run_pip(
     command = _python_installer_command(target)
     if upgrade:
         command.append("--upgrade")
-    if not with_dependencies:
-        command.append("--no-deps")
+    # The host distribution is already supplied by the interpreter running Karyvia. Install the
+    # plugin first without dependencies, then resolve its non-host requirements into the plugin
+    # root. A single `uv install source` cannot express that one dependency is host-provided.
+    command.append("--no-deps")
     command.append(source)
+    _run_installer(command, target, phase="plugin")
+    if not with_dependencies:
+        return
+
+    requirements = _stage_requirements(target, extras=_source_extras(source))
+    if not requirements:
+        return
+    dependency_command = _python_installer_command(target)
+    if upgrade:
+        dependency_command.append("--upgrade")
+    dependency_command.extend(requirements)
+    _run_installer(dependency_command, target, phase="dependencies")
+
+
+def _run_installer(command: Sequence[str], target: Path, *, phase: str) -> None:
+    """Run one installer phase using the cache owned by the global plugin home."""
     installer_env = dict(os.environ)
     installer_env.setdefault("UV_CACHE_DIR", str(target.parent.parent / "plugin-cache"))
     result = subprocess.run(  # noqa: S603
-        command,
+        list(command),
         check=False,
         capture_output=True,
         text=True,
@@ -459,7 +484,100 @@ def _run_pip(
         raise KaryviaError(
             ErrorCode.PLUGIN_LOAD_FAILED,
             "插件安装失败。",
-            detail={"installer": "python", "exit_code": result.returncode},
+            detail={
+                "installer": "python",
+                "phase": phase,
+                "exit_code": result.returncode,
+            },
+        )
+
+
+def _stage_requirements(stage: Path, *, extras: Sequence[str] = ()) -> tuple[str, ...]:
+    """Return active plugin requirements after validating the host distribution.
+
+    The first installer phase places only the plugin distribution in ``stage``. Its metadata is
+    therefore the authoritative source for the second phase. ``karyvia`` is deliberately omitted
+    from that phase: it is the host package, not a dependency to duplicate in every plugin root.
+    """
+    candidates = tuple(
+        distribution
+        for distribution in distributions(path=[str(stage)])
+        if any(point.group == ENTRY_POINT_GROUP for point in distribution.entry_points)
+    )
+    if len(candidates) != 1:
+        raise KaryviaError(
+            ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED,
+            "安装结果无法唯一确定插件发行包。",
+            detail={"entry_points": len(candidates)},
+        )
+
+    requirements: list[str] = []
+    for raw in candidates[0].requires or ():
+        try:
+            requirement = Requirement(raw)
+        except InvalidRequirement as exc:
+            raise KaryviaError(
+                ErrorCode.PLUGIN_MANIFEST_UNSUPPORTED,
+                "插件发行包包含非法的 Python 依赖声明。",
+                detail={"requirement": raw},
+            ) from exc
+        if not _requirement_is_active(requirement, extras):
+            continue
+        if canonicalize_name(requirement.name) == _HOST_DISTRIBUTION:
+            _validate_host_requirement(requirement)
+        else:
+            requirements.append(_requirement_without_marker(requirement))
+    return tuple(requirements)
+
+
+def _source_extras(source: str) -> tuple[str, ...]:
+    """Extract requested extras from a package reference or a local path with ``[extra]``."""
+    try:
+        return tuple(sorted(Requirement(source).extras))
+    except InvalidRequirement:
+        match = _EXTRAS_SUFFIX.search(source)
+        if match is None:
+            return ()
+        return tuple(sorted(item.strip() for item in match.group(1).split(",") if item.strip()))
+
+
+def _requirement_is_active(requirement: Requirement, extras: Sequence[str]) -> bool:
+    if requirement.marker is None:
+        return True
+    if not extras:
+        return requirement.marker.evaluate()
+    environment = cast("dict[str, str | frozenset[str]]", default_environment())
+    return any(
+        requirement.marker.evaluate({**environment, "extra": extra}) for extra in extras
+    )
+
+
+def _requirement_without_marker(requirement: Requirement) -> str:
+    """Render an active requirement without its already-evaluated environment marker."""
+    extras = f"[{','.join(sorted(requirement.extras))}]" if requirement.extras else ""
+    reference = f" @ {requirement.url}" if requirement.url else ""
+    return f"{requirement.name}{extras}{requirement.specifier}{reference}"
+
+
+def _validate_host_requirement(requirement: Requirement) -> None:
+    """Ensure the active Karyvia distribution satisfies a plugin's host requirement."""
+    try:
+        host = find_distribution(_HOST_DISTRIBUTION)
+    except PackageNotFoundError as exc:
+        raise KaryviaError(
+            ErrorCode.PLUGIN_LOAD_FAILED,
+            "插件依赖当前 Karyvia 宿主，但运行安装器的 Python 环境没有提供它。",
+            detail={"distribution": _HOST_DISTRIBUTION, "requirement": str(requirement)},
+        ) from exc
+    if not requirement.specifier.contains(host.version, prereleases=True):
+        raise KaryviaError(
+            ErrorCode.PLUGIN_LOAD_FAILED,
+            "当前 Karyvia 版本不满足插件的宿主依赖。",
+            detail={
+                "distribution": _HOST_DISTRIBUTION,
+                "requirement": str(requirement),
+                "installed_version": host.version,
+            },
         )
 
 

@@ -41,6 +41,21 @@ def _distribution(version: str = "1.2.3") -> SimpleNamespace:
     )
 
 
+def _python_distribution(*requirements: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        metadata={"Name": "karyvia-plugin-alpha"},
+        version="1.2.3",
+        requires=list(requirements),
+        entry_points=[
+            EntryPoint(
+                name="alpha",
+                value="alpha_plugin:MANIFEST",
+                group="karyvia.plugins",
+            )
+        ],
+    )
+
+
 def test_layout_lives_directly_under_karyvia_home(tmp_path: Path) -> None:
     home = subject.GlobalPluginHome.resolve(home=tmp_path, env={})
 
@@ -105,6 +120,122 @@ def test_install_and_uninstall_are_owned_by_the_global_manager(
 
     assert home.catalog() == ()
     assert not home.package_dir("alpha").exists()
+
+
+def test_host_distribution_is_validated_but_not_installed_into_plugin_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plugin = _python_distribution("karyvia>=0.3.0", "lark-oapi>=1.5.0,<2.0.0")
+    monkeypatch.setattr(subject, "distributions", lambda **_: (plugin,))
+    monkeypatch.setattr(
+        subject, "find_distribution", lambda name: SimpleNamespace(version="0.3.0")
+    )
+
+    assert subject._stage_requirements(tmp_path) == ("lark-oapi<2.0.0,>=1.5.0",)
+
+
+def test_requested_package_extra_is_preserved_for_dependency_installation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plugin = _python_distribution('mcp>=1.9.0; extra == "client"')
+    monkeypatch.setattr(subject, "distributions", lambda **_: (plugin,))
+
+    assert subject._stage_requirements(tmp_path, extras=("client",)) == (
+        "mcp>=1.9.0",
+    )
+
+
+def test_dependency_install_runs_after_plugin_build_and_excludes_host(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plugin = _python_distribution("karyvia>=0.3.0", "lark-oapi>=1.5.0,<2.0.0")
+    commands: list[list[str]] = []
+    monkeypatch.setattr(subject, "distributions", lambda **_: (plugin,))
+    monkeypatch.setattr(
+        subject, "find_distribution", lambda name: SimpleNamespace(version="0.3.0")
+    )
+    monkeypatch.setattr(
+        subject,
+        "_python_installer_command",
+        lambda target: ["uv", "pip", "install", "--target", str(target)],
+    )
+    monkeypatch.setattr(
+        subject.subprocess,
+        "run",
+        lambda command, **kwargs: commands.append(list(command))
+        or SimpleNamespace(returncode=0),
+    )
+
+    subject._run_pip("demo-source", tmp_path, upgrade=True, with_dependencies=True)
+
+    assert commands == [
+        [
+            "uv",
+            "pip",
+            "install",
+            "--target",
+            str(tmp_path),
+            "--upgrade",
+            "--no-deps",
+            "demo-source",
+        ],
+        [
+            "uv",
+            "pip",
+            "install",
+            "--target",
+            str(tmp_path),
+            "--upgrade",
+            "lark-oapi<2.0.0,>=1.5.0",
+        ],
+    ]
+
+
+def test_no_deps_keeps_the_single_plugin_install_phase(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commands: list[list[str]] = []
+    monkeypatch.setattr(
+        subject,
+        "_python_installer_command",
+        lambda target: ["uv", "pip", "install", "--target", str(target)],
+    )
+    monkeypatch.setattr(
+        subject.subprocess,
+        "run",
+        lambda command, **kwargs: commands.append(list(command))
+        or SimpleNamespace(returncode=0),
+    )
+
+    subject._run_pip("demo-source", tmp_path, upgrade=False, with_dependencies=False)
+
+    assert commands == [
+        [
+            "uv",
+            "pip",
+            "install",
+            "--target",
+            str(tmp_path),
+            "--no-deps",
+            "demo-source",
+        ]
+    ]
+
+
+def test_host_distribution_version_must_satisfy_plugin_requirement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    plugin = _python_distribution("karyvia>=0.3.0")
+    monkeypatch.setattr(subject, "distributions", lambda **_: (plugin,))
+    monkeypatch.setattr(
+        subject, "find_distribution", lambda name: SimpleNamespace(version="0.2.0")
+    )
+
+    with pytest.raises(KaryviaError) as caught:
+        subject._stage_requirements(tmp_path)
+
+    assert caught.value.code is ErrorCode.PLUGIN_LOAD_FAILED
+    assert caught.value.detail["installed_version"] == "0.2.0"
 
 
 def test_mutation_rejects_a_running_registered_instance(tmp_path: Path) -> None:

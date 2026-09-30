@@ -147,12 +147,25 @@ karyvia plugins enable web    # 写进 config.json 的 plugins.enabled（下次�
 karyvia capabilities          # 生效 / 被覆盖 / 已禁用 / 冲突，四段都印
 ```
 
-七个官方插件（`--no-deps` 是刻意的，平台 SDK 由你按需另装）：
+官方插件可以由 Karyvia 自动解析依赖；只有在明确由当前 Python 环境自行提供依赖时才使用
+`--no-deps`。从已发布的插件包安装飞书时，应使用普通安装，让安装器一并安装 `lark-oapi`：
+
+```bash
+karyvia plugins install karyvia-plugin-feishu
+```
+
+如果是在本仓库中安装本地源码，改用本地路径即可。安装器会使用当前虚拟环境中的宿主
+`karyvia`，并自动安装插件自己的运行依赖：
+
+```bash
+karyvia plugins install ./plugins/karyvia-plugin-feishu
+```
+
+其余暂不自动安装平台 SDK 的插件可以使用：
 
 ```bash
 karyvia plugins install --no-deps plugins/karyvia-plugin-openai-api
 karyvia plugins install --no-deps plugins/karyvia-plugin-anthropic
-karyvia plugins install --no-deps plugins/karyvia-plugin-feishu
 karyvia plugins install --no-deps plugins/karyvia-plugin-web
 karyvia plugins install --no-deps plugins/karyvia-plugin-mcp
 karyvia plugins install --no-deps plugins/karyvia-plugin-memory
